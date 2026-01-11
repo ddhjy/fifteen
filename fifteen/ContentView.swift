@@ -180,6 +180,10 @@ struct ContentView: View {
     
     // MARK: - Actions
     private func clearText() {
+        // 轻触觉反馈
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        impactFeedback.impactOccurred()
+        
         withAnimation(.easeOut(duration: 0.25)) {
             inputText = ""
         }
@@ -188,9 +192,12 @@ struct ContentView: View {
     private func copyAndClear() {
         guard !inputText.isEmpty else { return }
         
+        // 轻触觉反馈
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        impactFeedback.impactOccurred()
+        
         // 复制到剪贴板
         UIPasteboard.general.string = inputText
-        let copiedCount = inputText.count
         
         // 清空输入
         withAnimation(.easeOut(duration: 0.25)) {
