@@ -84,10 +84,12 @@ struct ContentView: View {
     }
     
     private var statusText: String {
-        if inputText.isEmpty {
+        if isCopied {
+            return "已复制 \(characterCount) 字符"
+        } else if inputText.isEmpty {
             return "等待输入"
         } else {
-            return "已复制 \(characterCount) 字符"
+            return "\(characterCount) 字符"
         }
     }
     
@@ -105,8 +107,8 @@ struct ContentView: View {
                 .font(.system(size: 17, weight: .regular, design: .default))
                 .scrollContentBackground(.hidden)
                 .padding(16)
-                .onChange(of: inputText) { _, newValue in
-                    copyToClipboard(newValue)
+                .onChange(of: inputText) { _, _ in
+                    isCopied = false
                 }
             
             // 占位符文字
@@ -125,7 +127,7 @@ struct ContentView: View {
     
     // MARK: - 底部操作栏
     private var bottomBar: some View {
-        HStack {
+        HStack(spacing: 12) {
             Spacer()
             
             // 清空按钮 - 极简设计
@@ -147,6 +149,32 @@ struct ContentView: View {
             .disabled(inputText.isEmpty)
             .opacity(inputText.isEmpty ? 0.5 : 1.0)
             .animation(.easeInOut(duration: 0.2), value: inputText.isEmpty)
+            
+            // 复制按钮
+            Button(action: copyAndClear) {
+                HStack(spacing: 6) {
+                    Image(systemName: "doc.on.doc.fill")
+                        .font(.system(size: 14, weight: .medium))
+                    Text("复制")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(
+                    Capsule()
+                        .fill(accentGradient)
+                        .opacity(inputText.isEmpty ? 0 : 1)
+                )
+                .background(
+                    Capsule()
+                        .fill(Color(.systemGray4))
+                        .opacity(inputText.isEmpty ? 1 : 0)
+                )
+            }
+            .disabled(inputText.isEmpty)
+            .opacity(inputText.isEmpty ? 0.5 : 1.0)
+            .animation(.easeInOut(duration: 0.2), value: inputText.isEmpty)
         }
     }
     
@@ -157,15 +185,27 @@ struct ContentView: View {
         }
     }
     
-    private func copyToClipboard(_ text: String) {
-        if text.isEmpty {
+    private func copyAndClear() {
+        guard !inputText.isEmpty else { return }
+        
+        // 复制到剪贴板
+        UIPasteboard.general.string = inputText
+        let copiedCount = inputText.count
+        
+        // 清空输入
+        withAnimation(.easeOut(duration: 0.25)) {
+            inputText = ""
+        }
+        
+        // 显示已复制状态
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isCopied = true
+        }
+        
+        // 2秒后重置状态
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             withAnimation(.easeInOut(duration: 0.2)) {
                 isCopied = false
-            }
-        } else {
-            UIPasteboard.general.string = text
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isCopied = true
             }
         }
     }
