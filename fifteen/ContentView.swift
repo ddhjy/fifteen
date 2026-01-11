@@ -130,18 +130,12 @@ struct ContentView: View {
             }
             .buttonStyle(.glassProminent)
             .tint(Color(hex: 0x6366F1))
-            .disabled(inputText.isEmpty)
-            .opacity(inputText.isEmpty ? 0.5 : 1.0)
-            .animation(.easeInOut(duration: 0.2), value: inputText.isEmpty)
             
             // 清空按钮 - Liquid Glass 风格
             Button(action: clearText) {
                 Label("清空", systemImage: "trash")
             }
             .buttonStyle(.glass)
-            .disabled(inputText.isEmpty)
-            .opacity(inputText.isEmpty ? 0.5 : 1.0)
-            .animation(.easeInOut(duration: 0.2), value: inputText.isEmpty)
             
             Spacer()
         }
