@@ -128,7 +128,15 @@ struct ContentView: View {
     // MARK: - 底部操作栏
     private var bottomBar: some View {
         HStack(spacing: 16) {
-            Spacer()
+            // 复制按钮 - Liquid Glass Prominent 风格（主要操作）
+            Button(action: copyAndClear) {
+                Label("复制", systemImage: "doc.on.doc")
+            }
+            .buttonStyle(.glassProminent)
+            .tint(Color(hex: 0x007AFF).opacity(0.85))
+            .disabled(inputText.isEmpty)
+            .opacity(inputText.isEmpty ? 0.5 : 1.0)
+            .animation(.easeInOut(duration: 0.2), value: inputText.isEmpty)
             
             // 清空按钮 - Liquid Glass 风格
             Button(action: clearText) {
@@ -139,15 +147,7 @@ struct ContentView: View {
             .opacity(inputText.isEmpty ? 0.5 : 1.0)
             .animation(.easeInOut(duration: 0.2), value: inputText.isEmpty)
             
-            // 复制按钮 - Liquid Glass Prominent 风格（主要操作）
-            Button(action: copyAndClear) {
-                Label("复制", systemImage: "doc.on.doc")
-            }
-            .buttonStyle(.glassProminent)
-            .tint(Color(hex: 0x007AFF).opacity(0.85))
-            .disabled(inputText.isEmpty)
-            .opacity(inputText.isEmpty ? 0.5 : 1.0)
-            .animation(.easeInOut(duration: 0.2), value: inputText.isEmpty)
+            Spacer()
         }
     }
     
