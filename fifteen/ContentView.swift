@@ -100,7 +100,7 @@ struct ContentView: View {
     private var bottomBar: some View {
         HStack(spacing: 16) {
             Button(action: copyAndClear) {
-                Label("复制", systemImage: "doc.on.doc")
+                Label("复制", systemImage: "paperplane.fill")
             }
             .buttonStyle(.glassProminent)
             .tint(Color(hex: 0x6366F1))
