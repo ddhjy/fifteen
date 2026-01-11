@@ -23,8 +23,17 @@ struct ContentView: View {
                 Text(copyStatus)
                     .font(.subheadline)
                     .foregroundColor(statusColor)
+                
+                Spacer()
+                
+                Button(action: {
+                    inputText = ""
+                }) {
+                    Text("清空")
+                        .font(.subheadline)
+                        .foregroundColor(.red)
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal)
             
             // 多行文本编辑器
