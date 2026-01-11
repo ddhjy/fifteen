@@ -82,7 +82,7 @@ struct ContentView: View {
         }
         .frame(minHeight: 280)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .glassEffect(.regular.interactive, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
     
     private var bottomBar: some View {
@@ -113,10 +113,10 @@ struct ContentView: View {
     }
     
     private func copyAndClear() {
-        guard !inputText.isEmpty else { return }
-        
         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
         impactFeedback.impactOccurred()
+        
+        guard !inputText.isEmpty else { return }
         
         UIPasteboard.general.string = inputText
         
