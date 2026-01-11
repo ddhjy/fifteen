@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var inputText: String = ""
     @State private var copyStatus: String = "等待输入..."
     @State private var statusColor: Color = .secondary
+    @FocusState private var isTextEditorFocused: Bool
     
     var body: some View {
         VStack(spacing: 16) {
@@ -38,6 +39,7 @@ struct ContentView: View {
             
             // 多行文本编辑器
             TextEditor(text: $inputText)
+                .focused($isTextEditorFocused)
                 .frame(minHeight: 200)
                 .padding(8)
                 .background(Color(.systemGray6))
@@ -50,6 +52,14 @@ struct ContentView: View {
             Spacer()
         }
         .padding(.top)
+        .onAppear {
+            isTextEditorFocused = true
+        }
+        .onChange(of: isTextEditorFocused) { _, newValue in
+            if !newValue {
+                isTextEditorFocused = true
+            }
+        }
     }
     
     private func copyToClipboard(_ text: String) {
