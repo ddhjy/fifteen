@@ -96,9 +96,11 @@ struct ContentView: View {
             .tint(Color(hex: 0x6366F1))
             
             Button(action: clearText) {
-                Label("清空", systemImage: "trash")
+                Image(systemName: "trash")
+                    .font(.system(size: 16, weight: .medium))
             }
             .buttonStyle(.glass)
+            .clipShape(Circle())
             
             Spacer()
         }
