@@ -127,51 +127,24 @@ struct ContentView: View {
     
     // MARK: - 底部操作栏
     private var bottomBar: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 16) {
             Spacer()
             
-            // 清空按钮 - 极简设计
+            // 清空按钮 - Liquid Glass 风格
             Button(action: clearText) {
-                HStack(spacing: 6) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 14, weight: .medium))
-                    Text("清空")
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                }
-                .foregroundStyle(inputText.isEmpty ? Color(.quaternaryLabel) : Color(.secondaryLabel))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(
-                    Capsule()
-                        .fill(Color(.tertiarySystemFill))
-                )
+                Label("清空", systemImage: "xmark.circle")
             }
+            .buttonStyle(.glass)
             .disabled(inputText.isEmpty)
             .opacity(inputText.isEmpty ? 0.5 : 1.0)
             .animation(.easeInOut(duration: 0.2), value: inputText.isEmpty)
             
-            // 复制按钮
+            // 复制按钮 - Liquid Glass Prominent 风格（主要操作）
             Button(action: copyAndClear) {
-                HStack(spacing: 6) {
-                    Image(systemName: "doc.on.doc.fill")
-                        .font(.system(size: 14, weight: .medium))
-                    Text("复制")
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(
-                    Capsule()
-                        .fill(accentGradient)
-                        .opacity(inputText.isEmpty ? 0 : 1)
-                )
-                .background(
-                    Capsule()
-                        .fill(Color(.systemGray4))
-                        .opacity(inputText.isEmpty ? 1 : 0)
-                )
+                Label("复制", systemImage: "doc.on.doc")
             }
+            .buttonStyle(.glassProminent)
+            .tint(Color(hex: 0x007AFF).opacity(0.85))
             .disabled(inputText.isEmpty)
             .opacity(inputText.isEmpty ? 0.5 : 1.0)
             .animation(.easeInOut(duration: 0.2), value: inputText.isEmpty)
