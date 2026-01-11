@@ -100,7 +100,6 @@ struct ContentView: View {
                     .font(.system(size: 16, weight: .medium))
             }
             .buttonStyle(.glass)
-            .clipShape(Circle())
             
             Spacer()
         }
