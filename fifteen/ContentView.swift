@@ -59,10 +59,6 @@ struct ContentView: View {
     
     private var editorArea: some View {
         ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.white)
-                .shadow(color: .black.opacity(0.04), radius: 12, x: 0, y: 4)
-            
             TextEditor(text: $inputText)
                 .focused($isTextEditorFocused)
                 .font(.system(size: 17, weight: .regular, design: .default))
@@ -73,7 +69,7 @@ struct ContentView: View {
                     isCopied = false
                 }
             
-// 状态显示移到右下角
+            // 状态显示移到右下角
             VStack {
                 Spacer()
                 HStack {
@@ -85,6 +81,8 @@ struct ContentView: View {
             }
         }
         .frame(minHeight: 280)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .glassEffect(.regular.interactive, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
     
     private var bottomBar: some View {
