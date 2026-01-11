@@ -32,13 +32,6 @@ struct ContentView: View {
         .onAppear {
             isTextEditorFocused = true
         }
-        .onChange(of: isTextEditorFocused) { _, newValue in
-            if !newValue {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    isTextEditorFocused = true
-                }
-            }
-        }
     }
     
     private var statusBar: some View {
