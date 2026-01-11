@@ -13,12 +13,8 @@ struct ContentView: View {
     @State private var isCopied: Bool = false
     @FocusState private var isTextEditorFocused: Bool
     
-    // Jony Ive 风格配色
-    private let accentGradient = LinearGradient(
-        colors: [Color(hex: 0x007AFF), Color(hex: 0x5856D6)],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
+    // 主题配色 - 参考截图风格
+    private let primaryColor = Color(hex: 0x6366F1)  // 紫罗兰色主色调
     
     private var characterCount: Int { inputText.count }
     
@@ -133,7 +129,7 @@ struct ContentView: View {
                 Label("复制", systemImage: "doc.on.doc")
             }
             .buttonStyle(.glassProminent)
-            .tint(Color(hex: 0x007AFF).opacity(0.85))
+            .tint(Color(hex: 0x6366F1))
             .disabled(inputText.isEmpty)
             .opacity(inputText.isEmpty ? 0.5 : 1.0)
             .animation(.easeInOut(duration: 0.2), value: inputText.isEmpty)
