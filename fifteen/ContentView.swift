@@ -51,9 +51,9 @@ struct ContentView: View {
     
     private var statusText: String {
         if isCopied {
-            return "已复制 \(characterCount) 字符"
+            return "已复制 \(characterCount) 字"
         } else {
-            return "\(characterCount) 字符"
+            return "\(characterCount) 字"
         }
     }
     
