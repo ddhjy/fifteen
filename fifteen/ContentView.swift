@@ -73,17 +73,7 @@ struct ContentView: View {
                     isCopied = false
                 }
             
-            if inputText.isEmpty {
-                Text("开始输入...")
-                    .font(.system(size: 17, weight: .regular, design: .default))
-                    .foregroundStyle(Color(.placeholderText))
-                    .padding(16)
-                    .padding(.top, 8)
-                    .padding(.leading, 5)
-                    .allowsHitTesting(false)
-            }
-            
-            // 状态显示移到右下角
+// 状态显示移到右下角
             VStack {
                 Spacer()
                 HStack {
