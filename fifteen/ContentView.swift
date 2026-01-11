@@ -136,7 +136,7 @@ struct ContentView: View {
             
             // 清空按钮 - Liquid Glass 风格
             Button(action: clearText) {
-                Label("清空", systemImage: "xmark.circle")
+                Label("清空", systemImage: "trash")
             }
             .buttonStyle(.glass)
             .disabled(inputText.isEmpty)
