@@ -17,12 +17,8 @@ struct ContentView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    statusBar
-                        .padding(.top, 20)
-                        .padding(.horizontal, 24)
-                    
                     editorArea
-                        .padding(.top, 32)
+                        .padding(.top, 20)
                         .padding(.horizontal, 20)
                     
                     Spacer(minLength: 40)
@@ -46,30 +42,16 @@ struct ContentView: View {
     }
     
     private var statusBar: some View {
-        HStack(alignment: .center) {
-            HStack(spacing: 10) {
-                Circle()
-                    .fill(isCopied ? Color(hex: 0x34C759) : Color(.tertiaryLabel))
-                    .frame(width: 6, height: 6)
-                    .scaleEffect(isCopied ? 1.2 : 1.0)
-                    .animation(.spring(response: 0.4, dampingFraction: 0.6), value: isCopied)
-                
-                Text(statusText)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(isCopied ? Color(hex: 0x34C759) : Color(.tertiaryLabel))
-                    .contentTransition(.numericText())
-                    .animation(.easeInOut(duration: 0.2), value: characterCount)
-            }
-            
-            Spacer()
-        }
+        Text(statusText)
+            .font(.system(size: 12, weight: .medium, design: .rounded))
+            .foregroundStyle(isCopied ? Color(hex: 0x34C759) : Color(.tertiaryLabel))
+            .contentTransition(.numericText())
+            .animation(.easeInOut(duration: 0.2), value: characterCount)
     }
     
     private var statusText: String {
         if isCopied {
             return "已复制 \(characterCount) 字符"
-        } else if inputText.isEmpty {
-            return "等待输入"
         } else {
             return "\(characterCount) 字符"
         }
@@ -86,6 +68,7 @@ struct ContentView: View {
                 .font(.system(size: 17, weight: .regular, design: .default))
                 .scrollContentBackground(.hidden)
                 .padding(16)
+                .padding(.bottom, 32) // 为底部状态栏留出空间
                 .onChange(of: inputText) { _, _ in
                     isCopied = false
                 }
@@ -98,6 +81,17 @@ struct ContentView: View {
                     .padding(.top, 8)
                     .padding(.leading, 5)
                     .allowsHitTesting(false)
+            }
+            
+            // 状态显示移到右下角
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    statusBar
+                        .padding(.trailing, 16)
+                        .padding(.bottom, 12)
+                }
             }
         }
         .frame(minHeight: 280)
