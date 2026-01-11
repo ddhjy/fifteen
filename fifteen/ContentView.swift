@@ -13,7 +13,7 @@ struct ContentView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Color(.systemBackground)
+                Color(hex: 0xF2F2F6)
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
@@ -60,7 +60,7 @@ struct ContentView: View {
     private var editorArea: some View {
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(.secondarySystemBackground))
+                .fill(Color.white)
                 .shadow(color: .black.opacity(0.04), radius: 12, x: 0, y: 4)
             
             TextEditor(text: $inputText)
