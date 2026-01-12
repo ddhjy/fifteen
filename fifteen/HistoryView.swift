@@ -73,10 +73,10 @@ struct HistoryView: View {
                             }
                         }
                     }) {
-                        Text(isEditMode ? "完成" : "编辑")
-                            .font(.system(size: 16, weight: .medium))
+                        Image(systemName: isEditMode ? "checkmark" : "pencil")
+                            .font(.system(size: 17, weight: .regular))
                     }
-                    .tint(Color(hex: 0x6366F1))
+                    .tint(.primary)
                 }
             }
         }
