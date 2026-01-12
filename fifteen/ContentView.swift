@@ -45,7 +45,10 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            isTextEditorFocused = true
+            // 延迟弹出键盘，等待页面动画完成
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                isTextEditorFocused = true
+            }
         }
     }
     
