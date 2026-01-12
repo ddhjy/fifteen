@@ -356,9 +356,9 @@ struct HistoryRowView: View {
                         // 标签按钮
                         if !isEditMode {
                             Button(action: onTagTap) {
-                                Image(systemName: item.tags.isEmpty ? "tag" : "tag.fill")
+                                Image(systemName: "tag")
                                     .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(item.tags.isEmpty ? Color(.quaternaryLabel) : Color(hex: 0x6366F1).opacity(0.8))
+                                    .foregroundStyle(Color(.quaternaryLabel))
                             }
                             .buttonStyle(.plain)
                         }
