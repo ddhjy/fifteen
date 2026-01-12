@@ -34,6 +34,10 @@ struct ContentView: View {
             }
             .navigationDestination(isPresented: $showHistory) {
                 HistoryView()
+                    .onAppear {
+                        // 跳转完成后静默收起键盘
+                        isTextEditorFocused = false
+                    }
                     .onDisappear {
                         // 返回后延迟弹出键盘，等待动画结束
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
@@ -116,12 +120,7 @@ struct ContentView: View {
     }
     
     private func navigateToHistory() {
-        // 先收起键盘
-        isTextEditorFocused = false
-        // 延迟跳转，等待键盘收起动画
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            showHistory = true
-        }
+        showHistory = true
     }
     
     private func clearText() {
