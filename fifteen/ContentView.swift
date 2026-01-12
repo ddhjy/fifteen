@@ -4,6 +4,7 @@ import UIKit
 struct ContentView: View {
     @State private var inputText: String = ""
     @State private var isCopied: Bool = false
+    @State private var showHistoryAlert: Bool = false
     @FocusState private var isTextEditorFocused: Bool
     
     private let primaryColor = Color(hex: 0x6366F1)
@@ -93,6 +94,17 @@ struct ContentView: View {
             .buttonStyle(.glass)
             
             Spacer()
+            
+            Button(action: { showHistoryAlert = true }) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 16, weight: .medium))
+            }
+            .buttonStyle(.glass)
+        }
+        .alert("历史记录", isPresented: $showHistoryAlert) {
+            Button("好的", role: .cancel) { }
+        } message: {
+            Text("此功能即将推出，敬请期待！")
         }
     }
     
