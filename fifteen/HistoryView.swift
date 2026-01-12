@@ -333,23 +333,8 @@ struct HistoryRowView: View {
                                 Image(systemName: item.tags.isEmpty ? "tag" : "tag.fill")
                                     .font(.system(size: 14, weight: .medium))
                                     .foregroundStyle(item.tags.isEmpty ? Color(.tertiaryLabel) : Color(hex: 0x6366F1))
-                            }
-                            .buttonStyle(.plain)
                         }
-                        
-                        // 复制成功标识
-                        if isCopied && !isEditMode {
-                            HStack(spacing: 4) {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 12, weight: .semibold))
-                                Text("已复制")
-                                    .font(.system(size: 12, weight: .medium))
-                            }
-                            .foregroundStyle(Color(hex: 0x34C759))
-                            .transition(.asymmetric(
-                                insertion: .scale(scale: 0.8).combined(with: .opacity),
-                                removal: .opacity
-                            ))
+                        .buttonStyle(.plain)
                         }
                     }
                 }

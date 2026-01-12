@@ -3,7 +3,6 @@ import UIKit
 
 struct ContentView: View {
     @State private var inputText: String = ""
-    @State private var isCopied: Bool = false
     @State private var showHistory: Bool = false
     @State private var shimmerOffset: CGFloat = -80
 
@@ -54,19 +53,11 @@ struct ContentView: View {
     }
     
     private var statusBar: some View {
-        Text(statusText)
+        Text("\(characterCount) 字")
             .font(.system(size: 12, weight: .medium, design: .rounded))
-            .foregroundStyle(isCopied ? Color(hex: 0x34C759) : Color(.tertiaryLabel))
+            .foregroundStyle(Color(.tertiaryLabel))
             .contentTransition(.numericText())
             .animation(.easeInOut(duration: 0.2), value: characterCount)
-    }
-    
-    private var statusText: String {
-        if isCopied {
-            return "已复制 \(characterCount) 字"
-        } else {
-            return "\(characterCount) 字"
-        }
     }
     
     private var editorArea: some View {
@@ -77,9 +68,6 @@ struct ContentView: View {
                 .scrollContentBackground(.hidden)
                 .padding(16)
                 .padding(.bottom, 32) // 为底部状态栏留出空间
-                .onChange(of: inputText) { _, _ in
-                    isCopied = false
-                }
             
             // 状态显示移到右下角
             VStack {
@@ -177,17 +165,10 @@ struct ContentView: View {
             shimmerOffset = -80  // 无动画地重置回起点
         }
         
-        withAnimation(.easeOut(duration: 0.25)) {
-            inputText = ""
-        }
-        
-        withAnimation(.easeInOut(duration: 0.2)) {
-            isCopied = true
-        }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isCopied = false
+        // 动画走到一半时清空输入框
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            withAnimation(.easeOut(duration: 0.25)) {
+                inputText = ""
             }
         }
     }
