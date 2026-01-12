@@ -43,8 +43,6 @@ struct HistoryView: View {
                 VStack(spacing: 0) {
                     // 标签筛选栏
                     TagFilterBar(selectedTagName: $selectedTagFilter)
-                        .opacity(appearAnimation ? 1 : 0)
-                        .offset(y: appearAnimation ? 0 : -10)
                     
                     if filteredItems.isEmpty {
                         filteredEmptyStateView
@@ -204,7 +202,7 @@ struct HistoryView: View {
     private var historyList: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
-                ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
+                ForEach(filteredItems) { item in
                     HistoryRowView(
                         item: item,
                         isCopied: copiedItemId == item.id,
@@ -214,13 +212,6 @@ struct HistoryView: View {
                         onCopy: { copyItem(item) },
                         onToggleSelection: { toggleSelection(item) },
                         onTagTap: { tagPickerItem = item }
-                    )
-                    .opacity(appearAnimation ? 1 : 0)
-                    .offset(y: appearAnimation ? 0 : 20)
-                    .animation(
-                        .spring(response: 0.4, dampingFraction: 0.8)
-                        .delay(Double(index) * 0.03),
-                        value: appearAnimation
                     )
                 }
             }
