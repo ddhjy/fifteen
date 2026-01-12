@@ -8,61 +8,92 @@
 import Foundation
 import SwiftUI
 
-// MARK: - Tag Model
+// MARK: - Tag Model (纯文本，支持用户自定义)
 
 struct Tag: Identifiable, Codable, Hashable {
     let id: UUID
-    let name: String
-    let colorHex: UInt
-    let emoji: String
+    var name: String
     
-    init(id: UUID = UUID(), name: String, colorHex: UInt, emoji: String) {
+    init(id: UUID = UUID(), name: String) {
         self.id = id
         self.name = name
-        self.colorHex = colorHex
-        self.emoji = emoji
-    }
-    
-    var color: Color {
-        Color(hex: colorHex)
     }
 }
 
-// MARK: - Preset Tags
+// MARK: - Tag Manager (管理用户自定义标签)
 
-struct PresetTags {
-    static let important = Tag(
-        id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
-        name: "重要",
-        colorHex: 0xFF3B30,
-        emoji: "🔴"
-    )
-    static let pending = Tag(
-        id: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!,
-        name: "待处理",
-        colorHex: 0xFFCC00,
-        emoji: "🟡"
-    )
-    static let completed = Tag(
-        id: UUID(uuidString: "00000000-0000-0000-0000-000000000003")!,
-        name: "已完成",
-        colorHex: 0x34C759,
-        emoji: "🟢"
-    )
-    static let work = Tag(
-        id: UUID(uuidString: "00000000-0000-0000-0000-000000000004")!,
-        name: "工作",
-        colorHex: 0x007AFF,
-        emoji: "🔵"
-    )
-    static let personal = Tag(
-        id: UUID(uuidString: "00000000-0000-0000-0000-000000000005")!,
-        name: "个人",
-        colorHex: 0xAF52DE,
-        emoji: "🟣"
-    )
+@Observable
+class TagManager {
+    static let shared = TagManager()
     
-    static let all: [Tag] = [important, pending, completed, work, personal]
+    private let storageKey = "user_tags"
+    
+    var tags: [Tag] = []
+    
+    private init() {
+        loadTags()
+    }
+    
+    func createTag(name: String) -> Tag? {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return nil }
+        
+        // 检查是否已存在同名标签
+        if tags.contains(where: { $0.name == trimmedName }) {
+            return nil
+        }
+        
+        let newTag = Tag(name: trimmedName)
+        tags.append(newTag)
+        saveTags()
+        return newTag
+    }
+    
+    func updateTag(_ tagId: UUID, newName: String) {
+        let trimmedName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
+        
+        // 检查是否存在其他同名标签
+        if tags.contains(where: { $0.id != tagId && $0.name == trimmedName }) {
+            return
+        }
+        
+        if let index = tags.firstIndex(where: { $0.id == tagId }) {
+            tags[index].name = trimmedName
+            saveTags()
+        }
+    }
+    
+    func deleteTag(_ tagId: UUID) {
+        tags.removeAll { $0.id == tagId }
+        saveTags()
+        
+        // 同时从所有历史记录中移除该标签
+        HistoryManager.shared.removeTagFromAllItems(tagId: tagId)
+    }
+    
+    func getTag(by id: UUID) -> Tag? {
+        tags.first { $0.id == id }
+    }
+    
+    private func loadTags() {
+        guard let data = UserDefaults.standard.data(forKey: storageKey) else { return }
+        
+        do {
+            tags = try JSONDecoder().decode([Tag].self, from: data)
+        } catch {
+            print("Failed to decode tags: \(error)")
+        }
+    }
+    
+    private func saveTags() {
+        do {
+            let data = try JSONEncoder().encode(tags)
+            UserDefaults.standard.set(data, forKey: storageKey)
+        } catch {
+            print("Failed to encode tags: \(error)")
+        }
+    }
 }
 
 // MARK: - History Item
@@ -96,7 +127,7 @@ struct HistoryItem: Identifiable, Codable, Equatable {
     
     var tags: [Tag] {
         tagIds.compactMap { tagId in
-            PresetTags.all.first { $0.id == tagId }
+            TagManager.shared.getTag(by: tagId)
         }
     }
 }
@@ -181,6 +212,13 @@ class HistoryManager {
         saveItems()
     }
     
+    func removeTagFromAllItems(tagId: UUID) {
+        for index in items.indices {
+            items[index].tagIds.removeAll { $0 == tagId }
+        }
+        saveItems()
+    }
+    
     func getItems(filteredBy tagId: UUID?) -> [HistoryItem] {
         guard let tagId = tagId else { return items }
         return items.filter { $0.tagIds.contains(tagId) }
@@ -207,3 +245,4 @@ class HistoryManager {
         }
     }
 }
+

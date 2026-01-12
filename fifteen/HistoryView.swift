@@ -42,7 +42,7 @@ struct HistoryView: View {
             } else {
                 VStack(spacing: 0) {
                     // 标签筛选栏
-                    TagFilterBar(selectedTagId: $selectedTagFilter, tags: PresetTags.all)
+                    TagFilterBar(selectedTagId: $selectedTagFilter)
                         .opacity(appearAnimation ? 1 : 0)
                         .offset(y: appearAnimation ? 0 : -10)
                     
