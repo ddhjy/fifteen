@@ -53,10 +53,9 @@ struct ContentView: View {
     
     private var editorArea: some View {
         ZStack(alignment: .topLeading) {
-            TextEditor(text: $inputText)
+            TextField("开始输入...", text: $inputText, axis: .vertical)
                 .focused($isTextEditorFocused)
                 .font(.system(size: 17, weight: .regular, design: .default))
-                .scrollContentBackground(.hidden)
                 .padding(16)
                 .padding(.bottom, 32) // 为底部状态栏留出空间
                 .onChange(of: inputText) { _, _ in
