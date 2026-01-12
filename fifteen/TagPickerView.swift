@@ -18,26 +18,6 @@ struct TagPickerView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // 预览区域
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("内容预览")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color(.secondaryLabel))
-                    
-                    Text(item.preview)
-                        .font(.system(size: 15))
-                        .foregroundStyle(Color(.label))
-                        .lineLimit(2)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(16)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(.regularMaterial)
-                )
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-                
                 // 标签列表
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
@@ -83,7 +63,7 @@ struct TagPickerView: View {
                         .padding(.horizontal, 16)
                     }
                 }
-                .padding(.top, 24)
+                .padding(.top, 16)
                 
                 Spacer()
             }
