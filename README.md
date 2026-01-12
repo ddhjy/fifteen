@@ -2,6 +2,8 @@
 
 ## 演示
 
+![应用演示](docs/demo.png)
+
 ## 设计特点
 
 - Liquid Glass 风格输入框
