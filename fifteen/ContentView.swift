@@ -4,6 +4,7 @@ import UIKit
 struct ContentView: View {
     @State private var inputText: String = ""
     @State private var isCopied: Bool = false
+    @State private var showHistory: Bool = false
 
     @FocusState private var isTextEditorFocused: Bool
     
@@ -30,6 +31,15 @@ struct ContentView: View {
                             .padding(.bottom, 20)
                     }
                 }
+            }
+            .navigationDestination(isPresented: $showHistory) {
+                HistoryView()
+                    .onDisappear {
+                        // 返回后延迟弹出键盘，等待动画结束
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                            isTextEditorFocused = true
+                        }
+                    }
             }
         }
         .onAppear {
@@ -97,11 +107,20 @@ struct ContentView: View {
             
             Spacer()
             
-            NavigationLink(destination: HistoryView()) {
+            Button(action: navigateToHistory) {
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.system(size: 16, weight: .medium))
             }
             .buttonStyle(.glass)
+        }
+    }
+    
+    private func navigateToHistory() {
+        // 先收起键盘
+        isTextEditorFocused = false
+        // 延迟跳转，等待键盘收起动画
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            showHistory = true
         }
     }
     
