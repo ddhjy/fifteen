@@ -4,12 +4,6 @@
 
 ![应用演示](docs/demo.png)
 
-## 设计特点
-
-- Liquid Glass 风格输入框
-- 简洁现代的 UI 设计
-- 触觉反馈交互
-
 ## 技术栈
 
 - SwiftUI
