@@ -9,11 +9,15 @@ import SwiftUI
 import UIKit
 
 struct TagPickerView: View {
-    let item: HistoryItem
+    let itemId: UUID
     @State private var historyManager = HistoryManager.shared
     @State private var tagManager = TagManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showCreateTag = false
+    
+    private var currentItem: HistoryItem? {
+        historyManager.items.first { $0.id == itemId }
+    }
     
     var body: some View {
         NavigationStack {
@@ -25,7 +29,7 @@ struct TagPickerView: View {
                         ForEach(tagManager.tags, id: \.self) { tagName in
                             TagRowView(
                                 tagName: tagName,
-                                isSelected: item.tags.contains(tagName),
+                                isSelected: currentItem?.tags.contains(tagName) ?? false,
                                 onToggle: { toggleTag(tagName) }
                             )
                             
@@ -68,7 +72,7 @@ struct TagPickerView: View {
                 }
             }
             .sheet(isPresented: $showCreateTag) {
-                TagCreateSheet(itemId: item.id)
+                TagCreateSheet(itemId: itemId)
             }
         }
         .presentationDetents([.medium])
@@ -90,7 +94,7 @@ struct TagPickerView: View {
         impactFeedback.impactOccurred()
         
         withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-            historyManager.toggleTag(for: item.id, tagName: tagName)
+            historyManager.toggleTag(for: itemId, tagName: tagName)
         }
     }
 }
@@ -290,5 +294,5 @@ struct FilterChip: View {
 }
 
 #Preview {
-    TagPickerView(item: HistoryItem(fileName: "test.md", text: "这是一条测试记录内容"))
+    TagPickerView(itemId: UUID())
 }

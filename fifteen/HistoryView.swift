@@ -91,7 +91,7 @@ struct HistoryView: View {
             Button("取消", role: .cancel) { }
         }
         .sheet(item: $tagPickerItem) { item in
-            TagPickerView(item: item)
+            TagPickerView(itemId: item.id)
         }
         .onAppear {
             withAnimation(.easeOut(duration: 0.4)) {
