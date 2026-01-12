@@ -4,7 +4,7 @@ import UIKit
 struct ContentView: View {
     @State private var inputText: String = ""
     @State private var isCopied: Bool = false
-    @State private var showHistoryAlert: Bool = false
+
     @FocusState private var isTextEditorFocused: Bool
     
     private let primaryColor = Color(hex: 0x6366F1)
@@ -12,21 +12,23 @@ struct ContentView: View {
     private var characterCount: Int { inputText.count }
     
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                Color(hex: 0xF2F2F6)
-                    .ignoresSafeArea()
-                
-                VStack(spacing: 0) {
-                    editorArea
-                        .padding(.top, 20)
-                        .padding(.horizontal, 20)
+        NavigationStack {
+            GeometryReader { geometry in
+                ZStack {
+                    Color(hex: 0xF2F2F6)
+                        .ignoresSafeArea()
                     
-                    Spacer(minLength: 40)
-                    
-                    bottomBar
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 20)
+                    VStack(spacing: 0) {
+                        editorArea
+                            .padding(.top, 20)
+                            .padding(.horizontal, 20)
+                        
+                        Spacer(minLength: 40)
+                        
+                        bottomBar
+                            .padding(.horizontal, 24)
+                            .padding(.bottom, 20)
+                    }
                 }
             }
         }
@@ -95,16 +97,11 @@ struct ContentView: View {
             
             Spacer()
             
-            Button(action: { showHistoryAlert = true }) {
+            NavigationLink(destination: HistoryView()) {
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.system(size: 16, weight: .medium))
             }
             .buttonStyle(.glass)
-        }
-        .alert("历史记录", isPresented: $showHistoryAlert) {
-            Button("好的", role: .cancel) { }
-        } message: {
-            Text("此功能即将推出，敬请期待！")
         }
     }
     
@@ -124,6 +121,7 @@ struct ContentView: View {
         guard !inputText.isEmpty else { return }
         
         UIPasteboard.general.string = inputText
+        HistoryManager.shared.addRecord(inputText)
         
         withAnimation(.easeOut(duration: 0.25)) {
             inputText = ""
