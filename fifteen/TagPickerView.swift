@@ -18,52 +18,30 @@ struct TagPickerView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // 标签列表
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("选择标签")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(Color(.secondaryLabel))
-                        
-                        Spacer()
-                        
-                        Button(action: { showCreateTag = true }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 12, weight: .semibold))
-                                Text("新建")
-                                    .font(.system(size: 13, weight: .medium))
+                if tagManager.tags.isEmpty {
+                    emptyTagsView
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(tagManager.tags, id: \.self) { tagName in
+                            TagRowView(
+                                tagName: tagName,
+                                isSelected: item.tags.contains(tagName),
+                                onToggle: { toggleTag(tagName) }
+                            )
+                            
+                            if tagName != tagManager.tags.last {
+                                Divider()
+                                    .padding(.leading, 16)
                             }
-                            .foregroundStyle(Color(hex: 0x6366F1))
                         }
                     }
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(.regularMaterial)
+                    )
                     .padding(.horizontal, 16)
-                    
-                    if tagManager.tags.isEmpty {
-                        emptyTagsView
-                    } else {
-                        VStack(spacing: 0) {
-                            ForEach(tagManager.tags, id: \.self) { tagName in
-                                TagRowView(
-                                    tagName: tagName,
-                                    isSelected: item.tags.contains(tagName),
-                                    onToggle: { toggleTag(tagName) }
-                                )
-                                
-                                if tagName != tagManager.tags.last {
-                                    Divider()
-                                        .padding(.leading, 16)
-                                }
-                            }
-                        }
-                        .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(.regularMaterial)
-                        )
-                        .padding(.horizontal, 16)
-                    }
+                    .padding(.top, 16)
                 }
-                .padding(.top, 16)
                 
                 Spacer()
             }
@@ -74,6 +52,13 @@ struct TagPickerView: View {
             .navigationTitle("标签")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: { showCreateTag = true }) {
+                        Image(systemName: "plus")
+                    }
+                    .tint(Color(hex: 0x6366F1))
+                }
+                
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("完成") {
                         dismiss()
@@ -91,26 +76,13 @@ struct TagPickerView: View {
     }
     
     private var emptyTagsView: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "tag")
-                .font(.system(size: 32, weight: .light))
-                .foregroundStyle(Color(.tertiaryLabel))
-            
-            Text("还没有标签")
-                .font(.system(size: 15, weight: .medium))
+        VStack(spacing: 8) {
+            Text("暂无标签")
+                .font(.system(size: 15))
                 .foregroundStyle(Color(.secondaryLabel))
-            
-            Text("点击上方「新建」创建您的第一个标签")
-                .font(.system(size: 13))
-                .foregroundStyle(Color(.tertiaryLabel))
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(.regularMaterial)
-        )
-        .padding(.horizontal, 16)
+        .padding(.vertical, 60)
     }
     
     private func toggleTag(_ tagName: String) {
