@@ -10,9 +10,22 @@
 		0C7A28222F1403B6007D8C71 /* fifteen.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = fifteen.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		0C055B182F1516DD00233513 /* Exceptions for "fifteen" folder in "fifteen" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 0C7A28212F1403B6007D8C71 /* fifteen */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		0C7A28242F1403B6007D8C71 /* fifteen */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				0C055B182F1516DD00233513 /* Exceptions for "fifteen" folder in "fifteen" target */,
+			);
 			path = fifteen;
 			sourceTree = "<group>";
 		};
@@ -254,6 +267,7 @@
 				DEVELOPMENT_TEAM = 6KH2T566FP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = fifteen/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "语音输入";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -287,6 +301,7 @@
 				DEVELOPMENT_TEAM = 6KH2T566FP;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = fifteen/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "语音输入";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

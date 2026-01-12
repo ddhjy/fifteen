@@ -16,7 +16,7 @@ struct HistoryView: View {
     @State private var appearAnimation = false
     @State private var isEditMode = false
     @State private var selectedItems: Set<UUID> = []
-    @State private var selectedTagFilter: UUID? = nil
+    @State private var selectedTagFilter: String? = nil
     @State private var tagPickerItem: HistoryItem? = nil
     
     private var filteredItems: [HistoryItem] {
@@ -42,7 +42,7 @@ struct HistoryView: View {
             } else {
                 VStack(spacing: 0) {
                     // 标签筛选栏
-                    TagFilterBar(selectedTagId: $selectedTagFilter)
+                    TagFilterBar(selectedTagName: $selectedTagFilter)
                         .opacity(appearAnimation ? 1 : 0)
                         .offset(y: appearAnimation ? 0 : -10)
                     
@@ -314,8 +314,8 @@ struct HistoryRowView: View {
                     // 标签显示区域
                     if !item.tags.isEmpty && !isEditMode {
                         HStack(spacing: 6) {
-                            ForEach(item.tags) { tag in
-                                TagBadgeView(tag: tag)
+                            ForEach(item.tags, id: \.self) { tagName in
+                                TagBadgeView(tagName: tagName)
                             }
                         }
                     }
@@ -382,4 +382,3 @@ struct HistoryRowView: View {
         HistoryView()
     }
 }
-

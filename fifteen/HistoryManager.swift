@@ -8,107 +8,23 @@
 import Foundation
 import SwiftUI
 
-// MARK: - Tag Model (纯文本，支持用户自定义)
-
-struct Tag: Identifiable, Codable, Hashable {
-    let id: UUID
-    var name: String
-    
-    init(id: UUID = UUID(), name: String) {
-        self.id = id
-        self.name = name
-    }
-}
-
-// MARK: - Tag Manager (管理用户自定义标签)
-
-@Observable
-class TagManager {
-    static let shared = TagManager()
-    
-    private let storageKey = "user_tags"
-    
-    var tags: [Tag] = []
-    
-    private init() {
-        loadTags()
-    }
-    
-    func createTag(name: String) -> Tag? {
-        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedName.isEmpty else { return nil }
-        
-        // 检查是否已存在同名标签
-        if tags.contains(where: { $0.name == trimmedName }) {
-            return nil
-        }
-        
-        let newTag = Tag(name: trimmedName)
-        tags.append(newTag)
-        saveTags()
-        return newTag
-    }
-    
-    func updateTag(_ tagId: UUID, newName: String) {
-        let trimmedName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedName.isEmpty else { return }
-        
-        // 检查是否存在其他同名标签
-        if tags.contains(where: { $0.id != tagId && $0.name == trimmedName }) {
-            return
-        }
-        
-        if let index = tags.firstIndex(where: { $0.id == tagId }) {
-            tags[index].name = trimmedName
-            saveTags()
-        }
-    }
-    
-    func deleteTag(_ tagId: UUID) {
-        tags.removeAll { $0.id == tagId }
-        saveTags()
-        
-        // 同时从所有历史记录中移除该标签
-        HistoryManager.shared.removeTagFromAllItems(tagId: tagId)
-    }
-    
-    func getTag(by id: UUID) -> Tag? {
-        tags.first { $0.id == id }
-    }
-    
-    private func loadTags() {
-        guard let data = UserDefaults.standard.data(forKey: storageKey) else { return }
-        
-        do {
-            tags = try JSONDecoder().decode([Tag].self, from: data)
-        } catch {
-            print("Failed to decode tags: \(error)")
-        }
-    }
-    
-    private func saveTags() {
-        do {
-            let data = try JSONEncoder().encode(tags)
-            UserDefaults.standard.set(data, forKey: storageKey)
-        } catch {
-            print("Failed to encode tags: \(error)")
-        }
-    }
-}
-
 // MARK: - History Item
 
-struct HistoryItem: Identifiable, Codable, Equatable {
+struct HistoryItem: Identifiable, Equatable {
     let id: UUID
+    let fileName: String
     let text: String
     let createdAt: Date
-    var tagIds: [UUID]
+    var description: String
+    var tags: [String]
     
-    init(id: UUID = UUID(), text: String, createdAt: Date = Date(), tagIds: [UUID] = []) {
+    init(id: UUID = UUID(), fileName: String, text: String, createdAt: Date = Date(), description: String = "", tags: [String] = []) {
         self.id = id
+        self.fileName = fileName
         self.text = text
         self.createdAt = createdAt
-        self.tagIds = tagIds
+        self.description = description.isEmpty ? String(text.prefix(50)) : description
+        self.tags = tags
     }
     
     var preview: String {
@@ -124,11 +40,30 @@ struct HistoryItem: Identifiable, Codable, Equatable {
         formatter.locale = Locale(identifier: "zh_CN")
         return formatter.localizedString(for: createdAt, relativeTo: Date())
     }
+}
+
+// MARK: - Tag Manager (从记录中动态聚合标签)
+
+@Observable
+class TagManager {
+    static let shared = TagManager()
     
-    var tags: [Tag] {
-        tagIds.compactMap { tagId in
-            TagManager.shared.getTag(by: tagId)
+    var tags: [String] = []
+    
+    private init() {}
+    
+    func refreshTags(from items: [HistoryItem]) {
+        var uniqueTags = Set<String>()
+        for item in items {
+            for tag in item.tags {
+                uniqueTags.insert(tag)
+            }
         }
+        tags = Array(uniqueTags).sorted()
+    }
+    
+    func getTag(by name: String) -> String? {
+        tags.first { $0 == name }
     }
 }
 
@@ -138,111 +73,325 @@ struct HistoryItem: Identifiable, Codable, Equatable {
 class HistoryManager {
     static let shared = HistoryManager()
     
-    private let storageKey = "clipboard_history"
-    private let maxItems = 100
-    
     var items: [HistoryItem] = []
+    var isLoading = false
+    
+    private let fileManager = FileManager.default
+    private let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd-HHmm-ss"
+        return formatter
+    }()
     
     private init() {
         loadItems()
+    }
+    
+    // MARK: - Storage Directory (iCloud 优先，本地回退)
+    
+    private var storageURL: URL {
+        // 优先尝试 iCloud
+        if let containerURL = fileManager.url(forUbiquityContainerIdentifier: nil) {
+            let documentsURL = containerURL.appendingPathComponent("Documents")
+            
+            // 确保目录存在
+            if !fileManager.fileExists(atPath: documentsURL.path) {
+                try? fileManager.createDirectory(at: documentsURL, withIntermediateDirectories: true)
+            }
+            
+            print("Using iCloud storage: \(documentsURL.path)")
+            return documentsURL
+        }
+        
+        // 回退到本地存储
+        let localURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Records")
+        
+        if !fileManager.fileExists(atPath: localURL.path) {
+            try? fileManager.createDirectory(at: localURL, withIntermediateDirectories: true)
+        }
+        
+        print("Using local storage: \(localURL.path)")
+        return localURL
+    }
+    
+    // MARK: - File Name Generation
+    
+    private func generateFileName(for date: Date) -> String {
+        return dateFormatter.string(from: date) + ".md"
+    }
+    
+    private func parseDate(from fileName: String) -> Date? {
+        let name = fileName.replacingOccurrences(of: ".md", with: "")
+        return dateFormatter.date(from: name)
+    }
+    
+    // MARK: - Markdown Parsing & Generation
+    
+    private func parseMarkdownFile(content: String) -> (description: String, tags: [String], body: String)? {
+        let lines = content.components(separatedBy: "\n")
+        
+        guard lines.first == "---" else {
+            // 没有 front matter，整个内容就是 body
+            return ("", [], content)
+        }
+        
+        // 查找结束的 ---
+        var endIndex = -1
+        for i in 1..<lines.count {
+            if lines[i] == "---" {
+                endIndex = i
+                break
+            }
+        }
+        
+        guard endIndex > 0 else {
+            return ("", [], content)
+        }
+        
+        // 解析 front matter
+        let frontMatterLines = Array(lines[1..<endIndex])
+        var description = ""
+        var tags: [String] = []
+        var inTags = false
+        
+        for line in frontMatterLines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            
+            if trimmed.hasPrefix("description:") {
+                let value = trimmed.replacingOccurrences(of: "description:", with: "").trimmingCharacters(in: .whitespaces)
+                description = value.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+            } else if trimmed.hasPrefix("tags:") {
+                inTags = true
+            } else if inTags && trimmed.hasPrefix("- ") {
+                let tagValue = trimmed.replacingOccurrences(of: "- ", with: "").trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+                if !tagValue.isEmpty {
+                    tags.append(tagValue)
+                }
+            } else if !trimmed.hasPrefix("-") && trimmed.contains(":") {
+                inTags = false
+            }
+        }
+        
+        // 获取 body（跳过 front matter 后的空行）
+        var bodyStartIndex = endIndex + 1
+        while bodyStartIndex < lines.count && lines[bodyStartIndex].trimmingCharacters(in: .whitespaces).isEmpty {
+            bodyStartIndex += 1
+        }
+        
+        let body = lines[bodyStartIndex...].joined(separator: "\n")
+        
+        return (description, tags, body)
+    }
+    
+    private func generateMarkdownContent(text: String, description: String, tags: [String], createdAt: Date) -> String {
+        var content = "---\n"
+        content += "created: \(dateFormatter.string(from: createdAt))\n"
+        content += "description: \"\(description)\"\n"
+        
+        if !tags.isEmpty {
+            content += "tags:\n"
+            for tag in tags {
+                content += "  - \"\(tag)\"\n"
+            }
+        }
+        
+        content += "---\n\n"
+        content += text
+        
+        return content
     }
     
     // MARK: - Record Management
     
     func addRecord(_ text: String) {
         guard !text.isEmpty else { return }
+        let documentsURL = storageURL
         
         // 避免重复添加相同内容
-        if let existingIndex = items.firstIndex(where: { $0.text == text }) {
-            items.remove(at: existingIndex)
+        if let existingItem = items.first(where: { $0.text == text }) {
+            deleteRecord(existingItem)
         }
         
-        let newItem = HistoryItem(text: text)
-        items.insert(newItem, at: 0)
+        let now = Date()
+        let fileName = generateFileName(for: now)
+        let description = String(text.prefix(50))
+        let content = generateMarkdownContent(text: text, description: description, tags: [], createdAt: now)
         
-        // 限制最大条数
-        if items.count > maxItems {
-            items = Array(items.prefix(maxItems))
+        let fileURL = documentsURL.appendingPathComponent(fileName)
+        
+        do {
+            try content.write(to: fileURL, atomically: true, encoding: .utf8)
+            
+            let newItem = HistoryItem(
+                fileName: fileName,
+                text: text,
+                createdAt: now,
+                description: description,
+                tags: []
+            )
+            items.insert(newItem, at: 0)
+            TagManager.shared.refreshTags(from: items)
+            
+        } catch {
+            print("Failed to write record to iCloud: \(error)")
         }
-        
-        saveItems()
     }
     
     func deleteRecord(_ item: HistoryItem) {
-        items.removeAll { $0.id == item.id }
-        saveItems()
+        let documentsURL = storageURL
+        
+        let fileURL = documentsURL.appendingPathComponent(item.fileName)
+        
+        do {
+            try fileManager.removeItem(at: fileURL)
+            items.removeAll { $0.id == item.id }
+            TagManager.shared.refreshTags(from: items)
+        } catch {
+            print("Failed to delete record: \(error)")
+            // 即使文件删除失败，也从内存中移除
+            items.removeAll { $0.id == item.id }
+        }
     }
     
     func deleteRecords(at offsets: IndexSet) {
+        for index in offsets {
+            let item = items[index]
+            let documentsURL = storageURL
+            
+            let fileURL = documentsURL.appendingPathComponent(item.fileName)
+            try? fileManager.removeItem(at: fileURL)
+        }
         items.remove(atOffsets: offsets)
-        saveItems()
+        TagManager.shared.refreshTags(from: items)
     }
     
     func clearAll() {
+        let documentsURL = storageURL
+        
+        for item in items {
+            let fileURL = documentsURL.appendingPathComponent(item.fileName)
+            try? fileManager.removeItem(at: fileURL)
+        }
         items.removeAll()
-        saveItems()
+        TagManager.shared.refreshTags(from: items)
     }
     
     // MARK: - Tag Management
     
-    func addTag(to itemId: UUID, tagId: UUID) {
+    func addTag(to itemId: UUID, tagName: String) {
         guard let index = items.firstIndex(where: { $0.id == itemId }) else { return }
         
-        if !items[index].tagIds.contains(tagId) {
-            items[index].tagIds.append(tagId)
-            saveItems()
+        let trimmedTag = tagName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTag.isEmpty else { return }
+        
+        if !items[index].tags.contains(trimmedTag) {
+            items[index].tags.append(trimmedTag)
+            saveItem(items[index])
+            TagManager.shared.refreshTags(from: items)
         }
     }
     
-    func removeTag(from itemId: UUID, tagId: UUID) {
+    func removeTag(from itemId: UUID, tagName: String) {
         guard let index = items.firstIndex(where: { $0.id == itemId }) else { return }
         
-        items[index].tagIds.removeAll { $0 == tagId }
-        saveItems()
+        items[index].tags.removeAll { $0 == tagName }
+        saveItem(items[index])
+        TagManager.shared.refreshTags(from: items)
     }
     
-    func toggleTag(for itemId: UUID, tagId: UUID) {
+    func toggleTag(for itemId: UUID, tagName: String) {
         guard let index = items.firstIndex(where: { $0.id == itemId }) else { return }
         
-        if items[index].tagIds.contains(tagId) {
-            items[index].tagIds.removeAll { $0 == tagId }
+        if items[index].tags.contains(tagName) {
+            items[index].tags.removeAll { $0 == tagName }
         } else {
-            items[index].tagIds.append(tagId)
+            items[index].tags.append(tagName)
         }
-        saveItems()
+        saveItem(items[index])
+        TagManager.shared.refreshTags(from: items)
     }
     
-    func removeTagFromAllItems(tagId: UUID) {
-        for index in items.indices {
-            items[index].tagIds.removeAll { $0 == tagId }
-        }
-        saveItems()
+    func getItems(filteredBy tagName: String?) -> [HistoryItem] {
+        guard let tagName = tagName else { return items }
+        return items.filter { $0.tags.contains(tagName) }
     }
     
-    func getItems(filteredBy tagId: UUID?) -> [HistoryItem] {
-        guard let tagId = tagId else { return items }
-        return items.filter { $0.tagIds.contains(tagId) }
-    }
+    // MARK: - Save Item
     
-    // MARK: - Persistence
-    
-    private func loadItems() {
-        guard let data = UserDefaults.standard.data(forKey: storageKey) else { return }
+    private func saveItem(_ item: HistoryItem) {
+        let documentsURL = storageURL
+        
+        let content = generateMarkdownContent(
+            text: item.text,
+            description: item.description,
+            tags: item.tags,
+            createdAt: item.createdAt
+        )
+        
+        let fileURL = documentsURL.appendingPathComponent(item.fileName)
         
         do {
-            items = try JSONDecoder().decode([HistoryItem].self, from: data)
+            try content.write(to: fileURL, atomically: true, encoding: .utf8)
         } catch {
-            print("Failed to decode history items: \(error)")
+            print("Failed to update record: \(error)")
         }
     }
     
-    private func saveItems() {
+    // MARK: - Load Items
+    
+    func loadItems() {
+        let documentsURL = storageURL
+        
+        isLoading = true
+        
         do {
-            let data = try JSONEncoder().encode(items)
-            UserDefaults.standard.set(data, forKey: storageKey)
+            let fileURLs = try fileManager.contentsOfDirectory(
+                at: documentsURL,
+                includingPropertiesForKeys: [.creationDateKey],
+                options: .skipsHiddenFiles
+            )
+            
+            var loadedItems: [HistoryItem] = []
+            
+            for fileURL in fileURLs {
+                guard fileURL.pathExtension == "md" else { continue }
+                
+                let fileName = fileURL.lastPathComponent
+                guard let createdAt = parseDate(from: fileName) else { continue }
+                
+                do {
+                    let content = try String(contentsOf: fileURL, encoding: .utf8)
+                    
+                    if let parsed = parseMarkdownFile(content: content) {
+                        let item = HistoryItem(
+                            fileName: fileName,
+                            text: parsed.body,
+                            createdAt: createdAt,
+                            description: parsed.description,
+                            tags: parsed.tags
+                        )
+                        loadedItems.append(item)
+                    }
+                } catch {
+                    print("Failed to read file \(fileName): \(error)")
+                }
+            }
+            
+            // 按创建时间降序排序
+            items = loadedItems.sorted { $0.createdAt > $1.createdAt }
+            TagManager.shared.refreshTags(from: items)
+            
         } catch {
-            print("Failed to encode history items: \(error)")
+            print("Failed to list iCloud documents: \(error)")
         }
+        
+        isLoading = false
+    }
+    
+    // MARK: - Refresh (for pull-to-refresh)
+    
+    func refresh() {
+        loadItems()
     }
 }
-
