@@ -45,16 +45,18 @@ struct ContentView: View {
                         Image(systemName: "gearshape")
                             .font(.system(size: 17, weight: .regular))
                     }
-                    .tint(Color(hex: 0x6366F1))
+                    .tint(.primary)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: navigateToHistory) {
                         Image(systemName: "clock.arrow.circlepath")
                             .font(.system(size: 17, weight: .regular))
                     }
-                    .tint(Color(hex: 0x6366F1))
+                    .tint(.primary)
                 }
             }
+            .navigationTitle("语音输入")
+            .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(isPresented: $showHistory) {
                 HistoryView()
                     .onAppear {
