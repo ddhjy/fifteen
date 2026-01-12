@@ -16,6 +16,12 @@ struct HistoryView: View {
     @State private var appearAnimation = false
     @State private var isEditMode = false
     @State private var selectedItems: Set<UUID> = []
+    @State private var selectedTagFilter: UUID? = nil
+    @State private var tagPickerItem: HistoryItem? = nil
+    
+    private var filteredItems: [HistoryItem] {
+        historyManager.getItems(filteredBy: selectedTagFilter)
+    }
     
     var body: some View {
         ZStack {
@@ -34,7 +40,18 @@ struct HistoryView: View {
             if historyManager.items.isEmpty {
                 emptyStateView
             } else {
-                historyList
+                VStack(spacing: 0) {
+                    // 标签筛选栏
+                    TagFilterBar(selectedTagId: $selectedTagFilter, tags: PresetTags.all)
+                        .opacity(appearAnimation ? 1 : 0)
+                        .offset(y: appearAnimation ? 0 : -10)
+                    
+                    if filteredItems.isEmpty {
+                        filteredEmptyStateView
+                    } else {
+                        historyList
+                    }
+                }
             }
             
             // 编辑模式下的底部操作栏
@@ -73,6 +90,9 @@ struct HistoryView: View {
             }
             Button("取消", role: .cancel) { }
         }
+        .sheet(item: $tagPickerItem) { item in
+            TagPickerView(item: item)
+        }
         .onAppear {
             withAnimation(.easeOut(duration: 0.4)) {
                 appearAnimation = true
@@ -84,13 +104,13 @@ struct HistoryView: View {
         HStack(spacing: 16) {
             Button(action: {
                 // 全选/取消全选
-                if selectedItems.count == historyManager.items.count {
+                if selectedItems.count == filteredItems.count {
                     selectedItems.removeAll()
                 } else {
-                    selectedItems = Set(historyManager.items.map { $0.id })
+                    selectedItems = Set(filteredItems.map { $0.id })
                 }
             }) {
-                Text(selectedItems.count == historyManager.items.count ? "取消全选" : "全选")
+                Text(selectedItems.count == filteredItems.count ? "取消全选" : "全选")
                     .font(.system(size: 15, weight: .medium))
             }
             .tint(Color(hex: 0x6366F1))
@@ -168,17 +188,31 @@ struct HistoryView: View {
         .padding(.horizontal, 40)
     }
     
+    private var filteredEmptyStateView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "tag.slash")
+                .font(.system(size: 40, weight: .light))
+                .foregroundStyle(Color(.tertiaryLabel))
+            
+            Text("没有符合筛选条件的记录")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(Color(.secondaryLabel))
+        }
+        .frame(maxHeight: .infinity)
+    }
+    
     private var historyList: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
-                ForEach(Array(historyManager.items.enumerated()), id: \.element.id) { index, item in
+                ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
                     HistoryRowView(
                         item: item,
                         isCopied: copiedItemId == item.id,
                         isEditMode: isEditMode,
                         isSelected: selectedItems.contains(item.id),
                         onCopy: { copyItem(item) },
-                        onToggleSelection: { toggleSelection(item) }
+                        onToggleSelection: { toggleSelection(item) },
+                        onTagTap: { tagPickerItem = item }
                     )
                     .opacity(appearAnimation ? 1 : 0)
                     .offset(y: appearAnimation ? 0 : 20)
@@ -236,6 +270,7 @@ struct HistoryRowView: View {
     let isSelected: Bool
     let onCopy: () -> Void
     let onToggleSelection: () -> Void
+    let onTagTap: () -> Void
     
     @State private var isPressed = false
     
@@ -276,12 +311,31 @@ struct HistoryRowView: View {
                         .lineLimit(3)
                         .multilineTextAlignment(.leading)
                     
+                    // 标签显示区域
+                    if !item.tags.isEmpty && !isEditMode {
+                        HStack(spacing: 6) {
+                            ForEach(item.tags) { tag in
+                                TagBadgeView(tag: tag)
+                            }
+                        }
+                    }
+                    
                     HStack(spacing: 6) {
                         Text(item.formattedDate)
                             .font(.system(size: 12, weight: .regular))
                             .foregroundStyle(Color(.tertiaryLabel))
                         
                         Spacer()
+                        
+                        // 标签按钮
+                        if !isEditMode {
+                            Button(action: onTagTap) {
+                                Image(systemName: item.tags.isEmpty ? "tag" : "tag.fill")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(item.tags.isEmpty ? Color(.tertiaryLabel) : Color(hex: 0x6366F1))
+                            }
+                            .buttonStyle(.plain)
+                        }
                         
                         // 复制成功标识
                         if isCopied && !isEditMode {
