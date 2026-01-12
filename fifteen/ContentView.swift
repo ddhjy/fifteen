@@ -5,6 +5,7 @@ struct ContentView: View {
     @State private var inputText: String = ""
     @State private var isCopied: Bool = false
     @State private var showHistory: Bool = false
+    @State private var showShimmer: Bool = false
 
     @FocusState private var isTextEditorFocused: Bool
     
@@ -90,10 +91,35 @@ struct ContentView: View {
                         .padding(.bottom, 12)
                 }
             }
+            
+            // 玻璃光掠过效果
+            shimmerOverlay
         }
         .frame(minHeight: 280)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+    
+    private var shimmerOverlay: some View {
+        GeometryReader { geometry in
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0),
+                    Color.white.opacity(0.4),
+                    Color.white.opacity(0.6),
+                    Color.white.opacity(0.4),
+                    Color.white.opacity(0)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(width: 80)
+            .blur(radius: 4)
+            .offset(x: showShimmer ? geometry.size.width + 80 : -80)
+            .animation(.easeInOut(duration: 0.5), value: showShimmer)
+        }
+        .allowsHitTesting(false) // 确保不影响触摸交互
     }
     
     private var bottomBar: some View {
@@ -141,6 +167,12 @@ struct ContentView: View {
         
         UIPasteboard.general.string = inputText
         HistoryManager.shared.addRecord(inputText)
+        
+        // 触发玻璃光掠过动画
+        showShimmer = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            showShimmer = false
+        }
         
         withAnimation(.easeOut(duration: 0.25)) {
             inputText = ""
