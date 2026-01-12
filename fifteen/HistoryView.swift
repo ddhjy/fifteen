@@ -14,6 +14,8 @@ struct HistoryView: View {
     @State private var showClearConfirmation = false
     @State private var copiedItemId: UUID?
     @State private var appearAnimation = false
+    @State private var isEditMode = false
+    @State private var selectedItems: Set<UUID> = []
     
     var body: some View {
         ZStack {
@@ -34,26 +36,39 @@ struct HistoryView: View {
             } else {
                 historyList
             }
+            
+            // 编辑模式下的底部操作栏
+            if isEditMode && !selectedItems.isEmpty {
+                VStack {
+                    Spacer()
+                    editModeBottomBar
+                }
+            }
         }
         .navigationTitle("历史记录")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if !historyManager.items.isEmpty {
-                    Button(action: { showClearConfirmation = true }) {
-                        Image(systemName: "trash")
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            isEditMode.toggle()
+                            if !isEditMode {
+                                selectedItems.removeAll()
+                            }
+                        }
+                    }) {
+                        Text(isEditMode ? "完成" : "编辑")
                             .font(.system(size: 16, weight: .medium))
-                            .symbolRenderingMode(.hierarchical)
                     }
-                    .buttonStyle(.glass)
-                    .tint(Color(hex: 0xFF3B30))
+                    .tint(Color(hex: 0x6366F1))
                 }
             }
         }
-        .confirmationDialog("确定要清空所有历史记录吗？", isPresented: $showClearConfirmation, titleVisibility: .visible) {
-            Button("清空全部", role: .destructive) {
+        .confirmationDialog("确定要删除选中的 \(selectedItems.count) 条记录吗？", isPresented: $showClearConfirmation, titleVisibility: .visible) {
+            Button("删除选中", role: .destructive) {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    historyManager.clearAll()
+                    deleteSelectedItems()
                 }
             }
             Button("取消", role: .cancel) { }
@@ -62,6 +77,57 @@ struct HistoryView: View {
             withAnimation(.easeOut(duration: 0.4)) {
                 appearAnimation = true
             }
+        }
+    }
+    
+    private var editModeBottomBar: some View {
+        HStack(spacing: 16) {
+            Button(action: {
+                // 全选/取消全选
+                if selectedItems.count == historyManager.items.count {
+                    selectedItems.removeAll()
+                } else {
+                    selectedItems = Set(historyManager.items.map { $0.id })
+                }
+            }) {
+                Text(selectedItems.count == historyManager.items.count ? "取消全选" : "全选")
+                    .font(.system(size: 15, weight: .medium))
+            }
+            .tint(Color(hex: 0x6366F1))
+            
+            Spacer()
+            
+            Text("已选择 \(selectedItems.count) 项")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Color(.secondaryLabel))
+            
+            Spacer()
+            
+            Button(action: { showClearConfirmation = true }) {
+                Image(systemName: "trash")
+                    .font(.system(size: 16, weight: .medium))
+            }
+            .tint(Color(hex: 0xFF3B30))
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+    
+    private func deleteSelectedItems() {
+        let idsToDelete = selectedItems
+        for id in idsToDelete {
+            if let index = historyManager.items.firstIndex(where: { $0.id == id }) {
+                historyManager.deleteRecords(at: IndexSet(integer: index))
+            }
+        }
+        selectedItems.removeAll()
+        if historyManager.items.isEmpty {
+            isEditMode = false
         }
     }
     
@@ -109,22 +175,38 @@ struct HistoryView: View {
                     HistoryRowView(
                         item: item,
                         isCopied: copiedItemId == item.id,
+                        isEditMode: isEditMode,
+                        isSelected: selectedItems.contains(item.id),
                         onCopy: { copyItem(item) },
-                        onDelete: { deleteItem(item) }
+                        onToggleSelection: { toggleSelection(item) }
                     )
                     .opacity(appearAnimation ? 1 : 0)
                     .offset(y: appearAnimation ? 0 : 20)
                     .animation(
                         .spring(response: 0.4, dampingFraction: 0.8)
-                        .delay(Double(index) * 0.05),
+                        .delay(Double(index) * 0.03),
                         value: appearAnimation
                     )
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+            .padding(.bottom, isEditMode ? 80 : 0) // 为底部操作栏留空间
         }
         .scrollIndicators(.hidden)
+    }
+    
+    private func toggleSelection(_ item: HistoryItem) {
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        impactFeedback.impactOccurred()
+        
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+            if selectedItems.contains(item.id) {
+                selectedItems.remove(item.id)
+            } else {
+                selectedItems.insert(item.id)
+            }
+        }
     }
     
     private func copyItem(_ item: HistoryItem) {
@@ -145,87 +227,69 @@ struct HistoryView: View {
             }
         }
     }
-    
-    private func deleteItem(_ item: HistoryItem) {
-        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-        impactFeedback.impactOccurred()
-        
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            if let index = historyManager.items.firstIndex(where: { $0.id == item.id }) {
-                historyManager.deleteRecords(at: IndexSet(integer: index))
-            }
-        }
-    }
 }
 
 struct HistoryRowView: View {
     let item: HistoryItem
     let isCopied: Bool
+    let isEditMode: Bool
+    let isSelected: Bool
     let onCopy: () -> Void
-    let onDelete: () -> Void
+    let onToggleSelection: () -> Void
     
     @State private var isPressed = false
-    @State private var offset: CGFloat = 0
-    @State private var showDeleteButton = false
-    
-    private let deleteThreshold: CGFloat = -80
     
     var body: some View {
-        ZStack(alignment: .trailing) {
-            // 删除按钮背景
-            if showDeleteButton {
-                HStack {
-                    Spacer()
-                    Button(action: onDelete) {
-                        Image(systemName: "trash.fill")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundStyle(.white)
-                            .frame(width: 60, height: 60)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color(hex: 0xFF3B30), Color(hex: 0xFF6B6B)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                }
-                .transition(.asymmetric(
-                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                    removal: .move(edge: .trailing).combined(with: .opacity)
-                ))
+        Button(action: {
+            if isEditMode {
+                onToggleSelection()
+            } else {
+                onCopy()
             }
-            
-            // 主卡片内容
-            Button(action: onCopy) {
-                VStack(alignment: .leading, spacing: 10) {
+        }) {
+            HStack(spacing: 12) {
+                // 编辑模式下的选择圆圈
+                if isEditMode {
+                    ZStack {
+                        Circle()
+                            .stroke(isSelected ? Color(hex: 0x6366F1) : Color(.tertiaryLabel), lineWidth: 2)
+                            .frame(width: 24, height: 24)
+                        
+                        if isSelected {
+                            Circle()
+                                .fill(Color(hex: 0x6366F1))
+                                .frame(width: 24, height: 24)
+                            
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
+                    }
+                    .transition(.scale.combined(with: .opacity))
+                }
+                
+                // 主内容
+                VStack(alignment: .leading, spacing: 8) {
                     Text(item.preview)
                         .font(.system(size: 16, weight: .regular))
                         .foregroundStyle(Color(.label))
                         .lineLimit(3)
                         .multilineTextAlignment(.leading)
                     
-                    HStack(spacing: 8) {
-                        // 时间标签
-                        HStack(spacing: 4) {
-                            Image(systemName: "clock")
-                                .font(.system(size: 10, weight: .medium))
-                            Text(item.formattedDate)
-                                .font(.system(size: 12, weight: .medium))
-                        }
-                        .foregroundStyle(Color(.tertiaryLabel))
+                    HStack(spacing: 6) {
+                        Text(item.formattedDate)
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(Color(.tertiaryLabel))
                         
                         Spacer()
                         
                         // 复制成功标识
-                        if isCopied {
+                        if isCopied && !isEditMode {
                             HStack(spacing: 4) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 14, weight: .semibold))
-                                Text("已复制")
+                                Image(systemName: "checkmark")
                                     .font(.system(size: 12, weight: .semibold))
+                                Text("已复制")
+                                    .font(.system(size: 12, weight: .medium))
                             }
                             .foregroundStyle(Color(hex: 0x34C759))
                             .transition(.asymmetric(
@@ -235,55 +299,27 @@ struct HistoryRowView: View {
                         }
                     }
                 }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .scaleEffect(isPressed ? 0.98 : 1)
-                .scaleEffect(isCopied ? 1.02 : 1)
             }
-            .buttonStyle(.plain)
-            .offset(x: offset)
-            .gesture(
-                DragGesture(minimumDistance: 20)
-                    .onChanged { value in
-                        let translation = value.translation.width
-                        if translation < 0 {
-                            offset = translation * 0.8
-                            withAnimation(.easeOut(duration: 0.2)) {
-                                showDeleteButton = translation < deleteThreshold
-                            }
-                        }
-                    }
-                    .onEnded { value in
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            if value.translation.width < deleteThreshold {
-                                offset = deleteThreshold
-                                showDeleteButton = true
-                            } else {
-                                offset = 0
-                                showDeleteButton = false
-                            }
-                        }
-                    }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.regularMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(isSelected ? Color(hex: 0x6366F1).opacity(0.5) : Color.clear, lineWidth: 2)
+                    )
             )
-            .simultaneousGesture(
-                TapGesture()
-                    .onEnded {
-                        if showDeleteButton {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                offset = 0
-                                showDeleteButton = false
-                            }
-                        }
-                    }
-            )
-            .onLongPressGesture(minimumDuration: 0.1, pressing: { pressing in
-                withAnimation(.easeOut(duration: 0.15)) {
-                    isPressed = pressing
-                }
-            }) { }
+            .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .scaleEffect(isPressed ? 0.98 : 1)
+            .scaleEffect(isCopied && !isEditMode ? 1.01 : 1)
         }
+        .buttonStyle(.plain)
+        .onLongPressGesture(minimumDuration: 0.1, pressing: { pressing in
+            withAnimation(.easeOut(duration: 0.15)) {
+                isPressed = pressing
+            }
+        }) { }
     }
 }
 
@@ -292,3 +328,4 @@ struct HistoryRowView: View {
         HistoryView()
     }
 }
+
