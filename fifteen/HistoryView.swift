@@ -62,7 +62,7 @@ struct HistoryView: View {
                 }
             }
         }
-        .navigationTitle("历史记录")
+        .navigationTitle("记录")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -174,7 +174,7 @@ struct HistoryView: View {
             .scaleEffect(appearAnimation ? 1 : 0.8)
             
             VStack(spacing: 8) {
-                Text("暂无历史记录")
+                Text("暂无记录")
                     .font(.system(size: 20, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color(.label))
                 
