@@ -39,6 +39,22 @@ struct ContentView: View {
                     }
                 }
             }
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: {}) {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 17, weight: .regular))
+                    }
+                    .tint(Color(hex: 0x6366F1))
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: navigateToHistory) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 17, weight: .regular))
+                    }
+                    .tint(Color(hex: 0x6366F1))
+                }
+            }
             .navigationDestination(isPresented: $showHistory) {
                 HistoryView()
                     .onAppear {
@@ -132,12 +148,6 @@ struct ContentView: View {
             .buttonStyle(.glass)
             
             Spacer()
-            
-            Button(action: navigateToHistory) {
-                Image(systemName: "clock.arrow.circlepath")
-                    .font(.system(size: 16, weight: .medium))
-            }
-            .buttonStyle(.glass)
         }
     }
     
