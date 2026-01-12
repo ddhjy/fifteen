@@ -282,21 +282,30 @@ struct HistoryRowView: View {
                 onCopy()
             }
         }) {
-            HStack(spacing: 12) {
+            HStack(spacing: 14) {
                 // 编辑模式下的选择圆圈
                 if isEditMode {
                     ZStack {
                         Circle()
-                            .stroke(isSelected ? Color(hex: 0x6366F1) : Color(.tertiaryLabel), lineWidth: 2)
-                            .frame(width: 24, height: 24)
+                            .stroke(
+                                isSelected ? Color(hex: 0x6366F1) : Color(.quaternaryLabel),
+                                lineWidth: 1.5
+                            )
+                            .frame(width: 22, height: 22)
                         
                         if isSelected {
                             Circle()
-                                .fill(Color(hex: 0x6366F1))
-                                .frame(width: 24, height: 24)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color(hex: 0x6366F1), Color(hex: 0x818CF8)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 22, height: 22)
                             
                             Image(systemName: "checkmark")
-                                .font(.system(size: 12, weight: .bold))
+                                .font(.system(size: 11, weight: .bold))
                                 .foregroundStyle(.white)
                         }
                     }
@@ -304,26 +313,43 @@ struct HistoryRowView: View {
                 }
                 
                 // 主内容
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text(item.preview)
-                        .font(.system(size: 16, weight: .regular))
+                        .font(.system(size: 15, weight: .regular))
                         .foregroundStyle(Color(.label))
-                        .lineLimit(3)
+                        .lineLimit(2)
                         .multilineTextAlignment(.leading)
                     
-                    // 标签显示区域
-                    if !item.tags.isEmpty && !isEditMode {
-                        HStack(spacing: 6) {
-                            ForEach(item.tags, id: \.self) { tagName in
-                                TagBadgeView(tagName: tagName)
-                            }
-                        }
-                    }
-                    
-                    HStack(spacing: 6) {
+                    // 底部信息区
+                    HStack(spacing: 8) {
+                        // 日期
                         Text(item.formattedDate)
                             .font(.system(size: 12, weight: .regular))
                             .foregroundStyle(Color(.tertiaryLabel))
+                        
+                        // 标签 (内联显示)
+                        if !item.tags.isEmpty && !isEditMode {
+                            Text("·")
+                                .foregroundStyle(Color(.quaternaryLabel))
+                            
+                            ForEach(item.tags.prefix(2), id: \.self) { tagName in
+                                Text(tagName)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(Color(hex: 0x6366F1))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(
+                                        Capsule()
+                                            .fill(Color(hex: 0x6366F1).opacity(0.1))
+                                    )
+                            }
+                            
+                            if item.tags.count > 2 {
+                                Text("+\(item.tags.count - 2)")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(Color(.tertiaryLabel))
+                            }
+                        }
                         
                         Spacer()
                         
@@ -331,34 +357,53 @@ struct HistoryRowView: View {
                         if !isEditMode {
                             Button(action: onTagTap) {
                                 Image(systemName: item.tags.isEmpty ? "tag" : "tag.fill")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(item.tags.isEmpty ? Color(.tertiaryLabel) : Color(hex: 0x6366F1))
-                        }
-                        .buttonStyle(.plain)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(item.tags.isEmpty ? Color(.quaternaryLabel) : Color(hex: 0x6366F1).opacity(0.8))
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
             }
-            .padding(16)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(.regularMaterial)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(isSelected ? Color(hex: 0x6366F1).opacity(0.5) : Color.clear, lineWidth: 2)
-                    )
-            )
-            .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(rowBackground)
             .scaleEffect(isPressed ? 0.98 : 1)
-            .scaleEffect(isCopied && !isEditMode ? 1.01 : 1)
+            .scaleEffect(isCopied && !isEditMode ? 1.02 : 1)
         }
         .buttonStyle(.plain)
         .onLongPressGesture(minimumDuration: 0.1, pressing: { pressing in
-            withAnimation(.easeOut(duration: 0.15)) {
+            withAnimation(.easeOut(duration: 0.12)) {
                 isPressed = pressing
             }
         }) { }
+    }
+    
+    @ViewBuilder
+    private var rowBackground: some View {
+        if isSelected {
+            // 选中状态：带边框的高亮背景
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color(hex: 0x6366F1).opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Color(hex: 0x6366F1).opacity(0.3), lineWidth: 1.5)
+                )
+        } else if isCopied {
+            // 复制成功状态
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color(hex: 0x10B981).opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(Color(hex: 0x10B981).opacity(0.3), lineWidth: 1)
+                )
+        } else {
+            // 默认状态：使用轻量级白色背景
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color(.systemBackground).opacity(0.85))
+                .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
+        }
     }
 }
 
