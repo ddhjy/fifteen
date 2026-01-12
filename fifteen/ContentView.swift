@@ -74,6 +74,10 @@ struct ContentView: View {
             }
         }
         .frame(minHeight: 280)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            isTextEditorFocused = true
+        }
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
