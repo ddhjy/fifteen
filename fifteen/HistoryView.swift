@@ -401,7 +401,7 @@ struct HistoryRowView: View {
         } else {
             // 默认状态：使用轻量级白色背景
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color(.systemBackground).opacity(0.85))
+                .fill(Color(.systemBackground))
                 .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 2)
         }
     }
