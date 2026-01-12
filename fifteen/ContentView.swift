@@ -5,7 +5,7 @@ struct ContentView: View {
     @State private var inputText: String = ""
     @State private var isCopied: Bool = false
     @State private var showHistory: Bool = false
-    @State private var showShimmer: Bool = false
+    @State private var shimmerOffset: CGFloat = -80
 
     @FocusState private var isTextEditorFocused: Bool
     
@@ -114,10 +114,10 @@ struct ContentView: View {
                 startPoint: .leading,
                 endPoint: .trailing
             )
-            .frame(width: 80)
-            .blur(radius: 4)
-            .offset(x: showShimmer ? geometry.size.width + 80 : -80)
-            .animation(.easeInOut(duration: 0.5), value: showShimmer)
+            .frame(width: 120, height: geometry.size.height * 2)
+            .rotationEffect(.degrees(-45))
+            .blur(radius: 6)
+            .offset(x: shimmerOffset, y: -shimmerOffset * 0.7)
         }
         .allowsHitTesting(false) // 确保不影响触摸交互
     }
@@ -168,10 +168,13 @@ struct ContentView: View {
         UIPasteboard.general.string = inputText
         HistoryManager.shared.addRecord(inputText)
         
-        // 触发玻璃光掠过动画
-        showShimmer = true
+        // 触发玻璃光掠过动画（仅从左到右）
+        let screenWidth = UIScreen.main.bounds.width
+        withAnimation(.easeInOut(duration: 0.5)) {
+            shimmerOffset = screenWidth + 80
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            showShimmer = false
+            shimmerOffset = -80  // 无动画地重置回起点
         }
         
         withAnimation(.easeOut(duration: 0.25)) {
