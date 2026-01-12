@@ -210,6 +210,7 @@ struct HistoryView: View {
                         isCopied: copiedItemId == item.id,
                         isEditMode: isEditMode,
                         isSelected: selectedItems.contains(item.id),
+                        filteredTagName: selectedTagFilter,
                         onCopy: { copyItem(item) },
                         onToggleSelection: { toggleSelection(item) },
                         onTagTap: { tagPickerItem = item }
@@ -268,6 +269,7 @@ struct HistoryRowView: View {
     let isCopied: Bool
     let isEditMode: Bool
     let isSelected: Bool
+    var filteredTagName: String? = nil
     let onCopy: () -> Void
     let onToggleSelection: () -> Void
     let onTagTap: () -> Void
@@ -327,12 +329,13 @@ struct HistoryRowView: View {
                             .font(.system(size: 12, weight: .regular))
                             .foregroundStyle(Color(.tertiaryLabel))
                         
-                        // 标签 (内联显示)
-                        if !item.tags.isEmpty && !isEditMode {
+                        // 标签 (内联显示，排除当前筛选的标签)
+                        let displayTags = item.tags.filter { $0 != filteredTagName }
+                        if !displayTags.isEmpty && !isEditMode {
                             Text("·")
                                 .foregroundStyle(Color(.quaternaryLabel))
                             
-                            ForEach(item.tags.prefix(2), id: \.self) { tagName in
+                            ForEach(displayTags.prefix(2), id: \.self) { tagName in
                                 Text(tagName)
                                     .font(.system(size: 11, weight: .medium))
                                     .foregroundStyle(Color(hex: 0x6366F1))
@@ -344,8 +347,8 @@ struct HistoryRowView: View {
                                     )
                             }
                             
-                            if item.tags.count > 2 {
-                                Text("+\(item.tags.count - 2)")
+                            if displayTags.count > 2 {
+                                Text("+\(displayTags.count - 2)")
                                     .font(.system(size: 11, weight: .medium))
                                     .foregroundStyle(Color(.tertiaryLabel))
                             }
