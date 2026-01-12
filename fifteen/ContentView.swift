@@ -5,6 +5,7 @@ struct ContentView: View {
     @State private var inputText: String = ""
     @State private var showHistory: Bool = false
     @State private var shimmerOffset: CGFloat = -80
+    @State private var viewWidth: CGFloat = 0
 
     @FocusState private var isTextEditorFocused: Bool
     
@@ -18,6 +19,12 @@ struct ContentView: View {
                 ZStack {
                     Color(hex: 0xF2F2F6)
                         .ignoresSafeArea()
+                        .onAppear {
+                            viewWidth = geometry.size.width
+                        }
+                        .onChange(of: geometry.size.width) { _, newWidth in
+                            viewWidth = newWidth
+                        }
                     
                     VStack(spacing: 0) {
                         editorArea
@@ -157,9 +164,8 @@ struct ContentView: View {
         HistoryManager.shared.addRecord(inputText)
         
         // 触发玻璃光掠过动画（仅从左到右）
-        let screenWidth = UIScreen.main.bounds.width
         withAnimation(.easeInOut(duration: 0.5)) {
-            shimmerOffset = screenWidth + 80
+            shimmerOffset = viewWidth + 80
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             shimmerOffset = -80  // 无动画地重置回起点
