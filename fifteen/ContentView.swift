@@ -75,6 +75,10 @@ struct ContentView: View {
                 isTextEditorFocused = true
             }
         }
+        .onChange(of: isTextEditorFocused) { _, isFocused in
+            // 输入状态时阻止息屏
+            UIApplication.shared.isIdleTimerDisabled = isFocused
+        }
     }
     
     private var statusBar: some View {
