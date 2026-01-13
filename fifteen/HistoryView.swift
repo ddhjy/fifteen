@@ -265,8 +265,6 @@ struct HistoryRowView: View {
     let onToggleSelection: () -> Void
     let onTagTap: () -> Void
     
-    @State private var isPressed = false
-    
     var body: some View {
         Button(action: {
             if isEditMode {
@@ -365,15 +363,8 @@ struct HistoryRowView: View {
             .padding(.vertical, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(rowBackground)
-            .scaleEffect(isPressed ? 0.98 : 1)
-            .scaleEffect(isCopied && !isEditMode ? 1.02 : 1)
         }
         .buttonStyle(.plain)
-        .onLongPressGesture(minimumDuration: 0.1, pressing: { pressing in
-            withAnimation(.easeOut(duration: 0.12)) {
-                isPressed = pressing
-            }
-        }) { }
     }
     
     @ViewBuilder
@@ -386,19 +377,9 @@ struct HistoryRowView: View {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .strokeBorder(Color(hex: 0x6366F1).opacity(0.25), lineWidth: 1.5)
                 )
-        } else if isCopied {
-            // 复制成功状态
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(hex: 0x10B981).opacity(0.08))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color(hex: 0x10B981).opacity(0.25), lineWidth: 1)
-                )
         } else {
-            // 默认状态：使用轻量级白色背景
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(.systemBackground))
-                .shadow(color: Color.black.opacity(0.03), radius: 10, x: 0, y: 2)
+            // 透明背景
+            Color.clear
         }
     }
 }
