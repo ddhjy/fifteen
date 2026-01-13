@@ -55,6 +55,12 @@ struct ContentView: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(isPresented: $showHistory) {
                 HistoryView()
+                    .onDisappear {
+                        // 返回时延迟弹出键盘
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            isTextEditorFocused = true
+                        }
+                    }
             }
             .safeAreaBar(edge: .bottom) {
                 bottomToolbar
@@ -71,8 +77,10 @@ struct ContentView: View {
                 isTextEditorFocused = false
                 UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             } else {
-                // 返回时弹出键盘
-                isTextEditorFocused = true
+                // 返回时延迟弹出键盘，等待动画完成
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    isTextEditorFocused = true
+                }
             }
         }
         .onChange(of: isTextEditorFocused) { _, isFocused in
