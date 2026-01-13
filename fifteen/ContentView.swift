@@ -24,13 +24,7 @@ struct ContentView: View {
                 }
         }
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(action: {}) {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 17, weight: .regular))
-                    }
-                    .tint(.primary)
-                }
+
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: navigateToHistory) {
                         Image(systemName: "clock.arrow.circlepath")
@@ -39,8 +33,7 @@ struct ContentView: View {
                     .tint(.primary)
                 }
             }
-            .navigationTitle("语音输入")
-            .navigationBarTitleDisplayMode(.inline)
+
             .navigationDestination(isPresented: $showHistory) {
                 HistoryView()
                     .onDisappear {
