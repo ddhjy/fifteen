@@ -25,17 +25,8 @@ struct HistoryView: View {
     
     var body: some View {
         ZStack {
-            // 背景渐变 - iOS 26 风格
-            LinearGradient(
-                colors: [
-                    Color(hex: 0xF8F9FA),
-                    Color(hex: 0xF2F2F6),
-                    Color(hex: 0xEBECF0)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            Color(.secondarySystemBackground)
+                .ignoresSafeArea()
             
             if historyManager.items.isEmpty {
                 emptyStateView
