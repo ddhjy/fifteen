@@ -17,7 +17,7 @@ struct ContentView: View {
         NavigationStack {
             GeometryReader { geometry in
                 ZStack {
-                    Color(hex: 0xF2F2F6)
+                    Color(.systemBackground)
                         .ignoresSafeArea()
                         .onAppear {
                             viewWidth = geometry.size.width
@@ -27,16 +27,12 @@ struct ContentView: View {
                         }
                     
                     VStack(spacing: 0) {
-                        editorArea
-                            .padding(.top, 20)
-                            .padding(.horizontal, 20)
-                        
-                        Spacer(minLength: 40)
-                        
-                        bottomBar
-                            .padding(.horizontal, 24)
-                            .padding(.bottom, 20)
+                        // 全屏编辑区域
+                        fullScreenEditor
                     }
+                    
+                    // 玻璃光掠过效果（全屏）
+                    shimmerOverlay
                 }
             }
             .toolbar {
@@ -59,63 +55,84 @@ struct ContentView: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(isPresented: $showHistory) {
                 HistoryView()
-                    .onAppear {
-                        // 跳转完成后静默收起键盘
-                        isTextEditorFocused = false
-                    }
-                    .onDisappear {
-                        // 返回后直接弹出键盘
-                        isTextEditorFocused = true
-                    }
+            }
+            .safeAreaBar(edge: .bottom) {
+                bottomToolbar
             }
         }
         .onAppear {
-            // 延迟弹出键盘，等待页面动画完成
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 isTextEditorFocused = true
             }
         }
+        .onChange(of: showHistory) { _, isShowing in
+            if isShowing {
+                // 跳转到历史页面时隐藏键盘
+                isTextEditorFocused = false
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            } else {
+                // 返回时弹出键盘
+                isTextEditorFocused = true
+            }
+        }
         .onChange(of: isTextEditorFocused) { _, isFocused in
-            // 输入状态时阻止息屏
             UIApplication.shared.isIdleTimerDisabled = isFocused
         }
     }
     
-    private var statusBar: some View {
-        Text("\(characterCount) 字")
-            .font(.system(size: 12, weight: .medium, design: .rounded))
-            .foregroundStyle(Color(.tertiaryLabel))
-            .contentTransition(.numericText())
-            .animation(.easeInOut(duration: 0.2), value: characterCount)
+    private var bottomToolbar: some View {
+        HStack(spacing: 24) {
+            Button(action: copyAndClear) {
+                Image(systemName: "paperplane.fill")
+                    .font(.system(size: 20))
+            }
+            .tint(primaryColor)
+            
+            Button(action: clearText) {
+                Image(systemName: "trash")
+                    .font(.system(size: 20))
+            }
+            .tint(.primary)
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 12)
+        .glassEffect(.regular.interactive(), in: Capsule())
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
     }
     
-    private var editorArea: some View {
-        ZStack(alignment: .topLeading) {
-            TextEditor(text: $inputText)
-                .focused($isTextEditorFocused)
-                .font(.system(size: 17, weight: .regular, design: .default))
-                .scrollContentBackground(.hidden)
-                .padding(16)
-                .padding(.bottom, 32) // 为底部状态栏留出空间
+    private var fullScreenEditor: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // 标题输入区
+            TextField("标题", text: .constant(""))
+                .font(.system(size: 17, weight: .regular))
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
             
-            // 状态显示移到右下角
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    statusBar
-                        .padding(.trailing, 16)
-                        .padding(.bottom, 12)
+            // 分隔线
+            Divider()
+                .padding(.horizontal, 20)
+            
+            // 正文输入区
+            ZStack(alignment: .topLeading) {
+                if inputText.isEmpty {
+                    Text("开始记录...")
+                        .font(.system(size: 17))
+                        .foregroundStyle(Color(.placeholderText))
+                        .padding(.horizontal, 20)
+                        .padding(.top, 8)
                 }
+                
+                TextEditor(text: $inputText)
+                    .focused($isTextEditorFocused)
+                    .font(.system(size: 17, weight: .regular))
+                    .scrollContentBackground(.hidden)
+                    .padding(.horizontal, 16)
             }
-            
-            // 玻璃光掠过效果
-            shimmerOverlay
+            .frame(maxHeight: .infinity)
         }
-        .frame(minHeight: 280)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
     
     private var shimmerOverlay: some View {
@@ -136,25 +153,7 @@ struct ContentView: View {
             .blur(radius: 6)
             .offset(x: shimmerOffset, y: -shimmerOffset * 0.7)
         }
-        .allowsHitTesting(false) // 确保不影响触摸交互
-    }
-    
-    private var bottomBar: some View {
-        HStack(spacing: 16) {
-            Button(action: copyAndClear) {
-                Label("复制", systemImage: "paperplane.fill")
-            }
-            .buttonStyle(.glassProminent)
-            .tint(Color(hex: 0x6366F1))
-            
-            Button(action: clearText) {
-                Image(systemName: "trash")
-                    .font(.system(size: 16, weight: .medium))
-            }
-            .buttonStyle(.glass)
-            
-            Spacer()
-        }
+        .allowsHitTesting(false)
     }
     
     private func navigateToHistory() {
