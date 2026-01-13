@@ -378,8 +378,10 @@ struct HistoryRowView: View {
                         .strokeBorder(Color(hex: 0x6366F1).opacity(0.25), lineWidth: 1.5)
                 )
         } else {
-            // 透明背景
-            Color.clear
+            // 默认状态：使用轻量级白色背景
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(.systemBackground))
+                .shadow(color: Color.black.opacity(0.03), radius: 10, x: 0, y: 2)
         }
     }
 }
