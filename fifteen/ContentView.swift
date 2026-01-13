@@ -112,17 +112,6 @@ struct ContentView: View {
     
     private var fullScreenEditor: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // 标题输入区
-            TextField("标题", text: .constant(""))
-                .font(.system(size: 17, weight: .regular))
-                .foregroundStyle(.primary)
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-            
-            // 分隔线
-            Divider()
-                .padding(.horizontal, 20)
-            
             // 正文输入区
             ZStack(alignment: .topLeading) {
                 if inputText.isEmpty {
