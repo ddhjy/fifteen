@@ -89,22 +89,23 @@ struct ContentView: View {
     }
     
     private var bottomToolbar: some View {
-        HStack(spacing: 24) {
+        HStack(spacing: 12) {
             Button(action: copyAndClear) {
                 Image(systemName: "paperplane.fill")
                     .font(.system(size: 20))
             }
             .tint(primaryColor)
+            .padding(14)
+            .glassEffect(.regular.interactive(), in: Circle())
             
             Button(action: clearText) {
                 Image(systemName: "trash")
                     .font(.system(size: 20))
             }
             .tint(.primary)
+            .padding(14)
+            .glassEffect(.regular.interactive(), in: Circle())
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 12)
-        .glassEffect(.regular.interactive(), in: Capsule())
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
@@ -115,7 +116,7 @@ struct ContentView: View {
             // 正文输入区
             ZStack(alignment: .topLeading) {
                 if inputText.isEmpty {
-                    Text("开始记录...")
+                    Text("开始输入...")
                         .font(.system(size: 17))
                         .foregroundStyle(Color(.placeholderText))
                         .padding(.horizontal, 20)
@@ -126,6 +127,7 @@ struct ContentView: View {
                     .focused($isTextEditorFocused)
                     .font(.system(size: 17, weight: .regular))
                     .scrollContentBackground(.hidden)
+                    .scrollDisabled(inputText.isEmpty)
                     .padding(.horizontal, 16)
             }
             .frame(maxHeight: .infinity)
