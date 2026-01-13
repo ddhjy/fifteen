@@ -4,8 +4,7 @@ import UIKit
 struct ContentView: View {
     @State private var inputText: String = ""
     @State private var showHistory: Bool = false
-    @State private var shimmerOffset: CGFloat = -80
-    @State private var viewWidth: CGFloat = 0
+
 
     @FocusState private var isTextEditorFocused: Bool
     
@@ -15,26 +14,15 @@ struct ContentView: View {
     
     var body: some View {
         NavigationStack {
-            GeometryReader { geometry in
-                ZStack {
-                    Color(.systemBackground)
-                        .ignoresSafeArea()
-                        .onAppear {
-                            viewWidth = geometry.size.width
-                        }
-                        .onChange(of: geometry.size.width) { _, newWidth in
-                            viewWidth = newWidth
-                        }
-                    
-                    VStack(spacing: 0) {
-                        // 全屏编辑区域
-                        fullScreenEditor
-                    }
-                    
-                    // 玻璃光掠过效果（全屏）
-                    shimmerOverlay
+            ZStack {
+                Color(.systemBackground)
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 0) {
+                    // 全屏编辑区域
+                    fullScreenEditor
                 }
-            }
+        }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button(action: {}) {
@@ -134,26 +122,7 @@ struct ContentView: View {
         }
     }
     
-    private var shimmerOverlay: some View {
-        GeometryReader { geometry in
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(0),
-                    Color.white.opacity(0.4),
-                    Color.white.opacity(0.6),
-                    Color.white.opacity(0.4),
-                    Color.white.opacity(0)
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-            .frame(width: 120, height: geometry.size.height * 2)
-            .rotationEffect(.degrees(-45))
-            .blur(radius: 6)
-            .offset(x: shimmerOffset, y: -shimmerOffset * 0.7)
-        }
-        .allowsHitTesting(false)
-    }
+
     
     private func navigateToHistory() {
         showHistory = true
@@ -177,20 +146,8 @@ struct ContentView: View {
         UIPasteboard.general.string = inputText
         HistoryManager.shared.addRecord(inputText)
         
-        // 触发玻璃光掠过动画（仅从左到右）
-        withAnimation(.easeInOut(duration: 0.5)) {
-            shimmerOffset = viewWidth + 80
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            shimmerOffset = -80  // 无动画地重置回起点
-        }
-        
-        // 动画走到一半时清空输入框
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            withAnimation(.easeOut(duration: 0.25)) {
-                inputText = ""
-            }
-        }
+        // 直接清空输入框
+        inputText = ""
     }
 }
 

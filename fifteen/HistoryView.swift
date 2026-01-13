@@ -311,7 +311,7 @@ struct HistoryRowView: View {
                         .lineLimit(10)
                         .multilineTextAlignment(.leading)
                     
-                    // 底部信息区
+                    // 底部信息区 - 固定高度防止标签增减时抖动
                     HStack(spacing: 8) {
                         // 日期图标
                         Image(systemName: "calendar")
@@ -357,6 +357,7 @@ struct HistoryRowView: View {
                             .buttonStyle(.plain)
                         }
                     }
+                    .frame(height: 20)
                 }
             }
             .padding(.horizontal, 16)
