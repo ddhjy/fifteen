@@ -82,24 +82,24 @@ struct ContentView: View {
             // 标签选择按钮
             if !tagManager.tags.isEmpty {
                 Button(action: { showTagSelector = true }) {
-                    ZStack(alignment: .topTrailing) {
+                    HStack(spacing: 6) {
                         Image(systemName: "tag")
                             .font(.system(size: 18))
                         
-                        if !selectedTags.isEmpty {
+                        if selectedTags.count == 1, let tagName = selectedTags.first {
+                            Text(tagName)
+                                .font(.system(size: 14, weight: .medium))
+                                .lineLimit(1)
+                        } else if selectedTags.count > 1 {
                             Text("\(selectedTags.count)")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(.white)
-                                .frame(width: 16, height: 16)
-                                .background(primaryColor)
-                                .clipShape(Circle())
-                                .offset(x: 6, y: -6)
+                                .font(.system(size: 14, weight: .medium))
                         }
                     }
                 }
                 .tint(selectedTags.isEmpty ? .primary : primaryColor)
-                .padding(14)
-                .glassEffect(.regular.interactive(), in: Circle())
+                .padding(.horizontal, selectedTags.isEmpty ? 14 : 16)
+                .padding(.vertical, 14)
+                .glassEffect(.regular.interactive(), in: Capsule())
             }
             
             Spacer()
