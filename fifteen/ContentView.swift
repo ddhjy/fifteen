@@ -70,7 +70,7 @@ struct ContentView: View {
     }
     
     private var bottomToolbar: some View {
-        HStack(spacing: 12) {
+        HStack {
             Button(action: copyAndClear) {
                 Image(systemName: "paperplane.fill")
                     .font(.system(size: 20))
@@ -78,6 +78,8 @@ struct ContentView: View {
             .tint(primaryColor)
             .padding(14)
             .glassEffect(.regular.interactive(), in: Circle())
+            
+            Spacer()
             
             Button(action: clearText) {
                 Image(systemName: "trash")
@@ -87,7 +89,6 @@ struct ContentView: View {
             .padding(14)
             .glassEffect(.regular.interactive(), in: Circle())
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
     }
