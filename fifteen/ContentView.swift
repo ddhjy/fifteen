@@ -5,8 +5,10 @@ struct ContentView: View {
     @State private var inputText: String = ""
     @State private var showHistory: Bool = false
 
-
     @FocusState private var isTextEditorFocused: Bool
+    
+    // 使用静态变量存储键盘弹出任务，可以被取消
+    private static var keyboardWorkItem: DispatchWorkItem?
     
     private let primaryColor = Color(hex: 0x6366F1)
     
@@ -36,32 +38,24 @@ struct ContentView: View {
 
             .navigationDestination(isPresented: $showHistory) {
                 HistoryView()
-                    .onDisappear {
-                        // 返回时延迟弹出键盘
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            isTextEditorFocused = true
-                        }
-                    }
             }
             .safeAreaBar(edge: .bottom) {
                 bottomToolbar
             }
         }
         .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                isTextEditorFocused = true
-            }
+            scheduleKeyboardShow(delay: 0.5)
         }
         .onChange(of: showHistory) { _, isShowing in
             if isShowing {
-                // 跳转到历史页面时隐藏键盘
+                // 跳转到历史页面时隐藏键盘并取消任务
+                Self.keyboardWorkItem?.cancel()
+                Self.keyboardWorkItem = nil
                 isTextEditorFocused = false
                 UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             } else {
-                // 返回时延迟弹出键盘，等待动画完成
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    isTextEditorFocused = true
-                }
+                // 返回时延迟弹出键盘
+                scheduleKeyboardShow(delay: 0.5)
             }
         }
         .onChange(of: isTextEditorFocused) { _, isFocused in
@@ -117,6 +111,28 @@ struct ContentView: View {
     }
     
 
+    
+    /// 安全地调度键盘弹出任务，使用 DispatchWorkItem 实现可取消的延迟任务
+    private func scheduleKeyboardShow(delay: Double) {
+        Self.keyboardWorkItem?.cancel()
+        
+        let workItem = DispatchWorkItem { [self] in
+            guard !showHistory else { return }
+            isTextEditorFocused = true
+            
+            // 重试机制，确保视图完全就绪后焦点能正确设置
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [self] in
+                guard !showHistory, !isTextEditorFocused else { return }
+                isTextEditorFocused = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [self] in
+                guard !showHistory, !isTextEditorFocused else { return }
+                isTextEditorFocused = true
+            }
+        }
+        Self.keyboardWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
+    }
     
     private func navigateToHistory() {
         showHistory = true
