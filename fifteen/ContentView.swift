@@ -4,6 +4,9 @@ import UIKit
 struct ContentView: View {
     @State private var inputText: String = ""
     @State private var showHistory: Bool = false
+    @State private var selectedTags: Set<String> = []
+    @State private var showTagSelector: Bool = false
+    @State private var tagManager = TagManager.shared
 
     @FocusState private var isTextEditorFocused: Bool
     
@@ -42,6 +45,9 @@ struct ContentView: View {
             .safeAreaBar(edge: .bottom) {
                 bottomToolbar
             }
+            .sheet(isPresented: $showTagSelector) {
+                EditPageTagSelector(selectedTags: $selectedTags)
+            }
         }
         .onAppear {
             scheduleKeyboardShow(delay: 0.5)
@@ -72,6 +78,29 @@ struct ContentView: View {
             .tint(primaryColor)
             .padding(14)
             .glassEffect(.regular.interactive(), in: Circle())
+            
+            // 标签选择按钮
+            if !tagManager.tags.isEmpty {
+                Button(action: { showTagSelector = true }) {
+                    ZStack(alignment: .topTrailing) {
+                        Image(systemName: "tag")
+                            .font(.system(size: 18))
+                        
+                        if !selectedTags.isEmpty {
+                            Text("\(selectedTags.count)")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 16, height: 16)
+                                .background(primaryColor)
+                                .clipShape(Circle())
+                                .offset(x: 6, y: -6)
+                        }
+                    }
+                }
+                .tint(selectedTags.isEmpty ? .primary : primaryColor)
+                .padding(14)
+                .glassEffect(.regular.interactive(), in: Circle())
+            }
             
             Spacer()
             
@@ -154,10 +183,11 @@ struct ContentView: View {
         guard !inputText.isEmpty else { return }
         
         UIPasteboard.general.string = inputText
-        HistoryManager.shared.addRecord(inputText)
+        HistoryManager.shared.addRecord(inputText, tags: Array(selectedTags))
         
-        // 直接清空输入框
+        // 直接清空输入框和选中的标签
         inputText = ""
+        selectedTags.removeAll()
     }
 }
 

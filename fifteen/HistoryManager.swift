@@ -204,7 +204,7 @@ class HistoryManager {
     
     // MARK: - Record Management
     
-    func addRecord(_ text: String) {
+    func addRecord(_ text: String, tags: [String] = []) {
         guard !text.isEmpty else { return }
         let documentsURL = storageURL
         
@@ -216,7 +216,7 @@ class HistoryManager {
         let now = Date()
         let fileName = generateFileName(for: now)
         let description = String(text.prefix(50))
-        let content = generateMarkdownContent(text: text, description: description, tags: [], createdAt: now)
+        let content = generateMarkdownContent(text: text, description: description, tags: tags, createdAt: now)
         
         let fileURL = documentsURL.appendingPathComponent(fileName)
         
@@ -228,7 +228,7 @@ class HistoryManager {
                 text: text,
                 createdAt: now,
                 description: description,
-                tags: []
+                tags: tags
             )
             items.insert(newItem, at: 0)
             TagManager.shared.refreshTags(from: items)
