@@ -39,10 +39,17 @@ struct ContentView: View {
                 }
         }
             .toolbar {
-
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .topBarLeading) {
                     Button(action: navigateToHistory) {
                         Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 17, weight: .regular))
+                    }
+                    .tint(.primary)
+                }
+                
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: {}) {
+                        Image(systemName: "ellipsis")
                             .font(.system(size: 17, weight: .regular))
                     }
                     .tint(.primary)
