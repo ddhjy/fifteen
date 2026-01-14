@@ -136,7 +136,7 @@ struct HistoryView: View {
                     .frame(width: 100, height: 100)
                     .glassEffect(.regular, in: Circle())
                 
-                Image(systemName: "clock.arrow.circlepath")
+                Image(systemName: "rectangle.stack")
                     .font(.system(size: 40, weight: .light))
                     .foregroundStyle(
                         LinearGradient(

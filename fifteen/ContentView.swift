@@ -41,7 +41,7 @@ struct ContentView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button(action: navigateToHistory) {
-                        Image(systemName: "clock.arrow.circlepath")
+                        Image(systemName: "rectangle.stack")
                             .font(.system(size: 17, weight: .regular))
                     }
                     .tint(.primary)
@@ -92,7 +92,7 @@ struct ContentView: View {
     private var bottomToolbar: some View {
         HStack {
             Button(action: copyAndClear) {
-                Image(systemName: "paperplane.fill")
+                Image(systemName: "paperplane")
                     .font(.system(size: 20))
             }
             .tint(primaryColor)
