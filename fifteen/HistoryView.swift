@@ -296,19 +296,18 @@ struct HistoryRowView: View {
                 
                 // 主内容
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(item.preview)
+                    Text(item.text)
                         .font(.system(size: 16, weight: .regular))
                         .foregroundStyle(Color(.label))
-                        .lineLimit(10)
                         .multilineTextAlignment(.leading)
+                    
+                    // 分割线
+                    Rectangle()
+                        .fill(Color(.separator).opacity(0.5))
+                        .frame(height: 1)
                     
                     // 底部信息区 - 固定高度防止标签增减时抖动
                     HStack(spacing: 8) {
-                        // 日期图标
-                        Image(systemName: "calendar")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(Color(hex: 0x6366F1).opacity(0.7))
-                        
                         // 日期
                         Text(item.formattedDate)
                             .font(.system(size: 11, weight: .regular))
@@ -344,13 +343,13 @@ struct HistoryRowView: View {
                                 Image(systemName: "ellipsis")
                                     .font(.system(size: 14, weight: .semibold))
                                     .foregroundStyle(Color(.tertiaryLabel))
-                                    .frame(width: 32, height: 32)
+                                    .frame(width: 32, height: 16, alignment: .trailing)
                                     .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                         }
                     }
-                    .frame(height: 20)
+                    .frame(height: 16)
                 }
             }
             .padding(.horizontal, 16)
