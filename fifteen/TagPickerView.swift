@@ -240,9 +240,7 @@ struct TagFilterBar: View {
                         title: "全部",
                         isSelected: selectedTagName == nil
                     ) {
-                        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-                            selectedTagName = nil
-                        }
+                        selectedTagName = nil
                     }
                     
                     // 各个标签筛选
@@ -251,9 +249,7 @@ struct TagFilterBar: View {
                             title: tagName,
                             isSelected: selectedTagName == tagName
                         ) {
-                            withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-                                selectedTagName = selectedTagName == tagName ? nil : tagName
-                            }
+                            selectedTagName = selectedTagName == tagName ? nil : tagName
                         }
                     }
                 }
