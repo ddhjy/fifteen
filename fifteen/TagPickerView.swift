@@ -300,7 +300,10 @@ struct FilterChip: View {
 // MARK: - Edit Page Tag Selector (用于编辑页预选标签)
 
 struct EditPageTagSelector: View {
-    @Binding var selectedTags: Set<String>
+    let initialSelectedTags: Set<String>
+    let onSelectionChanged: (Set<String>) -> Void
+    
+    @State private var selectedTags: Set<String> = []
     @State private var tagManager = TagManager.shared
     @Environment(\.dismiss) private var dismiss
     
@@ -352,6 +355,9 @@ struct EditPageTagSelector: View {
         }
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
+        .onAppear {
+            selectedTags = initialSelectedTags
+        }
     }
     
     private var emptyTagsView: some View {
@@ -377,6 +383,7 @@ struct EditPageTagSelector: View {
             } else {
                 selectedTags.insert(tagName)
             }
+            onSelectionChanged(selectedTags)
         }
     }
 }

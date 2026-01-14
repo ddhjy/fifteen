@@ -4,9 +4,19 @@ import UIKit
 struct ContentView: View {
     @State private var inputText: String = ""
     @State private var showHistory: Bool = false
-    @State private var selectedTags: Set<String> = []
+    @AppStorage("selectedTagsData") private var selectedTagsData: Data = Data()
     @State private var showTagSelector: Bool = false
     @State private var tagManager = TagManager.shared
+    
+    private var selectedTags: Set<String> {
+        get {
+            (try? JSONDecoder().decode(Set<String>.self, from: selectedTagsData)) ?? []
+        }
+    }
+    
+    private func updateSelectedTags(_ newValue: Set<String>) {
+        selectedTagsData = (try? JSONEncoder().encode(newValue)) ?? Data()
+    }
 
     @FocusState private var isTextEditorFocused: Bool
     
@@ -46,7 +56,10 @@ struct ContentView: View {
                 bottomToolbar
             }
             .sheet(isPresented: $showTagSelector) {
-                EditPageTagSelector(selectedTags: $selectedTags)
+                EditPageTagSelector(
+                    initialSelectedTags: selectedTags,
+                    onSelectionChanged: { updateSelectedTags($0) }
+                )
             }
         }
         .onAppear {
@@ -185,9 +198,8 @@ struct ContentView: View {
         UIPasteboard.general.string = inputText
         HistoryManager.shared.addRecord(inputText, tags: Array(selectedTags))
         
-        // 直接清空输入框和选中的标签
+        // 只清空输入框，保留选中的标签供下次使用
         inputText = ""
-        selectedTags.removeAll()
     }
 }
 
