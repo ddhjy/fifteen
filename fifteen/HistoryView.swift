@@ -42,14 +42,6 @@ struct HistoryView: View {
                     }
                 }
             }
-            
-            // 编辑模式下的底部操作栏
-            if isEditMode && !selectedItems.isEmpty {
-                VStack {
-                    Spacer()
-                    editModeBottomBar
-                }
-            }
         }
         .navigationTitle("记录")
         .navigationBarTitleDisplayMode(.inline)
@@ -70,7 +62,40 @@ struct HistoryView: View {
                     .tint(.primary)
                 }
             }
+            
+            // 编辑模式底部工具栏
+            ToolbarItemGroup(placement: .bottomBar) {
+                if isEditMode && !selectedItems.isEmpty {
+                    Button(action: {
+                        if selectedItems.count == filteredItems.count {
+                            selectedItems.removeAll()
+                        } else {
+                            selectedItems = Set(filteredItems.map { $0.id })
+                        }
+                    }) {
+                        Text(selectedItems.count == filteredItems.count ? "取消全选" : "全选")
+                            .font(.system(size: 17))
+                    }
+                    .tint(Color(hex: 0x6366F1))
+                    
+                    Spacer()
+                    
+                    Text("已选择 \(selectedItems.count) 项")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color(.secondaryLabel))
+                        .fixedSize()
+                    
+                    Spacer()
+                    
+                    Button(action: { showClearConfirmation = true }) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 20))
+                    }
+                    .tint(Color(hex: 0xFF3B30))
+                }
+            }
         }
+        .toolbarBackgroundVisibility(.visible, for: .bottomBar)
         .confirmationDialog("确定要删除选中的 \(selectedItems.count) 条记录吗？", isPresented: $showClearConfirmation, titleVisibility: .visible) {
             Button("删除选中", role: .destructive) {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -87,44 +112,6 @@ struct HistoryView: View {
                 appearAnimation = true
             }
         }
-    }
-    
-    private var editModeBottomBar: some View {
-        HStack(spacing: 16) {
-            Button(action: {
-                // 全选/取消全选
-                if selectedItems.count == filteredItems.count {
-                    selectedItems.removeAll()
-                } else {
-                    selectedItems = Set(filteredItems.map { $0.id })
-                }
-            }) {
-                Text(selectedItems.count == filteredItems.count ? "取消全选" : "全选")
-                    .font(.system(size: 15, weight: .medium))
-            }
-            .tint(Color(hex: 0x6366F1))
-            
-            Spacer()
-            
-            Text("已选择 \(selectedItems.count) 项")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(Color(.secondaryLabel))
-            
-            Spacer()
-            
-            Button(action: { showClearConfirmation = true }) {
-                Image(systemName: "trash")
-                    .font(.system(size: 16, weight: .medium))
-            }
-            .tint(Color(hex: 0xFF3B30))
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
-        .transition(.move(edge: .bottom).combined(with: .opacity))
     }
     
     private func deleteSelectedItems() {
@@ -208,7 +195,6 @@ struct HistoryView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .padding(.bottom, isEditMode ? 80 : 0) // 为底部操作栏留空间
         }
         .scrollIndicators(.hidden)
     }
