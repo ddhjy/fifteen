@@ -342,8 +342,10 @@ struct HistoryRowView: View {
                         if !isEditMode {
                             Button(action: onTagTap) {
                                 Image(systemName: "ellipsis")
-                                    .font(.system(size: 14, weight: .medium))
+                                    .font(.system(size: 14, weight: .semibold))
                                     .foregroundStyle(Color(.tertiaryLabel))
+                                    .frame(width: 32, height: 32)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                         }
