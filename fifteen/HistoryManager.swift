@@ -317,6 +317,32 @@ class HistoryManager {
         return items.filter { $0.tags.contains(tagName) }
     }
     
+    func renameTag(from oldName: String, to newName: String) {
+        let trimmedNewName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedNewName.isEmpty, oldName != trimmedNewName else { return }
+        
+        // 更新所有包含该标签的 items
+        for index in items.indices {
+            if let tagIndex = items[index].tags.firstIndex(of: oldName) {
+                items[index].tags[tagIndex] = trimmedNewName
+                saveItem(items[index])
+            }
+        }
+        
+        TagManager.shared.refreshTags(from: items)
+        
+        // 同步更新编辑页的标签选择缓存
+        if let data = UserDefaults.standard.data(forKey: "selectedTagsData"),
+           var selectedTags = try? JSONDecoder().decode(Set<String>.self, from: data),
+           selectedTags.contains(oldName) {
+            selectedTags.remove(oldName)
+            selectedTags.insert(trimmedNewName)
+            if let newData = try? JSONEncoder().encode(selectedTags) {
+                UserDefaults.standard.set(newData, forKey: "selectedTagsData")
+            }
+        }
+    }
+    
     // MARK: - Save Item
     
     private func saveItem(_ item: HistoryItem) {

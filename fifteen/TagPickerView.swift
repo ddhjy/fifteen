@@ -14,6 +14,7 @@ struct TagPickerView: View {
     @State private var tagManager = TagManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var showCreateTag = false
+    @State private var editingTagName: String? = nil
     
     private var currentItem: HistoryItem? {
         historyManager.items.first { $0.id == itemId }
@@ -30,7 +31,8 @@ struct TagPickerView: View {
                             TagRowView(
                                 tagName: tagName,
                                 isSelected: currentItem?.tags.contains(tagName) ?? false,
-                                onToggle: { toggleTag(tagName) }
+                                onToggle: { toggleTag(tagName) },
+                                onEdit: { editingTagName = tagName }
                             )
                             
                             if tagName != tagManager.tags.last {
@@ -74,6 +76,9 @@ struct TagPickerView: View {
             .sheet(isPresented: $showCreateTag) {
                 TagCreateSheet(itemId: itemId)
             }
+            .sheet(item: $editingTagName) { tagName in
+                TagEditSheet(tagName: tagName)
+            }
         }
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
@@ -105,38 +110,121 @@ struct TagRowView: View {
     let tagName: String
     let isSelected: Bool
     let onToggle: () -> Void
+    var onEdit: (() -> Void)? = nil
     
     var body: some View {
-        Button(action: onToggle) {
-            HStack(spacing: 12) {
-                // 选中状态
-                ZStack {
-                    Circle()
-                        .stroke(isSelected ? Color(hex: 0x6366F1) : Color(.tertiaryLabel), lineWidth: 2)
-                        .frame(width: 22, height: 22)
-                    
-                    if isSelected {
+        HStack(spacing: 12) {
+            Button(action: onToggle) {
+                HStack(spacing: 12) {
+                    // 选中状态
+                    ZStack {
                         Circle()
-                            .fill(Color(hex: 0x6366F1))
+                            .stroke(isSelected ? Color(hex: 0x6366F1) : Color(.tertiaryLabel), lineWidth: 2)
                             .frame(width: 22, height: 22)
                         
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white)
+                        if isSelected {
+                            Circle()
+                                .fill(Color(hex: 0x6366F1))
+                                .frame(width: 22, height: 22)
+                            
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(.white)
+                        }
                     }
+                    
+                    Text(tagName)
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundStyle(Color(.label))
                 }
-                
-                Text(tagName)
-                    .font(.system(size: 16, weight: .regular))
-                    .foregroundStyle(Color(.label))
+            }
+            .buttonStyle(.plain)
+            
+            Spacer()
+            
+            if let onEdit = onEdit {
+                Button(action: onEdit) {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color(.tertiaryLabel))
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+}
+
+// MARK: - Tag Edit Sheet
+
+extension String: @retroactive Identifiable {
+    public var id: String { self }
+}
+
+struct TagEditSheet: View {
+    let tagName: String
+    @State private var historyManager = HistoryManager.shared
+    @Environment(\.dismiss) private var dismiss
+    @State private var newTagName: String = ""
+    @FocusState private var isInputFocused: Bool
+    
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                TextField("标签名称", text: $newTagName)
+                    .font(.system(size: 17))
+                    .padding(16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(.regularMaterial)
+                    )
+                    .padding(.horizontal, 16)
+                    .focused($isInputFocused)
                 
                 Spacer()
             }
-            .contentShape(Rectangle())
+            .padding(.top, 20)
+            .background(
+                Color(hex: 0xF2F2F6)
+                    .ignoresSafeArea()
+            )
+            .navigationTitle("编辑标签")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("取消") {
+                        dismiss()
+                    }
+                    .foregroundStyle(Color(.secondaryLabel))
+                }
+                
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("保存") {
+                        saveTag()
+                    }
+                    .font(.system(size: 16, weight: .semibold))
+                    .tint(Color(hex: 0x6366F1))
+                    .disabled(newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .onAppear {
+                newTagName = tagName
+                isInputFocused = true
+            }
         }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .presentationDetents([.height(200)])
+        .presentationDragIndicator(.visible)
+    }
+    
+    private func saveTag() {
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+        
+        historyManager.renameTag(from: tagName, to: newTagName)
+        dismiss()
     }
 }
 
