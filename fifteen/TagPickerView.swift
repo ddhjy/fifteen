@@ -34,7 +34,7 @@ struct TagPickerView: View {
                                 HStack(spacing: 12) {
                                     Image(systemName: "line.3.horizontal")
                                         .font(.system(size: 14))
-                                        .foregroundStyle(Color(.tertiaryLabel))
+                                        .foregroundStyle(Color(.secondaryLabel))
                                     
                                     Text(tagName)
                                         .font(.system(size: 16, weight: .regular))
@@ -64,15 +64,10 @@ struct TagPickerView: View {
                                 
                                 if tagName != tagManager.tags.last {
                                     Divider()
-                                        .padding(.leading, 16)
+                                        .padding(.leading, 52)
                                 }
                             }
                         }
-                        .background(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(.regularMaterial)
-                        )
-                        .padding(.horizontal, 16)
                         .padding(.top, 16)
                     }
                 }
@@ -166,7 +161,7 @@ struct TagRowView: View {
                     // 选中状态
                     ZStack {
                         Circle()
-                            .stroke(isSelected ? Color(hex: 0x6366F1) : Color(.tertiaryLabel), lineWidth: 2)
+                            .stroke(isSelected ? Color(hex: 0x6366F1) : Color(.secondaryLabel), lineWidth: 2)
                             .frame(width: 22, height: 22)
                         
                         if isSelected {
@@ -193,7 +188,7 @@ struct TagRowView: View {
                 Button(action: onEdit) {
                     Image(systemName: "pencil")
                         .font(.system(size: 14))
-                        .foregroundStyle(Color(.tertiaryLabel))
+                        .foregroundStyle(Color(.secondaryLabel))
                         .frame(width: 32, height: 32)
                         .contentShape(Rectangle())
                 }
@@ -201,7 +196,7 @@ struct TagRowView: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.vertical, 14)
     }
 }
 
@@ -454,16 +449,10 @@ struct EditPageTagSelector: View {
                             
                             if tagName != tagManager.tags.last {
                                 Divider()
-                                    .padding(.leading, 16)
+                                    .padding(.leading, 52)
                             }
                         }
                     }
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(.regularMaterial)
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
                 }
                 
                 Spacer()
@@ -530,7 +519,7 @@ struct TagSelectorRow: View {
                 // 选中状态
                 ZStack {
                     Circle()
-                        .stroke(isSelected ? Color(hex: 0x6366F1) : Color(.tertiaryLabel), lineWidth: 2)
+                        .stroke(isSelected ? Color(hex: 0x6366F1) : Color(.secondaryLabel), lineWidth: 2)
                         .frame(width: 22, height: 22)
                     
                     if isSelected {
