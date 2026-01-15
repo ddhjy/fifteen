@@ -298,49 +298,42 @@ struct HistoryRowView: View {
     let onTagTap: () -> Void
     
     var body: some View {
-        Button(action: {
+        HStack(spacing: 14) {
+            // 编辑模式下的选择圆圈
             if isEditMode {
-                onToggleSelection()
-            } else {
-                onCopy()
-            }
-        }) {
-            HStack(spacing: 14) {
-                // 编辑模式下的选择圆圈
-                if isEditMode {
-                    ZStack {
+                ZStack {
+                    Circle()
+                        .stroke(
+                            isSelected ? Color(hex: 0x6366F1) : Color(.quaternaryLabel),
+                            lineWidth: 1.5
+                        )
+                        .frame(width: 22, height: 22)
+                    
+                    if isSelected {
                         Circle()
-                            .stroke(
-                                isSelected ? Color(hex: 0x6366F1) : Color(.quaternaryLabel),
-                                lineWidth: 1.5
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color(hex: 0x6366F1), Color(hex: 0x818CF8)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
                             )
                             .frame(width: 22, height: 22)
                         
-                        if isSelected {
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [Color(hex: 0x6366F1), Color(hex: 0x818CF8)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 22, height: 22)
-                            
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(.white)
-                        }
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(.white)
                     }
-                    .transition(.scale.combined(with: .opacity))
                 }
-                
-                // 主内容
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(item.preview)
-                        .font(.system(size: 16, weight: .regular))
-                        .foregroundStyle(Color(.label))
-                        .multilineTextAlignment(.leading)
+                .transition(.scale.combined(with: .opacity))
+            }
+            
+            // 主内容
+            VStack(alignment: .leading, spacing: 8) {
+                Text(item.preview)
+                    .font(.system(size: 17, weight: .regular))
+                    .foregroundStyle(Color(.label))
+                    .multilineTextAlignment(.leading)
                     
                     // 分割线
                     Rectangle()
@@ -389,16 +382,20 @@ struct HistoryRowView: View {
                             }
                             .buttonStyle(.plain)
                         }
-                    }
-                    .frame(height: 16)
                 }
+                .frame(height: 16)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(rowBackground)
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(rowBackground)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if isEditMode {
+                onToggleSelection()
+            }
+        }
     }
     
     @ViewBuilder
