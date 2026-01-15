@@ -328,7 +328,7 @@ struct HistoryRowView: View {
                 
                 // 主内容
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(item.text)
+                    Text(item.preview)
                         .font(.system(size: 16, weight: .regular))
                         .foregroundStyle(Color(.label))
                         .multilineTextAlignment(.leading)
