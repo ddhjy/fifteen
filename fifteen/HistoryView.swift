@@ -20,9 +20,18 @@ struct HistoryView: View {
     @State private var tagPickerItem: HistoryItem? = nil
     @State private var isExporting = false
     @State private var exportedFileURL: URL? = nil
+    @State private var searchText = ""
+    @State private var isSearchActive = false
     
     private var filteredItems: [HistoryItem] {
-        historyManager.getItems(filteredBy: selectedTagFilter)
+        var items = historyManager.getItems(filteredBy: selectedTagFilter)
+        
+        // 搜索过滤
+        if !searchText.isEmpty {
+            items = items.filter { $0.text.localizedCaseInsensitiveContains(searchText) }
+        }
+        
+        return items
     }
     
     var body: some View {
@@ -33,16 +42,7 @@ struct HistoryView: View {
             if historyManager.items.isEmpty {
                 emptyStateView
             } else {
-                VStack(spacing: 0) {
-                    // 标签筛选栏
-                    TagFilterBar(selectedTagName: $selectedTagFilter)
-                    
-                    if filteredItems.isEmpty {
-                        filteredEmptyStateView
-                    } else {
-                        historyList
-                    }
-                }
+                historyContent
             }
         }
         .navigationTitle("记录")
@@ -65,6 +65,12 @@ struct HistoryView: View {
                     } else {
                         // 非编辑模式显示更多菜单
                         Menu {
+                            Button(action: {
+                                isSearchActive = true
+                            }) {
+                                Label("搜索", systemImage: "magnifyingglass")
+                            }
+                            
                             Button(action: exportNotes) {
                                 Label("导出", systemImage: "square.and.arrow.up")
                             }
@@ -148,6 +154,12 @@ struct HistoryView: View {
                 appearAnimation = true
             }
         }
+        .onChange(of: isSearchActive) { oldValue, newValue in
+            // 搜索被关闭时清空搜索文本
+            if !newValue {
+                searchText = ""
+            }
+        }
     }
     
     private func deleteSelectedItems() {
@@ -179,6 +191,31 @@ struct HistoryView: View {
                     print("Export failed: \(error)")
                 }
             }
+        }
+    }
+    
+    @ViewBuilder
+    private var historyContent: some View {
+        let content = VStack(spacing: 0) {
+            // 标签筛选栏
+            TagFilterBar(selectedTagName: $selectedTagFilter)
+            
+            if filteredItems.isEmpty {
+                if !searchText.isEmpty {
+                    searchEmptyStateView
+                } else {
+                    filteredEmptyStateView
+                }
+            } else {
+                historyList
+            }
+        }
+        
+        if isSearchActive {
+            content
+                .searchable(text: $searchText, isPresented: $isSearchActive, placement: .toolbar, prompt: "搜索记录")
+        } else {
+            content
         }
     }
     
@@ -226,6 +263,19 @@ struct HistoryView: View {
                 .foregroundStyle(Color(.tertiaryLabel))
             
             Text("没有符合筛选条件的记录")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(Color(.secondaryLabel))
+        }
+        .frame(maxHeight: .infinity)
+    }
+    
+    private var searchEmptyStateView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 40, weight: .light))
+                .foregroundStyle(Color(.tertiaryLabel))
+            
+            Text("没有找到 \"\(searchText)\"")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(Color(.secondaryLabel))
         }
