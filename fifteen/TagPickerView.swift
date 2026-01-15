@@ -15,6 +15,7 @@ struct TagPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showCreateTag = false
     @State private var editingTagName: String? = nil
+    @State private var isReordering = false
     
     private var currentItem: HistoryItem? {
         historyManager.items.first { $0.id == itemId }
@@ -26,27 +27,54 @@ struct TagPickerView: View {
                 if tagManager.tags.isEmpty {
                     emptyTagsView
                 } else {
-                    VStack(spacing: 0) {
-                        ForEach(tagManager.tags, id: \.self) { tagName in
-                            TagRowView(
-                                tagName: tagName,
-                                isSelected: currentItem?.tags.contains(tagName) ?? false,
-                                onToggle: { toggleTag(tagName) },
-                                onEdit: { editingTagName = tagName }
-                            )
-                            
-                            if tagName != tagManager.tags.last {
-                                Divider()
-                                    .padding(.leading, 16)
+                    if isReordering {
+                        // 排序模式：使用 List 支持拖拽
+                        List {
+                            ForEach(tagManager.tags, id: \.self) { tagName in
+                                HStack(spacing: 12) {
+                                    Image(systemName: "line.3.horizontal")
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(Color(.tertiaryLabel))
+                                    
+                                    Text(tagName)
+                                        .font(.system(size: 16, weight: .regular))
+                                        .foregroundStyle(Color(.label))
+                                    
+                                    Spacer()
+                                }
+                                .listRowBackground(Color.clear)
+                            }
+                            .onMove { source, destination in
+                                tagManager.moveTag(from: source, to: destination)
                             }
                         }
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
+                        .environment(\.editMode, .constant(.active))
+                    } else {
+                        // 普通模式：选择标签
+                        VStack(spacing: 0) {
+                            ForEach(tagManager.tags, id: \.self) { tagName in
+                                TagRowView(
+                                    tagName: tagName,
+                                    isSelected: currentItem?.tags.contains(tagName) ?? false,
+                                    onToggle: { toggleTag(tagName) },
+                                    onEdit: { editingTagName = tagName }
+                                )
+                                
+                                if tagName != tagManager.tags.last {
+                                    Divider()
+                                        .padding(.leading, 16)
+                                }
+                            }
+                        }
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(.regularMaterial)
+                        )
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
                     }
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(.regularMaterial)
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
                 }
                 
                 Spacer()
@@ -55,22 +83,41 @@ struct TagPickerView: View {
                 Color(hex: 0xF2F2F6)
                     .ignoresSafeArea()
             )
-            .navigationTitle("标签")
+            .navigationTitle(isReordering ? "调整顺序" : "标签")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button(action: { showCreateTag = true }) {
-                        Image(systemName: "plus")
+                    if isReordering {
+                        Button("完成") {
+                            isReordering = false
+                        }
+                        .font(.system(size: 16, weight: .semibold))
+                        .tint(Color(hex: 0x6366F1))
+                    } else {
+                        HStack(spacing: 16) {
+                            Button(action: { showCreateTag = true }) {
+                                Image(systemName: "plus")
+                            }
+                            .tint(Color(hex: 0x6366F1))
+                            
+                            if !tagManager.tags.isEmpty {
+                                Button(action: { isReordering = true }) {
+                                    Image(systemName: "arrow.up.arrow.down")
+                                }
+                                .tint(Color(hex: 0x6366F1))
+                            }
+                        }
                     }
-                    .tint(Color(hex: 0x6366F1))
                 }
                 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") {
-                        dismiss()
+                    if !isReordering {
+                        Button("完成") {
+                            dismiss()
+                        }
+                        .font(.system(size: 16, weight: .semibold))
+                        .tint(Color(hex: 0x6366F1))
                     }
-                    .font(.system(size: 16, weight: .semibold))
-                    .tint(Color(hex: 0x6366F1))
                 }
             }
             .sheet(isPresented: $showCreateTag) {

@@ -50,7 +50,11 @@ class TagManager {
     
     var tags: [String] = []
     
-    private init() {}
+    private let tagOrderKey = "tagOrderData"
+    
+    private init() {
+        loadTagOrder()
+    }
     
     func refreshTags(from items: [HistoryItem]) {
         var uniqueTags = Set<String>()
@@ -59,11 +63,50 @@ class TagManager {
                 uniqueTags.insert(tag)
             }
         }
-        tags = Array(uniqueTags).sorted()
+        
+        // 读取保存的顺序
+        let savedOrder = loadTagOrder()
+        
+        // 按保存的顺序排列，新标签追加到末尾
+        var orderedTags: [String] = []
+        for tagName in savedOrder {
+            if uniqueTags.contains(tagName) {
+                orderedTags.append(tagName)
+                uniqueTags.remove(tagName)
+            }
+        }
+        // 追加新标签（按字母排序）
+        orderedTags.append(contentsOf: uniqueTags.sorted())
+        
+        tags = orderedTags
     }
     
     func getTag(by name: String) -> String? {
         tags.first { $0 == name }
+    }
+    
+    // MARK: - Tag Order Persistence
+    
+    @discardableResult
+    private func loadTagOrder() -> [String] {
+        guard let data = UserDefaults.standard.data(forKey: tagOrderKey),
+              let order = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return order
+    }
+    
+    private func saveTagOrder() {
+        if let data = try? JSONEncoder().encode(tags) {
+            UserDefaults.standard.set(data, forKey: tagOrderKey)
+        }
+    }
+    
+    // MARK: - Reorder Tags
+    
+    func moveTag(from source: IndexSet, to destination: Int) {
+        tags.move(fromOffsets: source, toOffset: destination)
+        saveTagOrder()
     }
 }
 
