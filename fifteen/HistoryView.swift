@@ -48,37 +48,46 @@ struct HistoryView: View {
         .navigationTitle("记录")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            // 导出按钮
-            ToolbarItem(placement: .topBarLeading) {
-                if !historyManager.items.isEmpty && !isEditMode {
-                    Button(action: exportNotes) {
-                        if isExporting {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 17, weight: .regular))
-                        }
-                    }
-                    .tint(.primary)
-                    .disabled(isExporting)
-                }
-            }
-            
             ToolbarItem(placement: .topBarTrailing) {
                 if !historyManager.items.isEmpty {
-                    Button(action: {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            isEditMode.toggle()
-                            if !isEditMode {
+                    if isEditMode {
+                        // 编辑模式下显示完成按钮
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                isEditMode = false
                                 selectedItems.removeAll()
                             }
+                        }) {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 17, weight: .regular))
                         }
-                    }) {
-                        Image(systemName: isEditMode ? "checkmark" : "pencil")
-                            .font(.system(size: 17, weight: .regular))
+                        .tint(.primary)
+                    } else {
+                        // 非编辑模式显示更多菜单
+                        Menu {
+                            Button(action: exportNotes) {
+                                Label("导出", systemImage: "square.and.arrow.up")
+                            }
+                            .disabled(isExporting)
+                            
+                            Button(action: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    isEditMode = true
+                                }
+                            }) {
+                                Label("编辑", systemImage: "pencil")
+                            }
+                        } label: {
+                            if isExporting {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "ellipsis")
+                                    .font(.system(size: 17, weight: .regular))
+                            }
+                        }
+                        .tint(.primary)
                     }
-                    .tint(.primary)
                 }
             }
             
