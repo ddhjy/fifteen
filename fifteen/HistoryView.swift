@@ -48,7 +48,7 @@ struct HistoryView: View {
         .navigationTitle("记录")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
                 if !historyManager.items.isEmpty {
                     if isEditMode {
                         // 编辑模式下显示完成按钮
@@ -63,14 +63,17 @@ struct HistoryView: View {
                         }
                         .tint(.primary)
                     } else {
-                        // 非编辑模式显示更多菜单
+                        // 搜索按钮
+                        Button(action: {
+                            isSearchActive = true
+                        }) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 17, weight: .regular))
+                        }
+                        .tint(.primary)
+                        
+                        // 更多菜单
                         Menu {
-                            Button(action: {
-                                isSearchActive = true
-                            }) {
-                                Label("搜索", systemImage: "magnifyingglass")
-                            }
-                            
                             Button(action: exportNotes) {
                                 Label("导出", systemImage: "square.and.arrow.up")
                             }
