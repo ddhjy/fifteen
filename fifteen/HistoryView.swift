@@ -18,6 +18,8 @@ struct HistoryView: View {
     @State private var selectedItems: Set<UUID> = []
     @State private var selectedTagFilter: String? = nil
     @State private var tagPickerItem: HistoryItem? = nil
+    @State private var isExporting = false
+    @State private var exportedFileURL: URL? = nil
     
     private var filteredItems: [HistoryItem] {
         historyManager.getItems(filteredBy: selectedTagFilter)
@@ -46,6 +48,23 @@ struct HistoryView: View {
         .navigationTitle("记录")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            // 导出按钮
+            ToolbarItem(placement: .topBarLeading) {
+                if !historyManager.items.isEmpty && !isEditMode {
+                    Button(action: exportNotes) {
+                        if isExporting {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 17, weight: .regular))
+                        }
+                    }
+                    .tint(.primary)
+                    .disabled(isExporting)
+                }
+            }
+            
             ToolbarItem(placement: .topBarTrailing) {
                 if !historyManager.items.isEmpty {
                     Button(action: {
@@ -107,6 +126,14 @@ struct HistoryView: View {
         .sheet(item: $tagPickerItem) { item in
             TagPickerView(itemId: item.id)
         }
+        .sheet(isPresented: Binding(
+            get: { exportedFileURL != nil },
+            set: { if !$0 { exportedFileURL = nil } }
+        )) {
+            if let url = exportedFileURL {
+                ShareSheet(items: [url])
+            }
+        }
         .onAppear {
             withAnimation(.easeOut(duration: 0.4)) {
                 appearAnimation = true
@@ -124,6 +151,25 @@ struct HistoryView: View {
         selectedItems.removeAll()
         if historyManager.items.isEmpty {
             isEditMode = false
+        }
+    }
+    
+    private func exportNotes() {
+        isExporting = true
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let url = try historyManager.exportAllNotes()
+                DispatchQueue.main.async {
+                    isExporting = false
+                    exportedFileURL = url
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    isExporting = false
+                    print("Export failed: \(error)")
+                }
+            }
         }
     }
     
@@ -369,4 +415,16 @@ struct HistoryRowView: View {
     NavigationStack {
         HistoryView()
     }
+}
+
+// MARK: - Share Sheet
+
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

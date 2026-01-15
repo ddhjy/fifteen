@@ -394,4 +394,53 @@ class HistoryManager {
     func refresh() {
         loadItems()
     }
+    
+    // MARK: - Export All Notes
+    
+    func exportAllNotes() throws -> URL {
+        let documentsURL = storageURL
+        
+        // 创建临时目录
+        let tempDir = fileManager.temporaryDirectory.appendingPathComponent("NotesExport_\(UUID().uuidString)")
+        try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        
+        // 复制所有 md 文件到临时目录
+        let fileURLs = try fileManager.contentsOfDirectory(
+            at: documentsURL,
+            includingPropertiesForKeys: nil,
+            options: .skipsHiddenFiles
+        )
+        
+        for fileURL in fileURLs {
+            guard fileURL.pathExtension == "md" else { continue }
+            let destURL = tempDir.appendingPathComponent(fileURL.lastPathComponent)
+            try fileManager.copyItem(at: fileURL, to: destURL)
+        }
+        
+        // 创建 zip 文件
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd_HHmmss"
+        let zipName = "Notes_\(dateFormatter.string(from: Date())).zip"
+        let zipURL = fileManager.temporaryDirectory.appendingPathComponent(zipName)
+        
+        // 删除可能存在的旧文件
+        try? fileManager.removeItem(at: zipURL)
+        
+        // 使用 FileManager 的 zipItem 方法创建 zip
+        let coordinator = NSFileCoordinator()
+        var error: NSError?
+        
+        coordinator.coordinate(readingItemAt: tempDir, options: .forUploading, error: &error) { zippedURL in
+            try? fileManager.copyItem(at: zippedURL, to: zipURL)
+        }
+        
+        // 清理临时目录
+        try? fileManager.removeItem(at: tempDir)
+        
+        if let error = error {
+            throw error
+        }
+        
+        return zipURL
+    }
 }
