@@ -28,10 +28,10 @@ struct HistoryItem: Identifiable, Equatable {
     }
     
     var preview: String {
-        if text.count <= 50 {
+        if text.count <= 200 {
             return text
         }
-        return String(text.prefix(50)) + "..."
+        return String(text.prefix(200)) + "..."
     }
     
     var formattedDate: String {
