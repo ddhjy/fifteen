@@ -440,24 +440,27 @@ struct EditPageTagSelector: View {
             VStack(spacing: 0) {
                 if tagManager.tags.isEmpty {
                     emptyTagsView
+                    Spacer()
                 } else {
-                    VStack(spacing: 0) {
-                        ForEach(tagManager.tags, id: \.self) { tagName in
-                            TagSelectorRow(
-                                tagName: tagName,
-                                isSelected: selectedTags.contains(tagName),
-                                onToggle: { toggleTag(tagName) }
-                            )
-                            
-                            if tagName != tagManager.tags.last {
-                                Divider()
-                                    .padding(.leading, 52)
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            ForEach(tagManager.tags, id: \.self) { tagName in
+                                TagSelectorRow(
+                                    tagName: tagName,
+                                    isSelected: selectedTags.contains(tagName),
+                                    onToggle: { toggleTag(tagName) }
+                                )
+                                
+                                if tagName != tagManager.tags.last {
+                                    Divider()
+                                        .padding(.leading, 52)
+                                }
                             }
                         }
+                        .padding(.top, 16)
                     }
+                    Spacer()
                 }
-                
-                Spacer()
             }
             .background(
                 Color(hex: 0xF2F2F6)
