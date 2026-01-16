@@ -52,10 +52,15 @@ class TagManager {
     
     var tags: [String] = []
     
+    /// 上次选择的标签（用于新草稿默认标签）
+    private(set) var lastSelectedTags: [String] = []
+    
     private let tagOrderKey = "tagOrderData"
+    private let lastSelectedTagsKey = "lastSelectedTags"
     
     private init() {
         loadTagOrder()
+        loadLastSelectedTags()
     }
     
     func refreshTags(from items: [HistoryItem]) {
@@ -101,6 +106,24 @@ class TagManager {
     private func saveTagOrder() {
         if let data = try? JSONEncoder().encode(tags) {
             UserDefaults.standard.set(data, forKey: tagOrderKey)
+        }
+    }
+    
+    // MARK: - Last Selected Tags
+    
+    private func loadLastSelectedTags() {
+        guard let data = UserDefaults.standard.data(forKey: lastSelectedTagsKey),
+              let savedTags = try? JSONDecoder().decode([String].self, from: data) else {
+            lastSelectedTags = []
+            return
+        }
+        lastSelectedTags = savedTags
+    }
+    
+    func saveLastSelectedTags(_ tags: [String]) {
+        lastSelectedTags = tags
+        if let data = try? JSONEncoder().encode(tags) {
+            UserDefaults.standard.set(data, forKey: lastSelectedTagsKey)
         }
     }
     
@@ -156,9 +179,9 @@ class HistoryManager {
         }
     }
     
-    /// 创建新的空草稿
+    /// 创建新的空草稿（使用上次选择的标签作为默认值）
     private func createNewDraft() -> HistoryItem {
-        return HistoryItem(isDraft: true)
+        return HistoryItem(tags: TagManager.shared.lastSelectedTags, isDraft: true)
     }
     
     /// 更新草稿文本内容
@@ -174,6 +197,9 @@ class HistoryManager {
               !items[draftIndex].text.isEmpty else { return }
         
         let draft = items[draftIndex]
+        
+        // 保存当前选择的标签，用于下次创建草稿时作为默认值
+        TagManager.shared.saveLastSelectedTags(draft.tags)
         
         // 生成正式文件名并保存
         let now = Date()
@@ -195,7 +221,7 @@ class HistoryManager {
         // 删除草稿文件
         deleteDraftFile()
         
-        // 创建新草稿并插入到最前面
+        // 创建新草稿并插入到最前面（会自动使用上次选择的标签）
         let newDraft = createNewDraft()
         items.insert(newDraft, at: 0)
         
