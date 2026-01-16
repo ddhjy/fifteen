@@ -373,17 +373,6 @@ class HistoryManager {
         }
         
         TagManager.shared.refreshTags(from: items)
-        
-        // 同步更新编辑页的标签选择缓存
-        if let data = UserDefaults.standard.data(forKey: "selectedTagsData"),
-           var selectedTags = try? JSONDecoder().decode(Set<String>.self, from: data),
-           selectedTags.contains(oldName) {
-            selectedTags.remove(oldName)
-            selectedTags.insert(trimmedNewName)
-            if let newData = try? JSONEncoder().encode(selectedTags) {
-                UserDefaults.standard.set(newData, forKey: "selectedTagsData")
-            }
-        }
     }
     
     // MARK: - Save Item

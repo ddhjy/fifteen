@@ -4,19 +4,9 @@ import UIKit
 struct ContentView: View {
     @State private var inputText: String = ""
     @State private var showHistory: Bool = false
-    @AppStorage("selectedTagsData") private var selectedTagsData: Data = Data()
+    @State private var selectedTags: Set<String> = []
     @State private var showTagSelector: Bool = false
     @State private var tagManager = TagManager.shared
-    
-    private var selectedTags: Set<String> {
-        get {
-            (try? JSONDecoder().decode(Set<String>.self, from: selectedTagsData)) ?? []
-        }
-    }
-    
-    private func updateSelectedTags(_ newValue: Set<String>) {
-        selectedTagsData = (try? JSONEncoder().encode(newValue)) ?? Data()
-    }
 
     @FocusState private var isTextEditorFocused: Bool
     
@@ -65,7 +55,7 @@ struct ContentView: View {
             .sheet(isPresented: $showTagSelector) {
                 EditPageTagSelector(
                     initialSelectedTags: selectedTags,
-                    onSelectionChanged: { updateSelectedTags($0) }
+                    onSelectionChanged: { selectedTags = $0 }
                 )
             }
         }
