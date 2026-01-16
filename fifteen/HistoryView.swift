@@ -133,13 +133,15 @@ struct HistoryView: View {
             }
         }
         .toolbarBackgroundVisibility(.visible, for: .bottomBar)
-        .confirmationDialog("确定要删除选中的 \(selectedItems.count) 条记录吗？", isPresented: $showClearConfirmation, titleVisibility: .visible) {
-            Button("删除选中", role: .destructive) {
+        .alert("确定要删除选中的 \(selectedItems.count) 条记录吗？", isPresented: $showClearConfirmation) {
+            Button("取消", role: .cancel) { }
+            Button("删除", role: .destructive) {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                     deleteSelectedItems()
                 }
             }
-            Button("取消", role: .cancel) { }
+        } message: {
+            Text("此操作无法撤销")
         }
         .sheet(item: $tagPickerItem) { item in
             TagPickerView(itemId: item.id)
