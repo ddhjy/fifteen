@@ -158,31 +158,26 @@ struct TagRowView: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            Button(action: onToggle) {
-                HStack(spacing: 12) {
-                    // 选中状态
-                    ZStack {
-                        Circle()
-                            .stroke(isSelected ? Color(hex: 0x6366F1) : Color(.secondaryLabel), lineWidth: 2)
-                            .frame(width: 22, height: 22)
-                        
-                        if isSelected {
-                            Circle()
-                                .fill(Color(hex: 0x6366F1))
-                                .frame(width: 22, height: 22)
-                            
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(.white)
-                        }
-                    }
+            // 选中状态
+            ZStack {
+                Circle()
+                    .stroke(isSelected ? Color(hex: 0x6366F1) : Color(.secondaryLabel), lineWidth: 2)
+                    .frame(width: 22, height: 22)
+                
+                if isSelected {
+                    Circle()
+                        .fill(Color(hex: 0x6366F1))
+                        .frame(width: 22, height: 22)
                     
-                    Text(tagName)
-                        .font(.system(size: 16, weight: .regular))
-                        .foregroundStyle(Color(.label))
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
                 }
             }
-            .buttonStyle(.plain)
+            
+            Text(tagName)
+                .font(.system(size: 16, weight: .regular))
+                .foregroundStyle(Color(.label))
             
             Spacer()
             
@@ -199,6 +194,10 @@ struct TagRowView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onToggle()
+        }
     }
 }
 
