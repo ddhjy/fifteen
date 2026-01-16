@@ -26,6 +26,7 @@ struct TagPickerView: View {
             VStack(spacing: 0) {
                 if tagManager.tags.isEmpty {
                     emptyTagsView
+                    Spacer()
                 } else {
                     if isReordering {
                         // 排序模式：使用 List 支持拖拽
@@ -42,7 +43,7 @@ struct TagPickerView: View {
                                     
                                     Spacer()
                                 }
-                                .listRowBackground(Color.clear)
+                                .listRowBackground(Color(hex: 0xF2F2F6))
                             }
                             .onMove { source, destination in
                                 tagManager.moveTag(from: source, to: destination)
@@ -53,26 +54,27 @@ struct TagPickerView: View {
                         .environment(\.editMode, .constant(.active))
                     } else {
                         // 普通模式：选择标签
-                        VStack(spacing: 0) {
-                            ForEach(tagManager.tags, id: \.self) { tagName in
-                                TagRowView(
-                                    tagName: tagName,
-                                    isSelected: currentItem?.tags.contains(tagName) ?? false,
-                                    onToggle: { toggleTag(tagName) },
-                                    onEdit: { editingTagName = tagName }
-                                )
-                                
-                                if tagName != tagManager.tags.last {
-                                    Divider()
-                                        .padding(.leading, 52)
+                        ScrollView {
+                            VStack(spacing: 0) {
+                                ForEach(tagManager.tags, id: \.self) { tagName in
+                                    TagRowView(
+                                        tagName: tagName,
+                                        isSelected: currentItem?.tags.contains(tagName) ?? false,
+                                        onToggle: { toggleTag(tagName) },
+                                        onEdit: { editingTagName = tagName }
+                                    )
+                                    
+                                    if tagName != tagManager.tags.last {
+                                        Divider()
+                                            .padding(.leading, 52)
+                                    }
                                 }
                             }
+                            .padding(.top, 16)
                         }
-                        .padding(.top, 16)
+                        Spacer()
                     }
                 }
-                
-                Spacer()
             }
             .background(
                 Color(hex: 0xF2F2F6)
