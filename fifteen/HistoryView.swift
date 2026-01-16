@@ -166,12 +166,8 @@ struct HistoryView: View {
     }
     
     private func deleteSelectedItems() {
-        let idsToDelete = selectedItems
-        for id in idsToDelete {
-            if let index = historyManager.items.firstIndex(where: { $0.id == id }) {
-                historyManager.deleteRecords(at: IndexSet(integer: index))
-            }
-        }
+        // 使用批量删除接口，一次性删除所有选中项，避免循环调用
+        historyManager.deleteRecords(ids: selectedItems)
         selectedItems.removeAll()
         if historyManager.savedItems.isEmpty {
             isEditMode = false

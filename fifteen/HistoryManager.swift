@@ -36,11 +36,16 @@ struct HistoryItem: Identifiable, Equatable {
         return String(text.prefix(200)) + "..."
     }
     
-    var formattedDate: String {
+    // 静态 DateFormatter 缓存，避免重复创建
+    private static let relativeDateFormatter: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
         formatter.locale = Locale(identifier: "zh_CN")
-        return formatter.localizedString(for: createdAt, relativeTo: Date())
+        return formatter
+    }()
+    
+    var formattedDate: String {
+        Self.relativeDateFormatter.localizedString(for: createdAt, relativeTo: Date())
     }
 }
 
@@ -143,6 +148,9 @@ class HistoryManager {
     
     var items: [HistoryItem] = []
     var isLoading = false
+    
+    // 缓存存储目录，避免重复检查 iCloud 和目录存在性
+    private var _cachedStorageURL: URL?
     
     private let fileManager = FileManager.default
     private let dateFormatter: DateFormatter = {
@@ -283,6 +291,18 @@ class HistoryManager {
     // MARK: - Storage Directory (iCloud 优先，本地回退)
     
     private var storageURL: URL {
+        // 使用缓存的存储路径，避免重复检查
+        if let cached = _cachedStorageURL {
+            return cached
+        }
+        
+        let url = resolveStorageURL()
+        _cachedStorageURL = url
+        return url
+    }
+    
+    /// 解析存储目录（仅在首次调用时执行）
+    private func resolveStorageURL() -> URL {
         // 优先尝试 iCloud
         if let containerURL = fileManager.url(forUbiquityContainerIdentifier: nil) {
             let documentsURL = containerURL.appendingPathComponent("Documents")
@@ -448,14 +468,32 @@ class HistoryManager {
     }
     
     func deleteRecords(at offsets: IndexSet) {
+        let documentsURL = storageURL  // 仅获取一次
         for index in offsets {
             let item = items[index]
-            let documentsURL = storageURL
-            
             let fileURL = documentsURL.appendingPathComponent(item.fileName)
             try? fileManager.removeItem(at: fileURL)
         }
         items.remove(atOffsets: offsets)
+        TagManager.shared.refreshTags(from: items)
+    }
+    
+    /// 批量删除记录（优化版本：一次性删除多条记录）
+    func deleteRecords(ids: Set<UUID>) {
+        guard !ids.isEmpty else { return }
+        
+        let documentsURL = storageURL
+        
+        // 删除文件
+        for item in items where ids.contains(item.id) {
+            let fileURL = documentsURL.appendingPathComponent(item.fileName)
+            try? fileManager.removeItem(at: fileURL)
+        }
+        
+        // 批量从内存移除
+        items.removeAll { ids.contains($0.id) }
+        
+        // 只刷新一次标签
         TagManager.shared.refreshTags(from: items)
     }
     
