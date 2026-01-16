@@ -24,7 +24,7 @@ struct HistoryView: View {
     @State private var isSearchActive = false
     
     private var filteredItems: [HistoryItem] {
-        var items = historyManager.getItems(filteredBy: selectedTagFilter)
+        var items = historyManager.getSavedItems(filteredBy: selectedTagFilter)
         
         // 搜索过滤
         if !searchText.isEmpty {
@@ -39,7 +39,7 @@ struct HistoryView: View {
             Color(.secondarySystemBackground)
                 .ignoresSafeArea()
             
-            if historyManager.items.isEmpty {
+            if historyManager.savedItems.isEmpty {
                 emptyStateView
             } else {
                 historyContent
@@ -49,7 +49,7 @@ struct HistoryView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
-                if !historyManager.items.isEmpty {
+                if !historyManager.savedItems.isEmpty {
                     if isEditMode {
                         // 编辑模式下显示完成按钮
                         Button(action: {
@@ -173,7 +173,7 @@ struct HistoryView: View {
             }
         }
         selectedItems.removeAll()
-        if historyManager.items.isEmpty {
+        if historyManager.savedItems.isEmpty {
             isEditMode = false
         }
     }

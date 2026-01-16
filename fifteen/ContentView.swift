@@ -2,10 +2,9 @@ import SwiftUI
 import UIKit
 
 struct ContentView: View {
-    @State private var inputText: String = ""
     @State private var showHistory: Bool = false
-    @State private var selectedTags: Set<String> = []
     @State private var showTagSelector: Bool = false
+    @State private var historyManager = HistoryManager.shared
     @State private var tagManager = TagManager.shared
 
     @FocusState private var isTextEditorFocused: Bool
@@ -15,7 +14,15 @@ struct ContentView: View {
     
     private let primaryColor = Color(hex: 0x6366F1)
     
-    private var characterCount: Int { inputText.count }
+    // 从草稿获取当前文本
+    private var draftText: String {
+        historyManager.currentDraft.text
+    }
+    
+    // 从草稿获取当前标签
+    private var selectedTags: [String] {
+        historyManager.currentDraft.tags
+    }
     
     var body: some View {
         NavigationStack {
@@ -53,10 +60,7 @@ struct ContentView: View {
                 bottomToolbar
             }
             .sheet(isPresented: $showTagSelector) {
-                EditPageTagSelector(
-                    initialSelectedTags: selectedTags,
-                    onSelectionChanged: { selectedTags = $0 }
-                )
+                TagPickerView(itemId: historyManager.currentDraft.id)
             }
         }
         .onAppear {
@@ -130,7 +134,7 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 8) {
             // 正文输入区
             ZStack(alignment: .topLeading) {
-                if inputText.isEmpty {
+                if draftText.isEmpty {
                     Text("开始输入...")
                         .font(.system(size: 17))
                         .foregroundStyle(Color(.placeholderText))
@@ -138,11 +142,14 @@ struct ContentView: View {
                         .padding(.top, 8)
                 }
                 
-                TextEditor(text: $inputText)
+                TextEditor(text: Binding(
+                    get: { draftText },
+                    set: { historyManager.updateDraftText($0) }
+                ))
                     .focused($isTextEditorFocused)
                     .font(.system(size: 17, weight: .regular))
                     .scrollContentBackground(.hidden)
-                    .scrollDisabled(inputText.isEmpty)
+                    .scrollDisabled(draftText.isEmpty)
                     .padding(.horizontal, 16)
             }
             .frame(maxHeight: .infinity)
@@ -182,7 +189,7 @@ struct ContentView: View {
         impactFeedback.impactOccurred()
         
         withAnimation(.easeOut(duration: 0.25)) {
-            inputText = ""
+            historyManager.updateDraftText("")
         }
     }
     
@@ -190,13 +197,10 @@ struct ContentView: View {
         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
         impactFeedback.impactOccurred()
         
-        guard !inputText.isEmpty else { return }
+        guard !draftText.isEmpty else { return }
         
-        UIPasteboard.general.string = inputText
-        HistoryManager.shared.addRecord(inputText, tags: Array(selectedTags))
-        
-        // 只清空输入框，保留选中的标签供下次使用
-        inputText = ""
+        UIPasteboard.general.string = draftText
+        historyManager.finalizeDraft()
     }
 }
 

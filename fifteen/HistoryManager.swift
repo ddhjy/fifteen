@@ -12,19 +12,21 @@ import SwiftUI
 
 struct HistoryItem: Identifiable, Equatable {
     let id: UUID
-    let fileName: String
-    let text: String
+    var fileName: String      // var: 草稿保存时需要更新文件名
+    var text: String          // var: 编辑时需要更新
     let createdAt: Date
     var description: String
     var tags: [String]
+    var isDraft: Bool         // 标记是否为草稿
     
-    init(id: UUID = UUID(), fileName: String, text: String, createdAt: Date = Date(), description: String = "", tags: [String] = []) {
+    init(id: UUID = UUID(), fileName: String = "", text: String = "", createdAt: Date = Date(), description: String = "", tags: [String] = [], isDraft: Bool = false) {
         self.id = id
         self.fileName = fileName
         self.text = text
         self.createdAt = createdAt
-        self.description = description.isEmpty ? String(text.prefix(50)) : description
+        self.description = description.isEmpty && !text.isEmpty ? String(text.prefix(50)) : description
         self.tags = tags
+        self.isDraft = isDraft
     }
     
     var preview: String {
@@ -128,6 +130,128 @@ class HistoryManager {
     
     private init() {
         loadItems()
+        ensureDraftExists()
+    }
+    
+    // MARK: - Draft Management
+    
+    private let draftFileName = "_draft.md"
+    
+    /// 当前草稿（始终存在唯一一个）
+    var currentDraft: HistoryItem {
+        if let draft = items.first(where: { $0.isDraft }) {
+            return draft
+        }
+        // 理论上不应该到这里，因为 ensureDraftExists 会确保存在
+        let newDraft = createNewDraft()
+        items.insert(newDraft, at: 0)
+        return newDraft
+    }
+    
+    /// 确保草稿存在
+    private func ensureDraftExists() {
+        if !items.contains(where: { $0.isDraft }) {
+            let newDraft = createNewDraft()
+            items.insert(newDraft, at: 0)
+        }
+    }
+    
+    /// 创建新的空草稿
+    private func createNewDraft() -> HistoryItem {
+        return HistoryItem(isDraft: true)
+    }
+    
+    /// 更新草稿文本内容
+    func updateDraftText(_ text: String) {
+        guard let index = items.firstIndex(where: { $0.isDraft }) else { return }
+        items[index].text = text
+        saveDraft()
+    }
+    
+    /// 完成草稿（发送按钮行为）
+    func finalizeDraft() {
+        guard let draftIndex = items.firstIndex(where: { $0.isDraft }),
+              !items[draftIndex].text.isEmpty else { return }
+        
+        let draft = items[draftIndex]
+        
+        // 生成正式文件名并保存
+        let now = Date()
+        let fileName = generateFileName(for: now)
+        let finalItem = HistoryItem(
+            id: draft.id,
+            fileName: fileName,
+            text: draft.text,
+            createdAt: now,
+            description: String(draft.text.prefix(50)),
+            tags: draft.tags,
+            isDraft: false
+        )
+        
+        // 替换草稿为正式记录
+        items[draftIndex] = finalItem
+        saveItem(finalItem)
+        
+        // 删除草稿文件
+        deleteDraftFile()
+        
+        // 创建新草稿并插入到最前面
+        let newDraft = createNewDraft()
+        items.insert(newDraft, at: 0)
+        
+        TagManager.shared.refreshTags(from: savedItems)
+    }
+    
+    /// 获取已保存的记录（排除草稿）
+    var savedItems: [HistoryItem] {
+        items.filter { !$0.isDraft }
+    }
+    
+    /// 获取已保存的记录（带标签筛选）
+    func getSavedItems(filteredBy tagName: String?) -> [HistoryItem] {
+        var result = savedItems
+        if let tagName = tagName {
+            result = result.filter { $0.tags.contains(tagName) }
+        }
+        return result
+    }
+    
+    /// 保存草稿到磁盘
+    private func saveDraft() {
+        guard let draft = items.first(where: { $0.isDraft }) else { return }
+        
+        let content = generateMarkdownContent(
+            text: draft.text,
+            description: String(draft.text.prefix(50)),
+            tags: draft.tags,
+            createdAt: draft.createdAt
+        )
+        
+        let fileURL = storageURL.appendingPathComponent(draftFileName)
+        try? content.write(to: fileURL, atomically: true, encoding: .utf8)
+    }
+    
+    /// 加载草稿
+    private func loadDraft() -> HistoryItem? {
+        let fileURL = storageURL.appendingPathComponent(draftFileName)
+        
+        guard fileManager.fileExists(atPath: fileURL.path),
+              let content = try? String(contentsOf: fileURL, encoding: .utf8),
+              let parsed = parseMarkdownFile(content: content) else {
+            return nil
+        }
+        
+        return HistoryItem(
+            text: parsed.body,
+            tags: parsed.tags,
+            isDraft: true
+        )
+    }
+    
+    /// 删除草稿文件
+    private func deleteDraftFile() {
+        let fileURL = storageURL.appendingPathComponent(draftFileName)
+        try? fileManager.removeItem(at: fileURL)
     }
     
     // MARK: - Storage Directory (iCloud 优先，本地回退)
@@ -330,8 +454,12 @@ class HistoryManager {
         
         if !items[index].tags.contains(trimmedTag) {
             items[index].tags.append(trimmedTag)
-            saveItem(items[index])
-            TagManager.shared.refreshTags(from: items)
+            if items[index].isDraft {
+                saveDraft()
+            } else {
+                saveItem(items[index])
+            }
+            TagManager.shared.refreshTags(from: savedItems)
         }
     }
     
@@ -339,8 +467,12 @@ class HistoryManager {
         guard let index = items.firstIndex(where: { $0.id == itemId }) else { return }
         
         items[index].tags.removeAll { $0 == tagName }
-        saveItem(items[index])
-        TagManager.shared.refreshTags(from: items)
+        if items[index].isDraft {
+            saveDraft()
+        } else {
+            saveItem(items[index])
+        }
+        TagManager.shared.refreshTags(from: savedItems)
     }
     
     func toggleTag(for itemId: UUID, tagName: String) {
@@ -351,8 +483,12 @@ class HistoryManager {
         } else {
             items[index].tags.append(tagName)
         }
-        saveItem(items[index])
-        TagManager.shared.refreshTags(from: items)
+        if items[index].isDraft {
+            saveDraft()
+        } else {
+            saveItem(items[index])
+        }
+        TagManager.shared.refreshTags(from: savedItems)
     }
     
     func getItems(filteredBy tagName: String?) -> [HistoryItem] {
@@ -416,6 +552,10 @@ class HistoryManager {
                 guard fileURL.pathExtension == "md" else { continue }
                 
                 let fileName = fileURL.lastPathComponent
+                
+                // 跳过草稿文件，草稿会单独加载
+                if fileName == draftFileName { continue }
+                
                 guard let createdAt = parseDate(from: fileName) else { continue }
                 
                 do {
@@ -438,7 +578,13 @@ class HistoryManager {
             
             // 按创建时间降序排序
             items = loadedItems.sorted { $0.createdAt > $1.createdAt }
-            TagManager.shared.refreshTags(from: items)
+            
+            // 加载草稿并插入到最前面
+            if let draft = loadDraft() {
+                items.insert(draft, at: 0)
+            }
+            
+            TagManager.shared.refreshTags(from: savedItems)
             
         } catch {
             print("Failed to list iCloud documents: \(error)")
