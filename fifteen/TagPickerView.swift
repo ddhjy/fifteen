@@ -20,6 +20,11 @@ struct TagPickerView: View {
         historyManager.items.first { $0.id == itemId }
     }
     
+    /// 当前选中的标签数量
+    private var selectedTagCount: Int {
+        currentItem?.tags.count ?? 0
+    }
+    
     /// 按标签出现次数排序的标签列表（使用缓存的计数）
     private var sortedTags: [String] {
         return tagManager.tags.sorted { tag1, tag2 in
@@ -60,7 +65,7 @@ struct TagPickerView: View {
                 Color(hex: 0xF2F2F6)
                     .ignoresSafeArea()
             )
-            .navigationTitle("标签")
+            .navigationTitle(selectedTagCount > 0 ? "标签 (\(selectedTagCount))" : "标签")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
