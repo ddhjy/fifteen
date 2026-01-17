@@ -15,10 +15,19 @@ struct TagPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showCreateTag = false
     @State private var editingTagName: String? = nil
-    @State private var isReordering = false
     
     private var currentItem: HistoryItem? {
         historyManager.items.first { $0.id == itemId }
+    }
+    
+    /// 按标签出现次数排序的标签列表
+    private var sortedTags: [String] {
+        let savedItems = historyManager.savedItems
+        return tagManager.tags.sorted { tag1, tag2 in
+            let count1 = savedItems.filter { $0.tags.contains(tag1) }.count
+            let count2 = savedItems.filter { $0.tags.contains(tag2) }.count
+            return count1 > count2
+        }
     }
     
     var body: some View {
@@ -28,93 +37,48 @@ struct TagPickerView: View {
                     emptyTagsView
                     Spacer()
                 } else {
-                    if isReordering {
-                        // 排序模式：使用 List 支持拖拽
-                        List {
-                            ForEach(tagManager.tags, id: \.self) { tagName in
-                                HStack(spacing: 12) {
-                                    Image(systemName: "line.3.horizontal")
-                                        .font(.system(size: 14))
-                                        .foregroundStyle(Color(.secondaryLabel))
-                                    
-                                    Text(tagName)
-                                        .font(.system(size: 16, weight: .regular))
-                                        .foregroundStyle(Color(.label))
-                                    
-                                    Spacer()
-                                }
-                                .listRowBackground(Color(hex: 0xF2F2F6))
-                            }
-                            .onMove { source, destination in
-                                tagManager.moveTag(from: source, to: destination)
-                            }
-                        }
-                        .listStyle(.plain)
-                        .scrollContentBackground(.hidden)
-                        .environment(\.editMode, .constant(.active))
-                    } else {
-                        // 普通模式：选择标签
-                        ScrollView {
-                            VStack(spacing: 0) {
-                                ForEach(tagManager.tags, id: \.self) { tagName in
-                                    TagRowView(
-                                        tagName: tagName,
-                                        isSelected: currentItem?.tags.contains(tagName) ?? false,
-                                        onToggle: { toggleTag(tagName) },
-                                        onEdit: { editingTagName = tagName }
-                                    )
-                                    
-                                    if tagName != tagManager.tags.last {
-                                        Divider()
-                                            .padding(.leading, 52)
-                                    }
+                    // 普通模式：选择标签
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            ForEach(sortedTags, id: \.self) { tagName in
+                                TagRowView(
+                                    tagName: tagName,
+                                    isSelected: currentItem?.tags.contains(tagName) ?? false,
+                                    onToggle: { toggleTag(tagName) },
+                                    onEdit: { editingTagName = tagName }
+                                )
+                                
+                                if tagName != sortedTags.last {
+                                    Divider()
+                                        .padding(.leading, 52)
                                 }
                             }
-                            .padding(.top, 16)
                         }
-                        Spacer()
+                        .padding(.top, 16)
                     }
+                    Spacer()
                 }
             }
             .background(
                 Color(hex: 0xF2F2F6)
                     .ignoresSafeArea()
             )
-            .navigationTitle(isReordering ? "调整顺序" : "标签")
+            .navigationTitle("标签")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    if isReordering {
-                        Button("完成") {
-                            isReordering = false
-                        }
-                        .font(.system(size: 16, weight: .semibold))
-                        .tint(Color(hex: 0x6366F1))
-                    } else {
-                        HStack(spacing: 16) {
-                            Button(action: { showCreateTag = true }) {
-                                Image(systemName: "plus")
-                            }
-                            .tint(Color(hex: 0x6366F1))
-                            
-                            if !tagManager.tags.isEmpty {
-                                Button(action: { isReordering = true }) {
-                                    Image(systemName: "arrow.up.arrow.down")
-                                }
-                                .tint(Color(hex: 0x6366F1))
-                            }
-                        }
+                    Button(action: { showCreateTag = true }) {
+                        Image(systemName: "plus")
                     }
+                    .tint(Color(hex: 0x6366F1))
                 }
                 
                 ToolbarItem(placement: .topBarTrailing) {
-                    if !isReordering {
-                        Button("完成") {
-                            dismiss()
-                        }
-                        .font(.system(size: 16, weight: .semibold))
-                        .tint(Color(hex: 0x6366F1))
+                    Button("完成") {
+                        dismiss()
                     }
+                    .font(.system(size: 16, weight: .semibold))
+                    .tint(Color(hex: 0x6366F1))
                 }
             }
             .sheet(isPresented: $showCreateTag) {
