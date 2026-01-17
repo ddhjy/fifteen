@@ -295,7 +295,13 @@ struct HistoryView: View {
                         filteredTags: selectedTags,
                         onCopy: { copyItem(item) },
                         onToggleSelection: { toggleSelection(item) },
-                        onTagTap: { tagPickerItem = item }
+                        onTagTap: { tagPickerItem = item },
+                        onEdit: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                isEditMode = true
+                                selectedItems.insert(item.id)
+                            }
+                        }
                     )
                 }
             }
@@ -347,6 +353,7 @@ struct HistoryRowView: View {
     let onCopy: () -> Void
     let onToggleSelection: () -> Void
     let onTagTap: () -> Void
+    let onEdit: () -> Void
     
     var body: some View {
         HStack(spacing: 14) {
@@ -455,6 +462,18 @@ struct HistoryRowView: View {
                     onCopy()
                 } label: {
                     Label("复制", systemImage: "doc.on.doc")
+                }
+                
+                Button {
+                    onTagTap()
+                } label: {
+                    Label("标签", systemImage: "tag")
+                }
+                
+                Button {
+                    onEdit()
+                } label: {
+                    Label("编辑", systemImage: "checkmark.circle")
                 }
             }
         }
