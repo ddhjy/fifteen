@@ -9,6 +9,9 @@ struct ContentView: View {
 
     @FocusState private var isTextEditorFocused: Bool
     
+    // 键盘动画期间禁用编辑框交互，避免用户误触导致 AutoFill 弹窗
+    @State private var isKeyboardAnimating: Bool = false
+    
     // 使用静态变量存储键盘弹出任务，可以被取消
     private static var keyboardWorkItem: DispatchWorkItem?
     
@@ -151,6 +154,7 @@ struct ContentView: View {
                     .scrollContentBackground(.hidden)
                     .scrollDisabled(draftText.isEmpty)
                     .padding(.horizontal, 16)
+                    .allowsHitTesting(!isKeyboardAnimating)
             }
             .frame(maxHeight: .infinity)
         }
@@ -162,8 +166,14 @@ struct ContentView: View {
     private func scheduleKeyboardShow(delay: Double) {
         Self.keyboardWorkItem?.cancel()
         
+        // 动画期间禁用编辑框点击
+        isKeyboardAnimating = true
+        
         let workItem = DispatchWorkItem { [self] in
-            guard !showHistory else { return }
+            guard !showHistory else {
+                isKeyboardAnimating = false
+                return
+            }
             isTextEditorFocused = true
             
             // 重试机制，确保视图完全就绪后焦点能正确设置
@@ -174,6 +184,11 @@ struct ContentView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [self] in
                 guard !showHistory, !isTextEditorFocused else { return }
                 isTextEditorFocused = true
+            }
+            
+            // 键盘动画完成后恢复编辑框交互（iOS 键盘动画约 0.25-0.3 秒）
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [self] in
+                isKeyboardAnimating = false
             }
         }
         Self.keyboardWorkItem = workItem
