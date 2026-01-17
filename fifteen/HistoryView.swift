@@ -301,6 +301,11 @@ struct HistoryView: View {
                                 isEditMode = true
                                 selectedItems.insert(item.id)
                             }
+                        },
+                        onDelete: {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                historyManager.deleteRecord(item)
+                            }
                         }
                     )
                 }
@@ -354,6 +359,7 @@ struct HistoryRowView: View {
     let onToggleSelection: () -> Void
     let onTagTap: () -> Void
     let onEdit: () -> Void
+    let onDelete: () -> Void
     
     var body: some View {
         HStack(spacing: 14) {
@@ -474,6 +480,14 @@ struct HistoryRowView: View {
                     onEdit()
                 } label: {
                     Label("编辑", systemImage: "checkmark.circle")
+                }
+                
+                Divider()
+                
+                Button(role: .destructive) {
+                    onDelete()
+                } label: {
+                    Label("删除", systemImage: "trash")
                 }
             }
         }
