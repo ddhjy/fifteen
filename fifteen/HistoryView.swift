@@ -424,17 +424,19 @@ struct HistoryRowView: View {
                         
                         // 更多按钮
                         if !isEditMode {
-                            Button(action: onTagTap) {
-                                Image(systemName: "ellipsis")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(Color(.tertiaryLabel))
-                                    .frame(width: 32, height: 16, alignment: .trailing)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Color(.tertiaryLabel))
+                                .frame(width: 32, height: 16, alignment: .trailing)
                         }
                 }
                 .frame(height: 16)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if !isEditMode {
+                        onTagTap()
+                    }
+                }
             }
         }
         .padding(.horizontal, 16)
