@@ -45,7 +45,15 @@ struct HistoryItem: Identifiable, Equatable {
     }()
     
     var formattedDate: String {
-        Self.relativeDateFormatter.localizedString(for: createdAt, relativeTo: Date())
+        let now = Date()
+        let interval = now.timeIntervalSince(createdAt)
+        
+        // 1 小时以内统一显示"刚刚"
+        if interval < 3600 {
+            return "刚刚"
+        }
+        
+        return Self.relativeDateFormatter.localizedString(for: createdAt, relativeTo: now)
     }
 }
 
