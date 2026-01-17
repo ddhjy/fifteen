@@ -16,7 +16,7 @@ struct HistoryView: View {
     @State private var appearAnimation = false
     @State private var isEditMode = false
     @State private var selectedItems: Set<UUID> = []
-    @State private var selectedTagFilter: String? = nil
+    @State private var selectedTags: [String] = []
     @State private var tagPickerItem: HistoryItem? = nil
     @State private var isExporting = false
     @State private var exportedFileURL: URL? = nil
@@ -24,7 +24,7 @@ struct HistoryView: View {
     @State private var isSearchActive = false
     
     private var filteredItems: [HistoryItem] {
-        var items = historyManager.getSavedItems(filteredBy: selectedTagFilter)
+        var items = historyManager.getSavedItems(filteredBy: selectedTags)
         
         // 搜索过滤
         if !searchText.isEmpty {
@@ -199,7 +199,7 @@ struct HistoryView: View {
     private var historyContent: some View {
         let content = VStack(spacing: 0) {
             // 标签筛选栏
-            TagFilterBar(selectedTagName: $selectedTagFilter)
+            TagFilterBar(selectedTags: $selectedTags)
             
             if filteredItems.isEmpty {
                 if !searchText.isEmpty {
@@ -292,7 +292,7 @@ struct HistoryView: View {
                         isCopied: copiedItemId == item.id,
                         isEditMode: isEditMode,
                         isSelected: selectedItems.contains(item.id),
-                        filteredTagName: selectedTagFilter,
+                        filteredTags: selectedTags,
                         onCopy: { copyItem(item) },
                         onToggleSelection: { toggleSelection(item) },
                         onTagTap: { tagPickerItem = item }
@@ -343,7 +343,7 @@ struct HistoryRowView: View {
     let isCopied: Bool
     let isEditMode: Bool
     let isSelected: Bool
-    var filteredTagName: String? = nil
+    var filteredTags: [String] = []
     let onCopy: () -> Void
     let onToggleSelection: () -> Void
     let onTagTap: () -> Void
@@ -399,7 +399,7 @@ struct HistoryRowView: View {
                             .foregroundStyle(Color(.secondaryLabel))
                         
                         // 标签 (内联显示，排除当前筛选的标签)
-                        let displayTags = item.tags.filter { $0 != filteredTagName }
+                        let displayTags = item.tags.filter { !filteredTags.contains($0) }
                         if !displayTags.isEmpty && !isEditMode {
                             ForEach(displayTags.prefix(2), id: \.self) { tagName in
                                 Text(tagName)

@@ -357,35 +357,98 @@ struct TagBadgeView: View {
 // MARK: - Tag Filter Bar (用于筛选)
 
 struct TagFilterBar: View {
-    @Binding var selectedTagName: String?
+    @Binding var selectedTags: [String]
     @State private var tagManager = TagManager.shared
+    let historyManager = HistoryManager.shared
     
     var body: some View {
         if tagManager.tags.isEmpty {
             EmptyView()
         } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    // "全部" 按钮
-                    FilterChip(
-                        title: "全部",
-                        isSelected: selectedTagName == nil
-                    ) {
-                        selectedTagName = nil
-                    }
+            VStack(spacing: 0) {
+                // 渲染每一级筛选条
+                ForEach(0...selectedTags.count, id: \.self) { level in
+                    let availableTags = getAvailableTags(at: level)
                     
-                    // 各个标签筛选
-                    ForEach(tagManager.tags, id: \.self) { tagName in
-                        FilterChip(
-                            title: tagName,
-                            isSelected: selectedTagName == tagName
-                        ) {
-                            selectedTagName = selectedTagName == tagName ? nil : tagName
+                    // 只有当有可选标签时才显示该级
+                    if !availableTags.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                // "全部" 按钮
+                                FilterChip(
+                                    title: "全部",
+                                    isSelected: level >= selectedTags.count
+                                ) {
+                                    selectAll(at: level)
+                                }
+                                
+                                // 各个标签筛选
+                                ForEach(availableTags, id: \.self) { tagName in
+                                    FilterChip(
+                                        title: tagName,
+                                        isSelected: level < selectedTags.count && selectedTags[level] == tagName
+                                    ) {
+                                        selectTag(tagName, at: level)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
                         }
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+            }
+        }
+    }
+    
+    /// 获取某一级可用的标签
+    private func getAvailableTags(at level: Int) -> [String] {
+        // 获取当前已选标签筛选后的结果
+        let currentSelectedTags = Array(selectedTags.prefix(level))
+        let filteredItems = historyManager.getSavedItems(filteredBy: currentSelectedTags)
+        
+        // 如果没有筛选结果，返回空
+        guard !filteredItems.isEmpty else { return [] }
+        
+        // 收集筛选结果中所有标签
+        var tagSet = Set<String>()
+        for item in filteredItems {
+            for tag in item.tags {
+                tagSet.insert(tag)
+            }
+        }
+        
+        // 排除已选标签
+        let availableTags = tagSet.subtracting(currentSelectedTags)
+        
+        // 如果没有可选标签，返回空
+        guard !availableTags.isEmpty else { return [] }
+        
+        // 按 TagManager 中的顺序排序
+        return tagManager.tags.filter { availableTags.contains($0) }
+    }
+    
+    /// 选择某一级的 "全部"
+    private func selectAll(at level: Int) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            // 清除该级及之后的所有选择
+            if level < selectedTags.count {
+                selectedTags = Array(selectedTags.prefix(level))
+            }
+        }
+    }
+    
+    /// 选择某一级的标签
+    private func selectTag(_ tagName: String, at level: Int) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            if level < selectedTags.count {
+                // 替换该级选择并清除后续选择
+                var newTags = Array(selectedTags.prefix(level))
+                newTags.append(tagName)
+                selectedTags = newTags
+            } else {
+                // 添加新的选择
+                selectedTags.append(tagName)
             }
         }
     }

@@ -250,6 +250,15 @@ class HistoryManager {
         return result
     }
     
+    /// 获取已保存的记录（带多标签交集筛选）
+    func getSavedItems(filteredBy tags: [String]) -> [HistoryItem] {
+        guard !tags.isEmpty else { return savedItems }
+        return savedItems.filter { item in
+            // 记录必须包含所有选中的标签
+            tags.allSatisfy { item.tags.contains($0) }
+        }
+    }
+    
     /// 保存草稿到磁盘
     private func saveDraft() {
         guard let draft = items.first(where: { $0.isDraft }) else { return }
