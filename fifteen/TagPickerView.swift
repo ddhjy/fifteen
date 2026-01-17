@@ -430,26 +430,22 @@ struct TagFilterBar: View {
     
     /// 选择某一级的 "全部"
     private func selectAll(at level: Int) {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            // 清除该级及之后的所有选择
-            if level < selectedTags.count {
-                selectedTags = Array(selectedTags.prefix(level))
-            }
+        // 清除该级及之后的所有选择
+        if level < selectedTags.count {
+            selectedTags = Array(selectedTags.prefix(level))
         }
     }
     
     /// 选择某一级的标签
     private func selectTag(_ tagName: String, at level: Int) {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            if level < selectedTags.count {
-                // 替换该级选择并清除后续选择
-                var newTags = Array(selectedTags.prefix(level))
-                newTags.append(tagName)
-                selectedTags = newTags
-            } else {
-                // 添加新的选择
-                selectedTags.append(tagName)
-            }
+        if level < selectedTags.count {
+            // 替换该级选择并清除后续选择
+            var newTags = Array(selectedTags.prefix(level))
+            newTags.append(tagName)
+            selectedTags = newTags
+        } else {
+            // 添加新的选择
+            selectedTags.append(tagName)
         }
     }
 }
