@@ -20,13 +20,10 @@ struct TagPickerView: View {
         historyManager.items.first { $0.id == itemId }
     }
     
-    /// 按标签出现次数排序的标签列表
+    /// 按标签出现次数排序的标签列表（使用缓存的计数）
     private var sortedTags: [String] {
-        let savedItems = historyManager.savedItems
         return tagManager.tags.sorted { tag1, tag2 in
-            let count1 = savedItems.filter { $0.tags.contains(tag1) }.count
-            let count2 = savedItems.filter { $0.tags.contains(tag2) }.count
-            return count1 > count2
+            tagManager.count(for: tag1) > tagManager.count(for: tag2)
         }
     }
     
@@ -374,27 +371,22 @@ struct TagFilterBar: View {
         // 如果没有筛选结果，返回空
         guard !filteredItems.isEmpty else { return [] }
         
-        // 收集筛选结果中所有标签
-        var tagSet = Set<String>()
+        // 收集筛选结果中所有标签，同时计算每个标签的出现次数
+        var tagCounts: [String: Int] = [:]
         for item in filteredItems {
             for tag in item.tags {
-                tagSet.insert(tag)
+                // 排除已选标签
+                if !currentSelectedTags.contains(tag) {
+                    tagCounts[tag, default: 0] += 1
+                }
             }
         }
         
-        // 排除已选标签
-        let availableTags = tagSet.subtracting(currentSelectedTags)
-        
         // 如果没有可选标签，返回空
-        guard !availableTags.isEmpty else { return [] }
+        guard !tagCounts.isEmpty else { return [] }
         
-        // 计算每个标签关联的文件数量，按数量降序排序
-        let sortedTags = availableTags.sorted { tag1, tag2 in
-            let count1 = filteredItems.filter { $0.tags.contains(tag1) }.count
-            let count2 = filteredItems.filter { $0.tags.contains(tag2) }.count
-            return count1 > count2
-        }
-        return sortedTags
+        // 按计数降序排序
+        return tagCounts.keys.sorted { tagCounts[$0, default: 0] > tagCounts[$1, default: 0] }
     }
     
     /// 选择某一级的 "全部"

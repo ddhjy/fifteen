@@ -65,6 +65,9 @@ class TagManager {
     
     var tags: [String] = []
     
+    /// 标签使用次数缓存（性能优化：避免每次排序时重复遍历）
+    private(set) var tagCounts: [String: Int] = [:]
+    
     /// 上次选择的标签（用于新草稿默认标签）
     private(set) var lastSelectedTags: [String] = []
     
@@ -76,12 +79,22 @@ class TagManager {
     
     func refreshTags(from items: [HistoryItem]) {
         var uniqueTags = Set<String>()
+        var counts: [String: Int] = [:]
+        
         for item in items {
             for tag in item.tags {
                 uniqueTags.insert(tag)
+                counts[tag, default: 0] += 1
             }
         }
+        
         tags = Array(uniqueTags)
+        tagCounts = counts
+    }
+    
+    /// 获取标签的使用次数（用于排序）
+    func count(for tag: String) -> Int {
+        return tagCounts[tag, default: 0]
     }
     
     func getTag(by name: String) -> String? {
