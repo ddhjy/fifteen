@@ -7,7 +7,7 @@ struct ContentView: View {
     @State private var historyManager = HistoryManager.shared
     @State private var tagManager = TagManager.shared
 
-    @FocusState private var isTextEditorFocused: Bool
+    @State private var isTextEditorFocused: Bool = false
     
     // 键盘动画期间禁用编辑框交互，避免用户误触导致 AutoFill 弹窗
     @State private var isKeyboardAnimating: Bool = false
@@ -29,7 +29,7 @@ struct ContentView: View {
     private var selectedTags: [String] {
         historyManager.currentDraft.tags
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -154,16 +154,17 @@ struct ContentView: View {
                         .padding(.top, 8)
                 }
                 
-                TextEditor(text: Binding(
-                    get: { draftText },
-                    set: { historyManager.updateDraftText($0) }
-                ))
-                    .focused($isTextEditorFocused)
-                    .font(.system(size: 17, weight: .regular))
-                    .scrollContentBackground(.hidden)
-                    .scrollDisabled(draftText.isEmpty)
-                    .padding(.horizontal, 16)
-                    .allowsHitTesting(!isKeyboardAnimating)
+                DraftTextView(
+                    text: Binding(
+                        get: { draftText },
+                        set: { historyManager.updateDraftText($0) }
+                    ),
+                    isFocused: $isTextEditorFocused,
+                    isScrollEnabled: !draftText.isEmpty,
+                    isUserInteractionEnabled: !isKeyboardAnimating,
+                    font: UIFont.systemFont(ofSize: 17, weight: .regular)
+                )
+                .padding(.horizontal, 16)
             }
             .frame(maxHeight: .infinity)
         }
@@ -225,6 +226,85 @@ struct ContentView: View {
         
         UIPasteboard.general.string = draftText
         historyManager.finalizeDraft()
+    }
+}
+
+struct DraftTextView: UIViewRepresentable {
+    @Binding var text: String
+    @Binding var isFocused: Bool
+    let isScrollEnabled: Bool
+    let isUserInteractionEnabled: Bool
+    let font: UIFont
+    
+    func makeUIView(context: Context) -> UITextView {
+        let textView = UITextView()
+        textView.delegate = context.coordinator
+        textView.backgroundColor = .clear
+        textView.font = font
+        textView.text = text
+        textView.isScrollEnabled = isScrollEnabled
+        textView.isEditable = true
+        textView.isSelectable = true
+        textView.textContainer.lineFragmentPadding = 0
+        textView.textContainerInset = UIEdgeInsets(top: 8, left: 4, bottom: 8, right: 4)
+        return textView
+    }
+    
+    func updateUIView(_ uiView: UITextView, context: Context) {
+        if uiView.text != text {
+            uiView.text = text
+        }
+        uiView.font = font
+        uiView.isScrollEnabled = isScrollEnabled
+        uiView.isUserInteractionEnabled = isUserInteractionEnabled
+        
+        if isFocused && !uiView.isFirstResponder {
+            uiView.becomeFirstResponder()
+        } else if !isFocused && uiView.isFirstResponder {
+            uiView.resignFirstResponder()
+        }
+        
+        if context.coordinator.lastText != text {
+            let wasNonEmpty = !context.coordinator.lastText.isEmpty
+            let isNowEmpty = text.isEmpty
+            context.coordinator.lastText = text
+            
+            if wasNonEmpty && isNowEmpty {
+                uiView.setContentOffset(.zero, animated: false)
+                uiView.selectedRange = NSRange(location: 0, length: 0)
+                uiView.scrollRangeToVisible(NSRange(location: 0, length: 0))
+            }
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    final class Coordinator: NSObject, UITextViewDelegate {
+        var parent: DraftTextView
+        var lastText: String
+        
+        init(_ parent: DraftTextView) {
+            self.parent = parent
+            self.lastText = parent.text
+        }
+        
+        func textViewDidChange(_ textView: UITextView) {
+            parent.text = textView.text
+        }
+        
+        func textViewDidBeginEditing(_ textView: UITextView) {
+            if !parent.isFocused {
+                parent.isFocused = true
+            }
+        }
+        
+        func textViewDidEndEditing(_ textView: UITextView) {
+            if parent.isFocused {
+                parent.isFocused = false
+            }
+        }
     }
 }
 
