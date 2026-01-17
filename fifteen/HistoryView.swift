@@ -445,6 +445,8 @@ struct HistoryRowView: View {
         .onTapGesture {
             if isEditMode {
                 onToggleSelection()
+            } else {
+                onCopy()
             }
         }
     }
