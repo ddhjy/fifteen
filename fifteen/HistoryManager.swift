@@ -72,6 +72,10 @@ class TagManager {
     private(set) var lastSelectedTags: [String] = []
     
     private let lastSelectedTagsKey = "lastSelectedTags"
+    private let lastSelectedTagsTimeKey = "lastSelectedTagsTime"
+    
+    /// 标签记忆过期时间（30分钟）
+    private let tagMemoryExpiration: TimeInterval = 30 * 60
     
     private init() {
         loadLastSelectedTags()
@@ -104,6 +108,17 @@ class TagManager {
     // MARK: - Last Selected Tags
     
     private func loadLastSelectedTags() {
+        // 检查是否已过期（超过30分钟）
+        let savedTime = UserDefaults.standard.double(forKey: lastSelectedTagsTimeKey)
+        if savedTime > 0 {
+            let elapsed = Date().timeIntervalSince1970 - savedTime
+            if elapsed > tagMemoryExpiration {
+                // 已过期，不使用记忆的标签
+                lastSelectedTags = []
+                return
+            }
+        }
+        
         guard let data = UserDefaults.standard.data(forKey: lastSelectedTagsKey),
               let savedTags = try? JSONDecoder().decode([String].self, from: data) else {
             lastSelectedTags = []
@@ -116,6 +131,8 @@ class TagManager {
         lastSelectedTags = tags
         if let data = try? JSONEncoder().encode(tags) {
             UserDefaults.standard.set(data, forKey: lastSelectedTagsKey)
+            // 同时保存时间戳
+            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastSelectedTagsTimeKey)
         }
     }
 }
