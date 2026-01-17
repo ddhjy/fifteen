@@ -424,8 +424,13 @@ struct TagFilterBar: View {
         // 如果没有可选标签，返回空
         guard !availableTags.isEmpty else { return [] }
         
-        // 按 TagManager 中的顺序排序
-        return tagManager.tags.filter { availableTags.contains($0) }
+        // 计算每个标签关联的文件数量，按数量降序排序
+        let sortedTags = availableTags.sorted { tag1, tag2 in
+            let count1 = filteredItems.filter { $0.tags.contains(tag1) }.count
+            let count2 = filteredItems.filter { $0.tags.contains(tag2) }.count
+            return count1 > count2
+        }
+        return sortedTags
     }
     
     /// 选择某一级的 "全部"
