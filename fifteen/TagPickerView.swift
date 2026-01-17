@@ -16,6 +16,9 @@ struct TagPickerView: View {
     @State private var showCreateTag = false
     @State private var editingTagName: String? = nil
     
+    /// 冻结的排序标签列表，只在视图首次出现时计算，避免编辑过程中顺序变化
+    @State private var frozenSortedTags: [String] = []
+    
     private var currentItem: HistoryItem? {
         historyManager.items.first { $0.id == itemId }
     }
@@ -25,10 +28,23 @@ struct TagPickerView: View {
         currentItem?.tags.count ?? 0
     }
     
-    /// 按标签出现次数排序的标签列表（使用缓存的计数）
+    /// 使用冻结的排序列表，如果还没计算则返回空数组
     private var sortedTags: [String] {
+        return frozenSortedTags
+    }
+    
+    /// 计算初始排序：选中的标签优先，然后按出现次数排序
+    private func computeInitialSortedTags() -> [String] {
+        let selectedTagsSet = Set(currentItem?.tags ?? [String]())
         return tagManager.tags.sorted { tag1, tag2 in
-            tagManager.count(for: tag1) > tagManager.count(for: tag2)
+            let tag1Selected = selectedTagsSet.contains(tag1)
+            let tag2Selected = selectedTagsSet.contains(tag2)
+            // 选中的标签优先
+            if tag1Selected != tag2Selected {
+                return tag1Selected
+            }
+            // 其次按出现次数排序
+            return tagManager.count(for: tag1) > tagManager.count(for: tag2)
         }
     }
     
@@ -92,6 +108,12 @@ struct TagPickerView: View {
         }
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
+        .onAppear {
+            // 只在首次出现时计算排序，之后保持不变
+            if frozenSortedTags.isEmpty {
+                frozenSortedTags = computeInitialSortedTags()
+            }
+        }
     }
     
     private var emptyTagsView: some View {
