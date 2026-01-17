@@ -447,8 +447,15 @@ struct HistoryRowView: View {
         .onTapGesture {
             if isEditMode {
                 onToggleSelection()
-            } else {
-                onCopy()
+            }
+        }
+        .contextMenu {
+            if !isEditMode {
+                Button {
+                    onCopy()
+                } label: {
+                    Label("复制", systemImage: "doc.on.doc")
+                }
             }
         }
     }
