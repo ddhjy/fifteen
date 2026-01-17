@@ -15,6 +15,9 @@ struct ContentView: View {
     // 使用静态变量存储键盘弹出任务，可以被取消
     private static var keyboardWorkItem: DispatchWorkItem?
     
+    // 追踪是否是首次启动，首次启动时直接弹出键盘无需延迟
+    private static var isFirstLaunch: Bool = true
+    
     private let primaryColor = Color(hex: 0x6366F1)
     
     // 从草稿获取当前文本
@@ -67,7 +70,13 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            scheduleKeyboardShow(delay: 0.5)
+            if Self.isFirstLaunch {
+                // 首次启动时直接弹出键盘，无需延迟
+                Self.isFirstLaunch = false
+                isTextEditorFocused = true
+            } else {
+                scheduleKeyboardShow(delay: 0.5)
+            }
         }
         .onChange(of: showHistory) { _, isShowing in
             if isShowing {
