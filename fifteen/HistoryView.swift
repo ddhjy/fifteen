@@ -21,17 +21,24 @@ struct HistoryView: View {
     @State private var isExporting = false
     @State private var exportedFileURL: URL? = nil
     @State private var searchText = ""
+    @State private var committedSearchText = ""
+    @State private var isSearchTextComposing = false
+    @State private var searchUpdateWorkItem: DispatchWorkItem?
     @State private var showStatistics = false
     
     private var filteredItems: [HistoryItem] {
         var items = historyManager.getSavedItems(filteredBy: selectedTags)
         
         // 搜索过滤
-        if !searchText.isEmpty {
-            items = items.filter { $0.text.localizedCaseInsensitiveContains(searchText) }
+        if !effectiveSearchText.isEmpty {
+            items = items.filter { $0.text.localizedCaseInsensitiveContains(effectiveSearchText) }
         }
         
         return items
+    }
+
+    private var effectiveSearchText: String {
+        committedSearchText
     }
     
     var body: some View {
@@ -188,6 +195,29 @@ struct HistoryView: View {
         }
     }
     
+    private func handleSearchTextChange(_ newValue: String) {
+        searchUpdateWorkItem?.cancel()
+        
+        let workItem = DispatchWorkItem { [newValue] in
+            let responder = UIApplication.shared.currentFirstResponder()
+            let textField = responder as? UITextField
+            let hasMarkedText = textField?.markedTextRange != nil
+            let isChineseInput = textField?.textInputMode?.primaryLanguage?.hasPrefix("zh") == true
+            let containsHanCharacters = newValue.range(of: "\\p{Han}", options: .regularExpression) != nil
+            let shouldDeferUpdate = hasMarkedText || (isChineseInput && !containsHanCharacters && !newValue.isEmpty)
+            
+            if isSearchTextComposing != shouldDeferUpdate {
+                isSearchTextComposing = shouldDeferUpdate
+            }
+            
+            guard !shouldDeferUpdate else { return }
+            committedSearchText = newValue
+        }
+        
+        searchUpdateWorkItem = workItem
+        DispatchQueue.main.async(execute: workItem)
+    }
+    
     @ViewBuilder
     private var historyContent: some View {
         VStack(spacing: 0) {
@@ -195,7 +225,7 @@ struct HistoryView: View {
             TagFilterBar(selectedTags: $selectedTags)
             
             if filteredItems.isEmpty {
-                if !searchText.isEmpty {
+                if !effectiveSearchText.isEmpty {
                     searchEmptyStateView
                 } else {
                     filteredEmptyStateView
@@ -205,6 +235,14 @@ struct HistoryView: View {
             }
         }
         .searchable(text: $searchText, prompt: "搜索记录")
+        .onChange(of: searchText) { _, newValue in
+            handleSearchTextChange(newValue)
+        }
+        .onSubmit(of: .search) {
+            searchUpdateWorkItem?.cancel()
+            isSearchTextComposing = false
+            committedSearchText = searchText
+        }
         .toolbar {
             if !isEditMode {
                 DefaultToolbarItem(kind: .search, placement: .bottomBar)
@@ -268,7 +306,7 @@ struct HistoryView: View {
                 .font(.system(size: 40, weight: .light))
                 .foregroundStyle(Color(.tertiaryLabel))
             
-            Text("没有找到 \"\(searchText)\"")
+            Text("没有找到 \"\(effectiveSearchText)\"")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(Color(.secondaryLabel))
         }
@@ -338,6 +376,24 @@ struct HistoryView: View {
                 }
             }
         }
+    }
+}
+
+private final class FirstResponderTracker {
+    static weak var current: UIResponder?
+}
+
+private extension UIResponder {
+    @objc func captureFirstResponder() {
+        FirstResponderTracker.current = self
+    }
+}
+
+private extension UIApplication {
+    func currentFirstResponder() -> UIResponder? {
+        FirstResponderTracker.current = nil
+        sendAction(#selector(UIResponder.captureFirstResponder), to: nil, from: nil, for: nil)
+        return FirstResponderTracker.current
     }
 }
 
