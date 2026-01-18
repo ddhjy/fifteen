@@ -19,13 +19,22 @@ struct TagPickerView: View {
     /// 冻结的排序标签列表，只在视图首次出现时计算，避免编辑过程中顺序变化
     @State private var frozenSortedTags: [String] = []
     
+    /// 待执行的标签重命名操作（编辑框关闭后执行）
+    @State private var pendingRenameOperation: (from: String, to: String)? = nil
+    
+    /// 本地选中的标签（页面关闭时才同步到 historyManager）
+    @State private var localSelectedTags: Set<String> = []
+    
+    /// 初始选中的标签（用于对比变化）
+    @State private var initialSelectedTags: Set<String> = []
+    
     private var currentItem: HistoryItem? {
         historyManager.items.first { $0.id == itemId }
     }
     
-    /// 当前选中的标签数量
+    /// 当前选中的标签数量（使用本地状态）
     private var selectedTagCount: Int {
-        currentItem?.tags.count ?? 0
+        localSelectedTags.count
     }
     
     /// 使用冻结的排序列表，如果还没计算则返回空数组
@@ -61,7 +70,7 @@ struct TagPickerView: View {
                             ForEach(sortedTags, id: \.self) { tagName in
                                 TagRowView(
                                     tagName: tagName,
-                                    isSelected: currentItem?.tags.contains(tagName) ?? false,
+                                    isSelected: localSelectedTags.contains(tagName),
                                     onToggle: { toggleTag(tagName) },
                                     onEdit: { editingTagName = tagName }
                                 )
@@ -109,16 +118,46 @@ struct TagPickerView: View {
             }) {
                 TagCreateSheet(itemId: itemId)
             }
-            .sheet(item: $editingTagName) { tagName in
-                TagEditSheet(tagName: tagName)
+            .sheet(item: $editingTagName, onDismiss: {
+                // 编辑框消失后再执行重命名操作，避免编辑过程中列表实时刷新
+                if let operation = pendingRenameOperation {
+                    historyManager.renameTag(from: operation.from, to: operation.to)
+                    // 更新冻结的标签列表
+                    if let index = frozenSortedTags.firstIndex(of: operation.from) {
+                        frozenSortedTags[index] = operation.to
+                    }
+                    pendingRenameOperation = nil
+                }
+            }) { tagName in
+                TagEditSheet(tagName: tagName) { newName in
+                    // 保存重命名操作，延迟到 sheet 关闭后执行
+                    pendingRenameOperation = (from: tagName, to: newName)
+                }
             }
         }
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
         .onAppear {
-            // 只在首次出现时计算排序，之后保持不变
+            // 只在首次出现时初始化
             if frozenSortedTags.isEmpty {
+                // 初始化本地选中状态
+                let currentTags = Set(currentItem?.tags ?? [])
+                localSelectedTags = currentTags
+                initialSelectedTags = currentTags
+                // 计算排序
                 frozenSortedTags = computeInitialSortedTags()
+            }
+        }
+        .onDisappear {
+            // 页面关闭时，同步标签变更到 historyManager
+            let addedTags = localSelectedTags.subtracting(initialSelectedTags)
+            let removedTags = initialSelectedTags.subtracting(localSelectedTags)
+            
+            for tag in addedTags {
+                historyManager.addTag(to: itemId, tagName: tag)
+            }
+            for tag in removedTags {
+                historyManager.removeTag(from: itemId, tagName: tag)
             }
         }
     }
@@ -137,8 +176,13 @@ struct TagPickerView: View {
         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
         impactFeedback.impactOccurred()
         
+        // 只更新本地状态，不立即同步到 historyManager
         withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-            historyManager.toggleTag(for: itemId, tagName: tagName)
+            if localSelectedTags.contains(tagName) {
+                localSelectedTags.remove(tagName)
+            } else {
+                localSelectedTags.insert(tagName)
+            }
         }
     }
 }
@@ -204,7 +248,7 @@ extension String: @retroactive Identifiable {
 
 struct TagEditSheet: View {
     let tagName: String
-    @State private var historyManager = HistoryManager.shared
+    var onSave: ((String) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var newTagName: String = ""
     @FocusState private var isInputFocused: Bool
@@ -261,7 +305,14 @@ struct TagEditSheet: View {
         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
         impactFeedback.impactOccurred()
         
-        historyManager.renameTag(from: tagName, to: newTagName)
+        let trimmedName = newTagName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let onSave = onSave {
+            // 使用回调延迟执行
+            onSave(trimmedName)
+        } else {
+            // 兼容直接调用的情况
+            HistoryManager.shared.renameTag(from: tagName, to: trimmedName)
+        }
         dismiss()
     }
 }
