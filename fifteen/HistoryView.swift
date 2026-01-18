@@ -469,7 +469,7 @@ struct HistoryRowView: View {
                         // 标签 (内联显示，排除当前筛选的标签)
                         let displayTags = item.tags.filter { !filteredTags.contains($0) }
                         if !displayTags.isEmpty && !isEditMode {
-                            ForEach(displayTags.prefix(2), id: \.self) { tagName in
+                            ForEach(displayTags.prefix(4), id: \.self) { tagName in
                                 Text(tagName)
                                     .font(.system(size: 10, weight: .medium))
                                     .foregroundStyle(Color(hex: 0x6366F1))
@@ -481,8 +481,8 @@ struct HistoryRowView: View {
                                     )
                             }
                             
-                            if displayTags.count > 2 {
-                                Text("+\(displayTags.count - 2)")
+                            if displayTags.count > 4 {
+                                Text("+\(displayTags.count - 4)")
                                     .font(.system(size: 10, weight: .medium))
                                     .foregroundStyle(Color(.tertiaryLabel))
                             }
