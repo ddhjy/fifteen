@@ -116,19 +116,34 @@ struct ContentView: View {
                         Image(systemName: "tag")
                             .font(.system(size: 18))
                         
-                        if selectedTags.count == 1, let tagName = selectedTags.first {
-                            Text(tagName)
-                                .font(.system(size: 14, weight: .medium))
-                                .lineLimit(1)
-                        } else if selectedTags.count > 1 {
-                            Text("\(selectedTags.count)")
-                                .font(.system(size: 14, weight: .medium))
+                        if !selectedTags.isEmpty {
+                            VStack(alignment: .leading, spacing: 2) {
+                                // 第一个标签
+                                if let first = selectedTags.first {
+                                    Text(first)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .lineLimit(1)
+                                }
+                                // 第二个标签 + 剩余数量（同一行）
+                                if selectedTags.count >= 2 {
+                                    HStack(spacing: 4) {
+                                        Text(selectedTags[1])
+                                            .font(.system(size: 12, weight: .medium))
+                                            .lineLimit(1)
+                                        if selectedTags.count > 2 {
+                                            Text("+\(selectedTags.count - 2)")
+                                                .font(.system(size: 11, weight: .regular))
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
                 .tint(selectedTags.isEmpty ? .primary : primaryColor)
                 .padding(.horizontal, selectedTags.isEmpty ? 14 : 16)
-                .padding(.vertical, 14)
+                .padding(.vertical, selectedTags.isEmpty ? 14 : 10)
                 .glassEffect(.regular.interactive(), in: Capsule())
             }
             
