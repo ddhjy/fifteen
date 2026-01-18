@@ -73,6 +73,14 @@ struct HistoryView: View {
                         
                         // 更多菜单
                         Menu {
+                            Button(action: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    isEditMode = true
+                                }
+                            }) {
+                                Label("编辑", systemImage: "pencil")
+                            }
+                            
                             Button(action: { showStatistics = true }) {
                                 Label("统计", systemImage: "chart.bar")
                             }
@@ -81,14 +89,6 @@ struct HistoryView: View {
                                 Label("导出", systemImage: "square.and.arrow.up")
                             }
                             .disabled(isExporting)
-                            
-                            Button(action: {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                    isEditMode = true
-                                }
-                            }) {
-                                Label("编辑", systemImage: "pencil")
-                            }
                         } label: {
                             if isExporting {
                                 ProgressView()
