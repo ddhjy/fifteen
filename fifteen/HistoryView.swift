@@ -527,18 +527,28 @@ struct ShareSheet: UIViewControllerRepresentable {
 struct StatisticsView: View {
     @Environment(\.dismiss) private var dismiss
     let items: [HistoryItem]
+    @State private var displayedMonth = Date()
+    @State private var selectedDate: Date? = nil
+    
+    private let calendar = Calendar.current
+    
+    /// 根据选中日期过滤后的记录
+    private var filteredItems: [HistoryItem] {
+        guard let selectedDate = selectedDate else { return items }
+        return items.filter { calendar.isDate($0.createdAt, inSameDayAs: selectedDate) }
+    }
     
     private var totalRecords: Int {
-        items.count
+        filteredItems.count
     }
     
     private var totalCharacters: Int {
-        items.reduce(0) { $0 + $1.text.count }
+        filteredItems.reduce(0) { $0 + $1.text.count }
     }
     
     private var tagStatistics: [(tag: String, count: Int)] {
         var tagCounts: [String: Int] = [:]
-        for item in items {
+        for item in filteredItems {
             for tag in item.tags {
                 tagCounts[tag, default: 0] += 1
             }
@@ -548,12 +558,52 @@ struct StatisticsView: View {
     }
     
     private var untaggedCount: Int {
-        items.filter { $0.tags.isEmpty }.count
+        filteredItems.filter { $0.tags.isEmpty }.count
+    }
+    
+    /// 按日期统计记录数（用于日历显示）
+    private var recordsByDate: [Date: Int] {
+        var counts: [Date: Int] = [:]
+        for item in items {
+            let dateOnly = calendar.startOfDay(for: item.createdAt)
+            counts[dateOnly, default: 0] += 1
+        }
+        return counts
+    }
+    
+    private var selectedDateString: String {
+        guard let date = selectedDate else { return "" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "M月d日"
+        return formatter.string(from: date)
     }
     
     var body: some View {
         NavigationStack {
             List {
+                // 日历
+                Section {
+                    CalendarGridView(
+                        displayedMonth: $displayedMonth,
+                        selectedDate: $selectedDate,
+                        recordsByDate: recordsByDate
+                    )
+                } header: {
+                    HStack {
+                        Text("记录日历")
+                        Spacer()
+                        if selectedDate != nil {
+                            Button("查看全部") {
+                                withAnimation {
+                                    selectedDate = nil
+                                }
+                            }
+                            .font(.system(size: 12))
+                            .textCase(nil)
+                        }
+                    }
+                }
+                
                 // 总览
                 Section {
                     HStack {
@@ -569,7 +619,11 @@ struct StatisticsView: View {
                             .foregroundStyle(.secondary)
                     }
                 } header: {
-                    Text("总览")
+                    if let _ = selectedDate {
+                        Text("\(selectedDateString) 统计")
+                    } else {
+                        Text("总览")
+                    }
                 }
                 
                 // 标签统计
@@ -609,5 +663,135 @@ struct StatisticsView: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+}
+
+// MARK: - Calendar Grid View
+
+struct CalendarGridView: View {
+    @Binding var displayedMonth: Date
+    @Binding var selectedDate: Date?
+    let recordsByDate: [Date: Int]
+    
+    private let calendar = Calendar.current
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
+    private let weekdaySymbols = ["日", "一", "二", "三", "四", "五", "六"]
+    
+    private var monthYearString: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy年M月"
+        return formatter.string(from: displayedMonth)
+    }
+    
+    private var daysInMonth: [Date?] {
+        guard let range = calendar.range(of: .day, in: .month, for: displayedMonth),
+              let firstDay = calendar.date(from: calendar.dateComponents([.year, .month], from: displayedMonth)) else {
+            return []
+        }
+        
+        let firstWeekday = calendar.component(.weekday, from: firstDay) - 1
+        var days: [Date?] = Array(repeating: nil, count: firstWeekday)
+        
+        for day in range {
+            if let date = calendar.date(byAdding: .day, value: day - 1, to: firstDay) {
+                days.append(date)
+            }
+        }
+        
+        return days
+    }
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            // 月份导航
+            HStack {
+                Button {
+                    withAnimation {
+                        displayedMonth = calendar.date(byAdding: .month, value: -1, to: displayedMonth) ?? displayedMonth
+                    }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color(hex: 0x6366F1))
+                }
+                
+                Spacer()
+                
+                Text(monthYearString)
+                    .font(.system(size: 16, weight: .semibold))
+                
+                Spacer()
+                
+                Button {
+                    withAnimation {
+                        displayedMonth = calendar.date(byAdding: .month, value: 1, to: displayedMonth) ?? displayedMonth
+                    }
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color(hex: 0x6366F1))
+                }
+            }
+            .padding(.horizontal, 8)
+            
+            // 星期标题
+            LazyVGrid(columns: columns, spacing: 4) {
+                ForEach(weekdaySymbols, id: \.self) { symbol in
+                    Text(symbol)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .frame(height: 24)
+                }
+            }
+            
+            // 日期格子
+            LazyVGrid(columns: columns, spacing: 4) {
+                ForEach(Array(daysInMonth.enumerated()), id: \.offset) { _, date in
+                    if let date = date {
+                        let dateOnly = calendar.startOfDay(for: date)
+                        let count = recordsByDate[dateOnly] ?? 0
+                        let isToday = calendar.isDateInToday(date)
+                        let isSelected = selectedDate.map { calendar.isDate($0, inSameDayAs: date) } ?? false
+                        
+                        VStack(spacing: 2) {
+                            Text("\(calendar.component(.day, from: date))")
+                                .font(.system(size: 14, weight: isToday || isSelected ? .bold : .regular))
+                                .foregroundStyle(isSelected ? .white : (isToday ? Color(hex: 0x6366F1) : .primary))
+                            
+                            if count > 0 && !isSelected {
+                                Circle()
+                                    .fill(Color.green.opacity(min(Double(count) / 5.0, 1.0) * 0.7 + 0.3))
+                                    .frame(width: 6, height: 6)
+                            } else {
+                                Circle()
+                                    .fill(Color.clear)
+                                    .frame(width: 6, height: 6)
+                            }
+                        }
+                        .frame(width: 36, height: 36)
+                        .background(
+                            Circle()
+                                .fill(isSelected ? Color(hex: 0x6366F1) : Color.clear)
+                        )
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            if count > 0 {
+                                withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                                    if isSelected {
+                                        selectedDate = nil
+                                    } else {
+                                        selectedDate = dateOnly
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Color.clear
+                            .frame(height: 36)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 8)
     }
 }
