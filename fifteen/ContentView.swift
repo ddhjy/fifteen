@@ -4,6 +4,7 @@ import UIKit
 struct ContentView: View {
     @State private var showHistory: Bool = false
     @State private var showTagSelector: Bool = false
+    @State private var showDebugView: Bool = false
     @State private var historyManager = HistoryManager.shared
     @State private var tagManager = TagManager.shared
 
@@ -67,6 +68,9 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showTagSelector) {
                 TagPickerView(itemId: historyManager.currentDraft.id)
+            }
+            .sheet(isPresented: $showDebugView) {
+                DebugView()
             }
         }
         .onAppear {
@@ -223,6 +227,13 @@ struct ContentView: View {
         impactFeedback.impactOccurred()
         
         guard !draftText.isEmpty else { return }
+        
+        // 检测是否是调试模式触发命令
+        if draftText.hasPrefix("打开调试模式") {
+            historyManager.updateDraftText("")
+            showDebugView = true
+            return
+        }
         
         UIPasteboard.general.string = draftText
         historyManager.finalizeDraft()
