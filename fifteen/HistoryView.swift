@@ -21,6 +21,7 @@ struct HistoryView: View {
     @State private var isExporting = false
     @State private var exportedFileURL: URL? = nil
     @State private var searchText = ""
+    @State private var showStatistics = false
     
     private var filteredItems: [HistoryItem] {
         var items = historyManager.getSavedItems(filteredBy: selectedTags)
@@ -65,6 +66,10 @@ struct HistoryView: View {
                         
                         // 更多菜单
                         Menu {
+                            Button(action: { showStatistics = true }) {
+                                Label("统计", systemImage: "chart.bar")
+                            }
+                            
                             Button(action: exportNotes) {
                                 Label("导出", systemImage: "square.and.arrow.up")
                             }
@@ -144,6 +149,9 @@ struct HistoryView: View {
             if let url = exportedFileURL {
                 ShareSheet(items: [url])
             }
+        }
+        .sheet(isPresented: $showStatistics) {
+            StatisticsView(items: historyManager.savedItems)
         }
         .onAppear {
             withAnimation(.easeOut(duration: 0.4)) {
@@ -512,4 +520,94 @@ struct ShareSheet: UIViewControllerRepresentable {
     }
     
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+// MARK: - Statistics View
+
+struct StatisticsView: View {
+    @Environment(\.dismiss) private var dismiss
+    let items: [HistoryItem]
+    
+    private var totalRecords: Int {
+        items.count
+    }
+    
+    private var totalCharacters: Int {
+        items.reduce(0) { $0 + $1.text.count }
+    }
+    
+    private var tagStatistics: [(tag: String, count: Int)] {
+        var tagCounts: [String: Int] = [:]
+        for item in items {
+            for tag in item.tags {
+                tagCounts[tag, default: 0] += 1
+            }
+        }
+        return tagCounts.map { ($0.key, $0.value) }
+            .sorted { $0.count > $1.count }
+    }
+    
+    private var untaggedCount: Int {
+        items.filter { $0.tags.isEmpty }.count
+    }
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                // 总览
+                Section {
+                    HStack {
+                        Label("记录数", systemImage: "doc.text")
+                        Spacer()
+                        Text("\(totalRecords)")
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Label("总字数", systemImage: "character.cursor.ibeam")
+                        Spacer()
+                        Text("\(totalCharacters)")
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("总览")
+                }
+                
+                // 标签统计
+                if !tagStatistics.isEmpty || untaggedCount > 0 {
+                    Section {
+                        ForEach(tagStatistics, id: \.tag) { stat in
+                            HStack {
+                                Text(stat.tag)
+                                Spacer()
+                                Text("\(stat.count)")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        
+                        if untaggedCount > 0 {
+                            HStack {
+                                Text("无标签")
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Text("\(untaggedCount)")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    } header: {
+                        Text("标签统计")
+                    }
+                }
+            }
+            .navigationTitle("统计")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
 }
