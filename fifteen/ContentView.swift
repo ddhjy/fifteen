@@ -117,22 +117,25 @@ struct ContentView: View {
                             .font(.system(size: 18))
                         
                         if !selectedTags.isEmpty {
-                            VStack(alignment: .leading, spacing: 2) {
+                            // 根据标签数量决定字体大小：1个标签时大一点，2个及以上时小一点
+                            let fontSize: CGFloat = selectedTags.count == 1 ? 13 : 11
+                            
+                            VStack(alignment: .leading, spacing: 1) {
                                 // 第一个标签
                                 if let first = selectedTags.first {
                                     Text(first)
-                                        .font(.system(size: 12, weight: .medium))
+                                        .font(.system(size: fontSize, weight: .medium))
                                         .lineLimit(1)
                                 }
                                 // 第二个标签 + 剩余数量（同一行）
                                 if selectedTags.count >= 2 {
-                                    HStack(spacing: 4) {
+                                    HStack(spacing: 3) {
                                         Text(selectedTags[1])
-                                            .font(.system(size: 12, weight: .medium))
+                                            .font(.system(size: fontSize, weight: .medium))
                                             .lineLimit(1)
                                         if selectedTags.count > 2 {
                                             Text("+\(selectedTags.count - 2)")
-                                                .font(.system(size: 11, weight: .regular))
+                                                .font(.system(size: fontSize - 1, weight: .regular))
                                                 .foregroundStyle(.secondary)
                                         }
                                     }
@@ -140,10 +143,11 @@ struct ContentView: View {
                             }
                         }
                     }
+                    .frame(height: 20) // 固定内容高度
                 }
                 .tint(selectedTags.isEmpty ? .primary : primaryColor)
                 .padding(.horizontal, selectedTags.isEmpty ? 14 : 16)
-                .padding(.vertical, selectedTags.isEmpty ? 14 : 10)
+                .padding(.vertical, 14) // 固定垂直内边距
                 .glassEffect(.regular.interactive(), in: Capsule())
             }
             
