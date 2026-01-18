@@ -17,6 +17,7 @@ struct HistoryView: View {
     @State private var isEditMode = false
     @State private var selectedItems: Set<UUID> = []
     @State private var selectedTags: [String] = []
+    @State private var tagBarHeight: CGFloat = 0
     @State private var tagPickerItem: HistoryItem? = nil
     @State private var isExporting = false
     @State private var exportedFileURL: URL? = nil
@@ -220,18 +221,22 @@ struct HistoryView: View {
     
     @ViewBuilder
     private var historyContent: some View {
-        VStack(spacing: 0) {
-            // 标签筛选栏
-            TagFilterBar(selectedTags: $selectedTags)
-            
+        Group {
             if filteredItems.isEmpty {
-                if !effectiveSearchText.isEmpty {
-                    searchEmptyStateView
-                } else {
-                    filteredEmptyStateView
+                VStack(spacing: 0) {
+                    TagFilterBar(selectedTags: $selectedTags)
+                    
+                    if !effectiveSearchText.isEmpty {
+                        searchEmptyStateView
+                    } else {
+                        filteredEmptyStateView
+                    }
                 }
             } else {
-                historyList
+                ZStack(alignment: .top) {
+                    historyList
+                    tagFilterOverlay
+                }
             }
         }
         .searchable(text: $searchText, prompt: "搜索记录")
@@ -341,9 +346,33 @@ struct HistoryView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.bottom, 12)
+            .padding(.top, tagBarHeight + 12)
+            .safeAreaPadding(.top)
         }
         .scrollIndicators(.hidden)
+        .ignoresSafeArea(edges: .top)
+    }
+    
+    private var tagFilterOverlay: some View {
+        TagFilterBar(selectedTags: $selectedTags)
+            .frame(maxWidth: .infinity)
+            .background(
+                GeometryReader { proxy in
+                    Color.clear
+                        .preference(key: TagBarHeightKey.self, value: proxy.size.height)
+                }
+            )
+            .background(.ultraThinMaterial)
+            .overlay(alignment: .bottom) {
+                Divider().opacity(0.4)
+            }
+            .onPreferenceChange(TagBarHeightKey.self) { newValue in
+                if tagBarHeight != newValue {
+                    tagBarHeight = newValue
+                }
+            }
+            .zIndex(1)
     }
     
     private func toggleSelection(_ item: HistoryItem) {
@@ -375,6 +404,17 @@ struct HistoryView: View {
                     copiedItemId = nil
                 }
             }
+        }
+    }
+}
+
+private struct TagBarHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        let next = nextValue()
+        if next > value {
+            value = next
         }
     }
 }
