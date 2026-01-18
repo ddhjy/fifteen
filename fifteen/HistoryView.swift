@@ -52,7 +52,7 @@ struct HistoryView: View {
                 historyContent
             }
         }
-        .navigationTitle("记录")
+        .navigationTitle("随心记")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
