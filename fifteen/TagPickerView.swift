@@ -419,28 +419,43 @@ struct TagFilterBar: View {
         // 如果没有可选标签，返回空
         guard !tagCounts.isEmpty else { return [] }
         
-        // 按计数降序排序
-        return tagCounts.keys.sorted { tagCounts[$0, default: 0] > tagCounts[$1, default: 0] }
+        // 按计数降序排序，计数相同时按标签名排序以保证稳定性
+        return tagCounts.keys.sorted { 
+            let count0 = tagCounts[$0, default: 0]
+            let count1 = tagCounts[$1, default: 0]
+            if count0 != count1 {
+                return count0 > count1
+            }
+            return $0 < $1
+        }
     }
     
     /// 选择某一级的 "全部"
     private func selectAll(at level: Int) {
         // 清除该级及之后的所有选择
         if level < selectedTags.count {
-            selectedTags = Array(selectedTags.prefix(level))
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                selectedTags = Array(selectedTags.prefix(level))
+            }
         }
     }
     
     /// 选择某一级的标签
     private func selectTag(_ tagName: String, at level: Int) {
-        if level < selectedTags.count {
-            // 替换该级选择并清除后续选择
-            var newTags = Array(selectedTags.prefix(level))
-            newTags.append(tagName)
-            selectedTags = newTags
-        } else {
-            // 添加新的选择
-            selectedTags.append(tagName)
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            if level < selectedTags.count {
+                // 替换该级选择并清除后续选择
+                var newTags = Array(selectedTags.prefix(level))
+                newTags.append(tagName)
+                selectedTags = newTags
+            } else {
+                // 添加新的选择
+                selectedTags.append(tagName)
+            }
         }
     }
 }
@@ -471,6 +486,7 @@ struct FilterChip: View {
                 )
         }
         .buttonStyle(.plain)
+        .animation(.none, value: isSelected)
     }
 }
 
