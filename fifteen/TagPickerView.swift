@@ -531,10 +531,6 @@ struct FilterChip: View {
                         .fill(isSelected ? Color(hex: 0x6366F1).opacity(0.15) : Color(.tertiarySystemFill))
                 )
                 .foregroundStyle(isSelected ? Color(hex: 0x6366F1) : Color(.secondaryLabel))
-                .overlay(
-                    Capsule()
-                        .stroke(isSelected ? Color(hex: 0x6366F1).opacity(0.3) : Color.clear, lineWidth: 1)
-                )
         }
         .buttonStyle(.plain)
         .animation(.none, value: isSelected)
