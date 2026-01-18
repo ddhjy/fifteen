@@ -21,7 +21,6 @@ struct HistoryView: View {
     @State private var isExporting = false
     @State private var exportedFileURL: URL? = nil
     @State private var searchText = ""
-    @State private var isSearchActive = false
     
     private var filteredItems: [HistoryItem] {
         var items = historyManager.getSavedItems(filteredBy: selectedTags)
@@ -63,14 +62,6 @@ struct HistoryView: View {
                         }
                         .tint(.primary)
                     } else {
-                        // 搜索按钮
-                        Button(action: {
-                            isSearchActive = true
-                        }) {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 17, weight: .regular))
-                        }
-                        .tint(.primary)
                         
                         // 更多菜单
                         Menu {
@@ -159,12 +150,6 @@ struct HistoryView: View {
                 appearAnimation = true
             }
         }
-        .onChange(of: isSearchActive) { oldValue, newValue in
-            // 搜索被关闭时清空搜索文本
-            if !newValue {
-                searchText = ""
-            }
-        }
     }
     
     private func deleteSelectedItems() {
@@ -197,7 +182,7 @@ struct HistoryView: View {
     
     @ViewBuilder
     private var historyContent: some View {
-        let content = VStack(spacing: 0) {
+        VStack(spacing: 0) {
             // 标签筛选栏
             TagFilterBar(selectedTags: $selectedTags)
             
@@ -211,12 +196,11 @@ struct HistoryView: View {
                 historyList
             }
         }
-        
-        if isSearchActive {
-            content
-                .searchable(text: $searchText, isPresented: $isSearchActive, placement: .toolbar, prompt: "搜索记录")
-        } else {
-            content
+        .searchable(text: $searchText, prompt: "搜索记录")
+        .toolbar {
+            if !isEditMode {
+                DefaultToolbarItem(kind: .search, placement: .bottomBar)
+            }
         }
     }
     
