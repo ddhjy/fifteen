@@ -99,7 +99,14 @@ struct TagPickerView: View {
                     .tint(Color(hex: 0x6366F1))
                 }
             }
-            .sheet(isPresented: $showCreateTag) {
+            .sheet(isPresented: $showCreateTag, onDismiss: {
+                // 新增标签后，将新标签添加到列表顶部
+                for tag in tagManager.tags {
+                    if !frozenSortedTags.contains(tag) {
+                        frozenSortedTags.insert(tag, at: 0)
+                    }
+                }
+            }) {
                 TagCreateSheet(itemId: itemId)
             }
             .sheet(item: $editingTagName) { tagName in
