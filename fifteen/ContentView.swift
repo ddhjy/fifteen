@@ -7,6 +7,9 @@ struct ContentView: View {
     @State private var showDebugView: Bool = false
     @State private var historyManager = HistoryManager.shared
     @State private var tagManager = TagManager.shared
+    
+    @State private var showSettings: Bool = false
+    @State private var settingsManager = SettingsManager.shared
 
     @State private var isTextEditorFocused: Bool = false
     
@@ -52,7 +55,7 @@ struct ContentView: View {
                 }
                 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: {}) {
+                    Button(action: { showSettings = true }) {
                         Image(systemName: "ellipsis")
                             .font(.system(size: 17, weight: .regular))
                     }
@@ -71,6 +74,9 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showDebugView) {
                 DebugView()
+            }
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
             }
         }
         .onAppear {
@@ -101,68 +107,96 @@ struct ContentView: View {
     
     private var bottomToolbar: some View {
         HStack {
-            Button(action: copyAndClear) {
-                Image(systemName: "paperplane")
-                    .font(.system(size: 20))
+            if settingsManager.isRightHandMode {
+                // 右手模式：删除按钮在左，发送和标签在右
+                Button(action: clearText) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 20))
+                }
+                .tint(.primary)
+                .padding(14)
+                .glassEffect(.regular.interactive(), in: Circle())
+                
+                Spacer()
+                
+                // 标签选择按钮
+                if !tagManager.tags.isEmpty {
+                    tagButton
+                }
+                
+                Button(action: copyAndClear) {
+                    Image(systemName: "paperplane")
+                        .font(.system(size: 20))
+                }
+                .tint(primaryColor)
+                .padding(14)
+                .glassEffect(.regular.interactive(), in: Circle())
+            } else {
+                // 默认模式：发送和标签在左，删除按钮在右
+                Button(action: copyAndClear) {
+                    Image(systemName: "paperplane")
+                        .font(.system(size: 20))
+                }
+                .tint(primaryColor)
+                .padding(14)
+                .glassEffect(.regular.interactive(), in: Circle())
+                
+                // 标签选择按钮
+                if !tagManager.tags.isEmpty {
+                    tagButton
+                }
+                
+                Spacer()
+                
+                Button(action: clearText) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 20))
+                }
+                .tint(.primary)
+                .padding(14)
+                .glassEffect(.regular.interactive(), in: Circle())
             }
-            .tint(primaryColor)
-            .padding(14)
-            .glassEffect(.regular.interactive(), in: Circle())
-            
-            // 标签选择按钮
-            if !tagManager.tags.isEmpty {
-                Button(action: { showTagSelector = true }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "tag")
-                            .font(.system(size: 18))
-                        
-                        if !selectedTags.isEmpty {
-                            // 根据标签数量决定字体大小：1个标签时大一点，2个及以上时小一点
-                            let fontSize: CGFloat = selectedTags.count == 1 ? 13 : 11
-                            
-                            VStack(alignment: .leading, spacing: 1) {
-                                // 第一个标签
-                                if let first = selectedTags.first {
-                                    Text(first)
-                                        .font(.system(size: fontSize, weight: .medium))
-                                        .lineLimit(1)
-                                }
-                                // 第二个标签 + 剩余数量（同一行）
-                                if selectedTags.count >= 2 {
-                                    HStack(spacing: 3) {
-                                        Text(selectedTags[1])
-                                            .font(.system(size: fontSize, weight: .medium))
-                                            .lineLimit(1)
-                                        if selectedTags.count > 2 {
-                                            Text("+\(selectedTags.count - 2)")
-                                                .font(.system(size: fontSize - 1, weight: .regular))
-                                                .foregroundStyle(.secondary)
-                                        }
-                                    }
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
+    }
+
+    private var tagButton: some View {
+        Button(action: { showTagSelector = true }) {
+            HStack(spacing: 6) {
+                Image(systemName: "tag")
+                    .font(.system(size: 18))
+                
+                if !selectedTags.isEmpty {
+                    let fontSize: CGFloat = selectedTags.count == 1 ? 13 : 11
+                    
+                    VStack(alignment: .leading, spacing: 1) {
+                        if let first = selectedTags.first {
+                            Text(first)
+                                .font(.system(size: fontSize, weight: .medium))
+                                .lineLimit(1)
+                        }
+                        if selectedTags.count >= 2 {
+                            HStack(spacing: 3) {
+                                Text(selectedTags[1])
+                                    .font(.system(size: fontSize, weight: .medium))
+                                    .lineLimit(1)
+                                if selectedTags.count > 2 {
+                                    Text("+\(selectedTags.count - 2)")
+                                        .font(.system(size: fontSize - 1, weight: .regular))
+                                        .foregroundStyle(.secondary)
                                 }
                             }
                         }
                     }
-                    .frame(height: 20) // 固定内容高度
                 }
-                .tint(selectedTags.isEmpty ? .primary : primaryColor)
-                .padding(.horizontal, selectedTags.isEmpty ? 14 : 16)
-                .padding(.vertical, 14) // 固定垂直内边距
-                .glassEffect(.regular.interactive(), in: Capsule())
             }
-            
-            Spacer()
-            
-            Button(action: clearText) {
-                Image(systemName: "trash")
-                    .font(.system(size: 20))
-            }
-            .tint(.primary)
-            .padding(14)
-            .glassEffect(.regular.interactive(), in: Circle())
+            .frame(height: 20)
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
+        .tint(selectedTags.isEmpty ? .primary : primaryColor)
+        .padding(.horizontal, selectedTags.isEmpty ? 14 : 16)
+        .padding(.vertical, 14)
+        .glassEffect(.regular.interactive(), in: Capsule())
     }
     
     private var fullScreenEditor: some View {
