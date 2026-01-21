@@ -32,7 +32,7 @@ class AIService {
         let combinedMessage = "\(prompt)\n\n---\n\n\(text)"
         
         let body: [String: Any] = [
-            "model": "gemini-3-flash",
+            "model": "kimi-k2",
             "messages": [
                 ["role": "user", "content": combinedMessage]
             ],

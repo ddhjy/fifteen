@@ -102,11 +102,7 @@ struct ContentView: View {
             } message: {
                 Text(workflowError?.localizedDescription ?? "未知错误")
             }
-            .overlay {
-                if isProcessingWorkflow {
-                    WorkflowProgressOverlay(currentIndex: workflowManager.currentNodeIndex)
-                }
-            }
+
         }
         .onAppear {
             if Self.isFirstLaunch {
@@ -150,10 +146,15 @@ struct ContentView: View {
                 
                 // Workflow 配置按钮
                 Button(action: { showWorkflowConfig = true }) {
-                    Image(systemName: "arrow.triangle.branch")
-                        .font(.system(size: 18))
+                    if isProcessingWorkflow {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "arrow.triangle.branch")
+                            .font(.system(size: 18))
+                    }
                 }
-                .tint(.primary)
+                .tint(isProcessingWorkflow ? primaryColor : .primary)
                 .padding(14)
                 .glassEffect(.regular.interactive(), in: Circle())
                 
@@ -186,10 +187,15 @@ struct ContentView: View {
                 
                 // Workflow 配置按钮
                 Button(action: { showWorkflowConfig = true }) {
-                    Image(systemName: "arrow.triangle.branch")
-                        .font(.system(size: 18))
+                    if isProcessingWorkflow {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "arrow.triangle.branch")
+                            .font(.system(size: 18))
+                    }
                 }
-                .tint(.primary)
+                .tint(isProcessingWorkflow ? primaryColor : .primary)
                 .padding(14)
                 .glassEffect(.regular.interactive(), in: Circle())
                 
@@ -340,7 +346,15 @@ struct ContentView: View {
     }
     
     private func executeWorkflow() {
-        isProcessingWorkflow = true
+        // 延迟显示 loading 态，0.1 秒内返回则不显示
+        let showLoadingTask = Task {
+            try? await Task.sleep(for: .milliseconds(100))
+            if !Task.isCancelled {
+                await MainActor.run {
+                    isProcessingWorkflow = true
+                }
+            }
+        }
         
         Task {
             do {
@@ -348,6 +362,8 @@ struct ContentView: View {
                     input: draftText,
                     tags: selectedTags
                 )
+                
+                showLoadingTask.cancel()
                 
                 await MainActor.run {
                     isProcessingWorkflow = false
@@ -366,6 +382,8 @@ struct ContentView: View {
                     }
                 }
             } catch {
+                showLoadingTask.cancel()
+                
                 await MainActor.run {
                     isProcessingWorkflow = false
                     workflowError = error
@@ -470,34 +488,6 @@ extension Color {
             blue: Double(hex & 0xFF) / 255.0,
             opacity: alpha
         )
-    }
-}
-
-// MARK: - Workflow Progress Overlay
-
-struct WorkflowProgressOverlay: View {
-    let currentIndex: Int
-    @State private var workflowManager = WorkflowManager.shared
-    
-    var body: some View {
-        ZStack {
-            Color.black.opacity(0.3)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 16) {
-                ProgressView()
-                    .scaleEffect(1.2)
-                
-                if currentIndex < workflowManager.nodes.count {
-                    let node = workflowManager.nodes[currentIndex]
-                    Text("正在执行: \(node.type.displayName)")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(24)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-        }
     }
 }
 
