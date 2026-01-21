@@ -28,11 +28,13 @@ class AIService {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 60
         
+        // 将提示词和用户文本组合成一条消息，确保 AI 能理解要处理的内容
+        let combinedMessage = "\(prompt)\n\n---\n\n\(text)"
+        
         let body: [String: Any] = [
             "model": "kimi-k2",
             "messages": [
-                ["role": "system", "content": prompt],
-                ["role": "user", "content": text]
+                ["role": "user", "content": combinedMessage]
             ],
             "stream": false,
             "temperature": 0.7,
