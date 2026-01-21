@@ -13,6 +13,12 @@ struct ContentView: View {
 
     @State private var isTextEditorFocused: Bool = false
     
+    @State private var showWorkflowConfig = false
+    @State private var workflowManager = WorkflowManager.shared
+    @State private var isProcessingWorkflow = false
+    @State private var workflowResult: WorkflowExecutionResult? = nil
+    @State private var workflowError: Error? = nil
+    
     // 键盘动画期间禁用编辑框交互，避免用户误触导致 AutoFill 弹窗
     @State private var isKeyboardAnimating: Bool = false
     
@@ -78,6 +84,29 @@ struct ContentView: View {
             .sheet(isPresented: $showSettings) {
                 SettingsView()
             }
+            .sheet(isPresented: $showWorkflowConfig) {
+                WorkflowConfigView()
+            }
+            .sheet(item: $workflowResult) { result in
+                WorkflowPreviewView(
+                    result: result,
+                    onSave: { performSave(text: result.finalText) },
+                    onCancel: { }
+                )
+            }
+            .alert("处理失败", isPresented: Binding(
+                get: { workflowError != nil },
+                set: { if !$0 { workflowError = nil } }
+            )) {
+                Button("确定") { workflowError = nil }
+            } message: {
+                Text(workflowError?.localizedDescription ?? "未知错误")
+            }
+            .overlay {
+                if isProcessingWorkflow {
+                    WorkflowProgressOverlay(currentIndex: workflowManager.currentNodeIndex)
+                }
+            }
         }
         .onAppear {
             if Self.isFirstLaunch {
@@ -119,6 +148,15 @@ struct ContentView: View {
                 
                 Spacer()
                 
+                // Workflow 配置按钮
+                Button(action: { showWorkflowConfig = true }) {
+                    Image(systemName: "arrow.triangle.branch")
+                        .font(.system(size: 18))
+                }
+                .tint(.primary)
+                .padding(14)
+                .glassEffect(.regular.interactive(), in: Circle())
+                
                 // 标签选择按钮
                 if !tagManager.tags.isEmpty {
                     tagButton
@@ -145,6 +183,15 @@ struct ContentView: View {
                 if !tagManager.tags.isEmpty {
                     tagButton
                 }
+                
+                // Workflow 配置按钮
+                Button(action: { showWorkflowConfig = true }) {
+                    Image(systemName: "arrow.triangle.branch")
+                        .font(.system(size: 18))
+                }
+                .tint(.primary)
+                .padding(14)
+                .glassEffect(.regular.interactive(), in: Circle())
                 
                 Spacer()
                 
@@ -288,7 +335,49 @@ struct ContentView: View {
             return
         }
         
-        UIPasteboard.general.string = draftText
+        // 执行 Workflow
+        executeWorkflow()
+    }
+    
+    private func executeWorkflow() {
+        isProcessingWorkflow = true
+        
+        Task {
+            do {
+                let result = try await workflowManager.execute(
+                    input: draftText,
+                    tags: selectedTags
+                )
+                
+                await MainActor.run {
+                    isProcessingWorkflow = false
+                    
+                    if result.shouldSave {
+                        if result.skipConfirmation {
+                            // 直接保存
+                            performSave(text: result.finalText)
+                        } else {
+                            // 显示预览
+                            workflowResult = result
+                        }
+                    } else {
+                        // 没有保存节点，只执行了其他操作（如复制）
+                        historyManager.updateDraftText("")
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    isProcessingWorkflow = false
+                    workflowError = error
+                }
+            }
+        }
+    }
+    
+    private func performSave(text: String) {
+        // 更新草稿文本为处理后的结果
+        historyManager.updateDraftText(text)
+        // 调用原有的保存逻辑
         historyManager.finalizeDraft()
     }
 }
@@ -381,6 +470,34 @@ extension Color {
             blue: Double(hex & 0xFF) / 255.0,
             opacity: alpha
         )
+    }
+}
+
+// MARK: - Workflow Progress Overlay
+
+struct WorkflowProgressOverlay: View {
+    let currentIndex: Int
+    @State private var workflowManager = WorkflowManager.shared
+    
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 16) {
+                ProgressView()
+                    .scaleEffect(1.2)
+                
+                if currentIndex < workflowManager.nodes.count {
+                    let node = workflowManager.nodes[currentIndex]
+                    Text("正在执行: \(node.type.displayName)")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(24)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        }
     }
 }
 

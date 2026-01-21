@@ -10,6 +10,7 @@ class SettingsManager {
     static let shared = SettingsManager()
     
     private let rightHandModeKey = "rightHandMode"
+    private let aiApiTokenKey = "aiApiToken"
     
     var isRightHandMode: Bool {
         didSet {
@@ -17,8 +18,19 @@ class SettingsManager {
         }
     }
     
+    var aiApiToken: String? {
+        didSet {
+            if let token = aiApiToken {
+                UserDefaults.standard.set(token, forKey: aiApiTokenKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: aiApiTokenKey)
+            }
+        }
+    }
+    
     private init() {
         self.isRightHandMode = UserDefaults.standard.bool(forKey: rightHandModeKey)
+        self.aiApiToken = UserDefaults.standard.string(forKey: aiApiTokenKey)
     }
 }
 
@@ -56,6 +68,17 @@ struct SettingsView: View {
                     Text("布局")
                 } footer: {
                     Text("开启后，底部工具栏的按钮排列将左右反转，方便右手操作。")
+                }
+                
+                Section {
+                    SecureField("API Token", text: Binding(
+                        get: { settingsManager.aiApiToken ?? "" },
+                        set: { settingsManager.aiApiToken = $0.isEmpty ? nil : $0 }
+                    ))
+                } header: {
+                    Text("AI 配置")
+                } footer: {
+                    Text("用于 Workflow 中的 AI 处理节点")
                 }
             }
             .navigationTitle("设置")
