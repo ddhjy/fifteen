@@ -53,6 +53,7 @@ struct WorkflowNode: Identifiable, Codable, Equatable {
     
     static func defaultNodes() -> [WorkflowNode] {
         [
+            WorkflowNode(type: .copyToClipboard, isEnabled: false),
             WorkflowNode(type: .save, isEnabled: true, config: NodeConfig(skipConfirmation: false))
         ]
     }
@@ -67,6 +68,7 @@ struct WorkflowExecutionResult: Identifiable {
     let tags: [String]
     let shouldSave: Bool
     let skipConfirmation: Bool
+    let didCopyToClipboard: Bool
 }
 
 // MARK: - Workflow Manager
@@ -81,9 +83,43 @@ class WorkflowManager {
     var executionError: Error?
     
     private let storageKey = "workflowNodes"
+    private let mandatoryTerminalOrder: [WorkflowNodeType] = [.copyToClipboard, .save]
     
     private init() {
         loadNodes()
+    }
+    
+    // MARK: - Terminal Node Helpers
+    
+    private func isMandatoryTerminal(_ type: WorkflowNodeType) -> Bool {
+        mandatoryTerminalOrder.contains(type)
+    }
+    
+    var areTerminalNodesAllDisabled: Bool {
+        let saveEnabled = nodes.first(where: { $0.type == .save })?.isEnabled ?? false
+        return !saveEnabled
+    }
+    
+    private func normalizeNodesIfNeeded() {
+        var seen = Set<WorkflowNodeType>()
+        nodes = nodes.filter { node in
+            guard isMandatoryTerminal(node.type) else { return true }
+            if seen.contains(node.type) { return false }
+            seen.insert(node.type)
+            return true
+        }
+        
+        for type in mandatoryTerminalOrder {
+            if !nodes.contains(where: { $0.type == type }) {
+                nodes.append(WorkflowNode(type: type, isEnabled: false))
+            }
+        }
+        
+        let others = nodes.filter { !isMandatoryTerminal($0.type) }
+        let terminal = mandatoryTerminalOrder.compactMap { type in
+            nodes.first(where: { $0.type == type })
+        }
+        nodes = others + terminal
     }
     
     // MARK: - Persistence
@@ -92,12 +128,17 @@ class WorkflowManager {
         guard let data = UserDefaults.standard.data(forKey: storageKey),
               let savedNodes = try? JSONDecoder().decode([WorkflowNode].self, from: data) else {
             nodes = WorkflowNode.defaultNodes()
+            normalizeNodesIfNeeded()
+            saveNodes()
             return
         }
         nodes = savedNodes
+        normalizeNodesIfNeeded()
+        saveNodes()
     }
     
     func saveNodes() {
+        normalizeNodesIfNeeded()
         if let data = try? JSONEncoder().encode(nodes) {
             UserDefaults.standard.set(data, forKey: storageKey)
         }
@@ -127,6 +168,15 @@ class WorkflowManager {
         }
     }
     
+    func deleteNodes(at offsets: IndexSet) {
+        let removable = offsets.filter { idx in
+            guard nodes.indices.contains(idx) else { return false }
+            return !isMandatoryTerminal(nodes[idx].type)
+        }
+        nodes.remove(atOffsets: IndexSet(removable))
+        saveNodes()
+    }
+    
     // MARK: - Execution
     
     func execute(input: String, tags: [String]) async throws -> WorkflowExecutionResult {
@@ -144,6 +194,7 @@ class WorkflowManager {
         
         var currentText = input
         let enabledNodes = nodes.filter { $0.isEnabled }
+        var didCopy = false
         var shouldSave = false
         var skipConfirmation = false
         
@@ -162,6 +213,7 @@ class WorkflowManager {
                 await MainActor.run {
                     UIPasteboard.general.string = currentText
                 }
+                didCopy = true
                 
             case .save:
                 shouldSave = true
@@ -174,7 +226,8 @@ class WorkflowManager {
             originalText: input,
             tags: tags,
             shouldSave: shouldSave,
-            skipConfirmation: skipConfirmation
+            skipConfirmation: skipConfirmation,
+            didCopyToClipboard: didCopy
         )
     }
 }

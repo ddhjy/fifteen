@@ -19,7 +19,9 @@ struct WorkflowConfigView: View {
                         NodeRowView(node: node, onEdit: { editingNode = node })
                     }
                     .onMove { workflowManager.moveNode(from: $0, to: $1) }
-                    .onDelete { workflowManager.nodes.remove(atOffsets: $0); workflowManager.saveNodes() }
+                    .onDelete { offsets in
+                        workflowManager.deleteNodes(at: offsets)
+                    }
                 } header: {
                     Text("处理节点")
                 } footer: {
@@ -105,7 +107,10 @@ struct AddNodeSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                ForEach(WorkflowNodeType.allCases, id: \.self) { type in
+                ForEach(
+                    WorkflowNodeType.allCases.filter { $0 != .copyToClipboard && $0 != .save },
+                    id: \.self
+                ) { type in
                     Button {
                         let newNode = WorkflowNode(type: type)
                         workflowManager.addNode(newNode)

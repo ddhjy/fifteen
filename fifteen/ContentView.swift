@@ -29,6 +29,7 @@ struct ContentView: View {
     private static var isFirstLaunch: Bool = true
     
     private let primaryColor = Color(hex: 0x6366F1)
+    private let warningColor = Color.yellow
     
     // 从草稿获取当前文本
     private var draftText: String {
@@ -154,7 +155,11 @@ struct ContentView: View {
                             .font(.system(size: 18))
                     }
                 }
-                .tint(isProcessingWorkflow ? primaryColor : .primary)
+                .tint(
+                    isProcessingWorkflow
+                        ? primaryColor
+                        : (workflowManager.areTerminalNodesAllDisabled ? warningColor : .primary)
+                )
                 .padding(14)
                 .glassEffect(.regular.interactive(), in: Circle())
                 
@@ -195,7 +200,11 @@ struct ContentView: View {
                             .font(.system(size: 18))
                     }
                 }
-                .tint(isProcessingWorkflow ? primaryColor : .primary)
+                .tint(
+                    isProcessingWorkflow
+                        ? primaryColor
+                        : (workflowManager.areTerminalNodesAllDisabled ? warningColor : .primary)
+                )
                 .padding(14)
                 .glassEffect(.regular.interactive(), in: Circle())
                 
@@ -370,15 +379,16 @@ struct ContentView: View {
                     
                     if result.shouldSave {
                         if result.skipConfirmation {
-                            // 直接保存
                             performSave(text: result.finalText)
                         } else {
-                            // 显示预览
                             workflowResult = result
                         }
                     } else {
-                        // 没有保存节点，只执行了其他操作（如复制）
-                        historyManager.updateDraftText("")
+                        if result.didCopyToClipboard {
+                            historyManager.updateDraftText("")
+                        } else {
+                            historyManager.updateDraftText(result.finalText)
+                        }
                     }
                 }
             } catch {
