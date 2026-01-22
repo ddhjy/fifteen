@@ -11,6 +11,8 @@ struct WorkflowConfigView: View {
     @State private var showAddNode = false
     @State private var editingNode: WorkflowNode? = nil
     
+    private let primaryColor = Color(hex: 0x6366F1)
+    
     var body: some View {
         NavigationStack {
             List {
@@ -34,6 +36,7 @@ struct WorkflowConfigView: View {
                     } label: {
                         Label("添加节点", systemImage: "plus.circle")
                     }
+                    .tint(primaryColor)
                 }
             }
             .navigationTitle("Workflow 配置")
@@ -104,6 +107,8 @@ struct AddNodeSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var workflowManager = WorkflowManager.shared
     
+    private let primaryColor = Color(hex: 0x6366F1)
+    
     var body: some View {
         NavigationStack {
             List {
@@ -120,11 +125,13 @@ struct AddNodeSheet: View {
                     }
                 }
             }
+            .tint(primaryColor)
             .navigationTitle("添加节点")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("取消") { dismiss() }
+                        .tint(primaryColor)
                 }
             }
         }
