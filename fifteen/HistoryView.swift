@@ -29,9 +29,28 @@ struct HistoryView: View {
     private var filteredItems: [HistoryItem] {
         var items = historyManager.getSavedItems(filteredBy: selectedTags)
         
-        // 搜索过滤
+        // 搜索过滤：同时匹配正文和标签名
         if !effectiveSearchText.isEmpty {
-            items = items.filter { $0.text.localizedCaseInsensitiveContains(effectiveSearchText) }
+            items = items.filter { item in
+                let textMatch = item.text.localizedCaseInsensitiveContains(effectiveSearchText)
+                let tagMatch = item.tags.contains { $0.localizedCaseInsensitiveContains(effectiveSearchText) }
+                return textMatch || tagMatch
+            }
+        }
+        
+        return items
+    }
+    
+    /// 仅应用搜索过滤、不应用标签筛选的记录（用于计算可选标签）
+    private var filteredItemsWithoutTagFilter: [HistoryItem] {
+        var items = historyManager.savedItems
+        
+        if !effectiveSearchText.isEmpty {
+            items = items.filter { item in
+                let textMatch = item.text.localizedCaseInsensitiveContains(effectiveSearchText)
+                let tagMatch = item.tags.contains { $0.localizedCaseInsensitiveContains(effectiveSearchText) }
+                return textMatch || tagMatch
+            }
         }
         
         return items
@@ -234,12 +253,14 @@ struct HistoryView: View {
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            TagFilterBar(selectedTags: $selectedTags)
-                .background {
-                    // 使用透明色让系统导航栏的 glass effect 延伸
-                    Color.clear
-                        .background(.bar)
-                }
+            TagFilterBar(
+                selectedTags: $selectedTags,
+                availableItems: filteredItemsWithoutTagFilter
+            )
+            .background {
+                Color.clear
+                    .background(.bar)
+            }
         }
         .searchable(text: $searchText, prompt: "搜索记录")
         .onChange(of: searchText) { _, newValue in
