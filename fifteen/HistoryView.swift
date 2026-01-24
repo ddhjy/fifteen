@@ -27,46 +27,81 @@ struct HistoryView: View {
     @State private var showStatistics = false
     @State private var isRandomMode = false
     @State private var randomShuffleSeed: UInt64 = 0
+    @State private var listCache = HistoryListCache()
     
-    private var filteredItems: [HistoryItem] {
-        var items = historyManager.getSavedItems(filteredBy: selectedTags)
+    private struct HistoryListCache {
+        var savedItems: [HistoryItem] = []
+        /// 仅应用搜索过滤、不应用标签筛选的记录（用于计算可选标签）
+        var searchFilteredItems: [HistoryItem] = []
+        var filteredItems: [HistoryItem] = []
+        var displayedItems: [HistoryItem] = []
         
-        // 搜索过滤：同时匹配正文和标签名
-        if !effectiveSearchText.isEmpty {
-            items = items.filter { item in
-                let textMatch = item.text.localizedCaseInsensitiveContains(effectiveSearchText)
-                let tagMatch = item.tags.contains { $0.localizedCaseInsensitiveContains(effectiveSearchText) }
-                return textMatch || tagMatch
+        static func build(
+            savedItems: [HistoryItem],
+            searchText: String,
+            selectedTags: [String],
+            isRandomMode: Bool,
+            randomShuffleSeed: UInt64
+        ) -> HistoryListCache {
+            let searchFilteredItems: [HistoryItem]
+            if searchText.isEmpty {
+                searchFilteredItems = savedItems
+            } else {
+                searchFilteredItems = savedItems.filter { item in
+                    let textMatch = item.text.localizedCaseInsensitiveContains(searchText)
+                    let tagMatch = item.tags.contains { $0.localizedCaseInsensitiveContains(searchText) }
+                    return textMatch || tagMatch
+                }
             }
+            
+            let filteredItems: [HistoryItem]
+            if selectedTags.isEmpty {
+                filteredItems = searchFilteredItems
+            } else {
+                filteredItems = searchFilteredItems.filter { item in
+                    selectedTags.allSatisfy { item.tags.contains($0) }
+                }
+            }
+            
+            let displayedItems: [HistoryItem]
+            if isRandomMode, randomShuffleSeed != 0 {
+                var generator = SeededGenerator(seed: randomShuffleSeed)
+                displayedItems = filteredItems.shuffled(using: &generator)
+            } else {
+                displayedItems = filteredItems
+            }
+            
+            return HistoryListCache(
+                savedItems: savedItems,
+                searchFilteredItems: searchFilteredItems,
+                filteredItems: filteredItems,
+                displayedItems: displayedItems
+            )
         }
-        
-        return items
-    }
-
-    private var displayedItems: [HistoryItem] {
-        let items = filteredItems
-        guard isRandomMode, randomShuffleSeed != 0 else { return items }
-        var generator = SeededGenerator(seed: randomShuffleSeed)
-        return items.shuffled(using: &generator)
     }
     
-    /// 仅应用搜索过滤、不应用标签筛选的记录（用于计算可选标签）
-    private var filteredItemsWithoutTagFilter: [HistoryItem] {
-        var items = historyManager.savedItems
-        
-        if !effectiveSearchText.isEmpty {
-            items = items.filter { item in
-                let textMatch = item.text.localizedCaseInsensitiveContains(effectiveSearchText)
-                let tagMatch = item.tags.contains { $0.localizedCaseInsensitiveContains(effectiveSearchText) }
-                return textMatch || tagMatch
-            }
-        }
-        
-        return items
+    init() {
+        _listCache = State(initialValue: HistoryListCache.build(
+            savedItems: HistoryManager.shared.savedItems,
+            searchText: "",
+            selectedTags: [],
+            isRandomMode: false,
+            randomShuffleSeed: 0
+        ))
     }
 
     private var effectiveSearchText: String {
         committedSearchText
+    }
+    
+    private func rebuildListCache() {
+        listCache = HistoryListCache.build(
+            savedItems: historyManager.savedItems,
+            searchText: effectiveSearchText,
+            selectedTags: selectedTags,
+            isRandomMode: isRandomMode,
+            randomShuffleSeed: randomShuffleSeed
+        )
     }
     
     var body: some View {
@@ -74,7 +109,7 @@ struct HistoryView: View {
             Color(.secondarySystemBackground)
                 .ignoresSafeArea()
             
-            if historyManager.savedItems.isEmpty {
+            if listCache.savedItems.isEmpty {
                 emptyStateView
             } else {
                 historyContent
@@ -84,7 +119,7 @@ struct HistoryView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
-                if !historyManager.savedItems.isEmpty {
+                if !listCache.savedItems.isEmpty {
                     if isEditMode {
                         // 编辑模式下显示完成按钮
                         Button(action: {
@@ -135,13 +170,13 @@ struct HistoryView: View {
             ToolbarItemGroup(placement: .bottomBar) {
                 if isEditMode && !selectedItems.isEmpty {
                     Button(action: {
-                        if selectedItems.count == filteredItems.count {
+                        if selectedItems.count == listCache.filteredItems.count {
                             selectedItems.removeAll()
                         } else {
-                            selectedItems = Set(filteredItems.map { $0.id })
+                            selectedItems = Set(listCache.filteredItems.map { $0.id })
                         }
                     }) {
-                        Text(selectedItems.count == filteredItems.count ? "取消全选" : "全选")
+                        Text(selectedItems.count == listCache.filteredItems.count ? "取消全选" : "全选")
                             .font(.system(size: 17))
                     }
                     .tint(Color(hex: 0x6366F1))
@@ -170,6 +205,16 @@ struct HistoryView: View {
             } else if randomShuffleSeed == 0 {
                 randomShuffleSeed = UInt64.random(in: 1...UInt64.max)
             }
+            rebuildListCache()
+        }
+        .onChange(of: selectedTags) { _, _ in
+            rebuildListCache()
+        }
+        .onChange(of: committedSearchText) { _, _ in
+            rebuildListCache()
+        }
+        .onChange(of: historyManager.items) { _, _ in
+            rebuildListCache()
         }
         .alert("确定要删除选中的 \(selectedItems.count) 条记录吗？", isPresented: $showClearConfirmation) {
             Button("取消", role: .cancel) { }
@@ -193,9 +238,10 @@ struct HistoryView: View {
             }
         }
         .sheet(isPresented: $showStatistics) {
-            StatisticsView(items: historyManager.savedItems)
+            StatisticsView(items: listCache.savedItems)
         }
         .onAppear {
+            rebuildListCache()
             withAnimation(.easeOut(duration: 0.4)) {
                 appearAnimation = true
             }
@@ -256,12 +302,13 @@ struct HistoryView: View {
     private func randomizeDisplayOrder() {
         isRandomMode = true
         randomShuffleSeed = UInt64.random(in: 1...UInt64.max)
+        rebuildListCache()
     }
     
     @ViewBuilder
     private var historyContent: some View {
         Group {
-            if filteredItems.isEmpty {
+            if listCache.filteredItems.isEmpty {
                 VStack(spacing: 0) {
                     if !effectiveSearchText.isEmpty {
                         searchEmptyStateView
@@ -277,7 +324,7 @@ struct HistoryView: View {
             TagFilterBar(
                 selectedTags: $selectedTags,
                 isRandomMode: $isRandomMode,
-                availableItems: filteredItemsWithoutTagFilter,
+                availableItems: listCache.searchFilteredItems,
                 onRandomize: randomizeDisplayOrder
             )
             .background {
@@ -367,7 +414,7 @@ struct HistoryView: View {
     private var historyList: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
-                ForEach(displayedItems) { item in
+                ForEach(listCache.displayedItems) { item in
                     HistoryRowView(
                         item: item,
                         isCopied: copiedItemId == item.id,

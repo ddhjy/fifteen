@@ -412,7 +412,7 @@ struct TagFilterBar: View {
     let historyManager = HistoryManager.shared
     
     /// 从搜索结果中提取可用标签
-    private var availableTagsFromItems: Set<String> {
+    private func computeAvailableTagsFromItems() -> Set<String> {
         var tags = Set<String>()
         for item in availableItems {
             for tag in item.tags {
@@ -423,12 +423,14 @@ struct TagFilterBar: View {
     }
     
     var body: some View {
+        let availableTagsFromItems = computeAvailableTagsFromItems()
+        
         if availableTagsFromItems.isEmpty {
             EmptyView()
         } else {
             VStack(spacing: 0) {
                 ForEach(0...selectedTags.count, id: \.self) { level in
-                    let availableTags = getAvailableTags(at: level)
+                    let availableTags = getAvailableTags(at: level, availableTagsFromItems: availableTagsFromItems)
                     
                     if !availableTags.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
@@ -469,7 +471,7 @@ struct TagFilterBar: View {
     }
     
     /// 获取某一级可用的标签（基于搜索结果）
-    private func getAvailableTags(at level: Int) -> [String] {
+    private func getAvailableTags(at level: Int, availableTagsFromItems: Set<String>) -> [String] {
         let currentSelectedTags = Array(selectedTags.prefix(level))
         
         var filteredItems = availableItems
