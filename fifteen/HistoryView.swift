@@ -25,6 +25,8 @@ struct HistoryView: View {
     @State private var isSearchTextComposing = false
     @State private var searchUpdateWorkItem: DispatchWorkItem?
     @State private var showStatistics = false
+    @State private var isRandomMode = false
+    @State private var randomShuffleSeed: UInt64 = 0
     
     private var filteredItems: [HistoryItem] {
         var items = historyManager.getSavedItems(filteredBy: selectedTags)
@@ -39,6 +41,13 @@ struct HistoryView: View {
         }
         
         return items
+    }
+
+    private var displayedItems: [HistoryItem] {
+        let items = filteredItems
+        guard isRandomMode, randomShuffleSeed != 0 else { return items }
+        var generator = SeededGenerator(seed: randomShuffleSeed)
+        return items.shuffled(using: &generator)
     }
     
     /// 仅应用搜索过滤、不应用标签筛选的记录（用于计算可选标签）
@@ -155,6 +164,13 @@ struct HistoryView: View {
             }
         }
         .toolbarBackgroundVisibility(.visible, for: .bottomBar)
+        .onChange(of: isRandomMode) { _, newValue in
+            if !newValue {
+                randomShuffleSeed = 0
+            } else if randomShuffleSeed == 0 {
+                randomShuffleSeed = UInt64.random(in: 1...UInt64.max)
+            }
+        }
         .alert("确定要删除选中的 \(selectedItems.count) 条记录吗？", isPresented: $showClearConfirmation) {
             Button("取消", role: .cancel) { }
             Button("删除", role: .destructive) {
@@ -236,6 +252,11 @@ struct HistoryView: View {
         searchUpdateWorkItem = workItem
         DispatchQueue.main.async(execute: workItem)
     }
+
+    private func randomizeDisplayOrder() {
+        isRandomMode = true
+        randomShuffleSeed = UInt64.random(in: 1...UInt64.max)
+    }
     
     @ViewBuilder
     private var historyContent: some View {
@@ -255,7 +276,9 @@ struct HistoryView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             TagFilterBar(
                 selectedTags: $selectedTags,
-                availableItems: filteredItemsWithoutTagFilter
+                isRandomMode: $isRandomMode,
+                availableItems: filteredItemsWithoutTagFilter,
+                onRandomize: randomizeDisplayOrder
             )
             .background {
                 Color.clear
@@ -344,7 +367,7 @@ struct HistoryView: View {
     private var historyList: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
-                ForEach(filteredItems) { item in
+                ForEach(displayedItems) { item in
                     HistoryRowView(
                         item: item,
                         isCopied: copiedItemId == item.id,
@@ -405,6 +428,22 @@ struct HistoryView: View {
                 }
             }
         }
+    }
+}
+
+private struct SeededGenerator: RandomNumberGenerator {
+    private var state: UInt64
+
+    init(seed: UInt64) {
+        state = seed
+    }
+
+    mutating func next() -> UInt64 {
+        state &+= 0x9E3779B97F4A7C15
+        var z = state
+        z = (z ^ (z >> 30)) &* 0xBF58476D1CE4E5B9
+        z = (z ^ (z >> 27)) &* 0x94D049BB133111EB
+        return z ^ (z >> 31)
     }
 }
 

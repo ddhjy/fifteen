@@ -404,7 +404,9 @@ struct TagBadgeView: View {
 
 struct TagFilterBar: View {
     @Binding var selectedTags: [String]
+    @Binding var isRandomMode: Bool
     var availableItems: [HistoryItem]
+    var onRandomize: () -> Void
     
     @State private var tagManager = TagManager.shared
     let historyManager = HistoryManager.shared
@@ -433,9 +435,19 @@ struct TagFilterBar: View {
                             HStack(spacing: 8) {
                                 FilterChip(
                                     title: "全部",
-                                    isSelected: level >= selectedTags.count
+                                    isSelected: level >= selectedTags.count && !(level == 0 && isRandomMode)
                                 ) {
                                     selectAll(at: level)
+                                }
+
+                                if level == 0 {
+                                    FilterIconChip(
+                                        systemImage: "shuffle",
+                                        accessibilityLabel: "随机",
+                                        isSelected: isRandomMode
+                                    ) {
+                                        selectRandom()
+                                    }
                                 }
                                 
                                 ForEach(availableTags, id: \.self) { tagName in
@@ -492,13 +504,14 @@ struct TagFilterBar: View {
     
     /// 选择某一级的 "全部"
     private func selectAll(at level: Int) {
-        // 清除该级及之后的所有选择
-        if level < selectedTags.count {
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            // 清除该级及之后的所有选择
+            if level < selectedTags.count {
                 selectedTags = Array(selectedTags.prefix(level))
             }
+            isRandomMode = false
         }
     }
     
@@ -516,7 +529,21 @@ struct TagFilterBar: View {
                 // 添加新的选择
                 selectedTags.append(tagName)
             }
+            isRandomMode = false
         }
+    }
+
+    /// 选择随机标签
+    private func selectRandom() {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            if !selectedTags.isEmpty {
+                selectedTags = []
+            }
+            isRandomMode = true
+        }
+        onRandomize()
     }
 }
 
@@ -542,6 +569,35 @@ struct FilterChip: View {
                 .foregroundStyle(isSelected ? Color(hex: 0x6366F1) : Color(.secondaryLabel))
         }
         .buttonStyle(.plain)
+        .animation(.none, value: isSelected)
+    }
+}
+
+struct FilterIconChip: View {
+    let systemImage: String
+    let accessibilityLabel: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: {
+            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+            impactFeedback.impactOccurred()
+            action()
+        }) {
+            Image(systemName: systemImage)
+                .font(.system(size: 13, weight: .medium))
+                .frame(height: 16)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .fill(isSelected ? Color(hex: 0x6366F1).opacity(0.15) : Color(.tertiarySystemFill))
+                )
+                .foregroundStyle(isSelected ? Color(hex: 0x6366F1) : Color(.secondaryLabel))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
         .animation(.none, value: isSelected)
     }
 }
