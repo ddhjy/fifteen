@@ -404,23 +404,33 @@ struct TagBadgeView: View {
 
 struct TagFilterBar: View {
     @Binding var selectedTags: [String]
+    var availableItems: [HistoryItem]
+    
     @State private var tagManager = TagManager.shared
     let historyManager = HistoryManager.shared
     
+    /// 从搜索结果中提取可用标签
+    private var availableTagsFromItems: Set<String> {
+        var tags = Set<String>()
+        for item in availableItems {
+            for tag in item.tags {
+                tags.insert(tag)
+            }
+        }
+        return tags
+    }
+    
     var body: some View {
-        if tagManager.tags.isEmpty {
+        if availableTagsFromItems.isEmpty {
             EmptyView()
         } else {
             VStack(spacing: 0) {
-                // 渲染每一级筛选条
                 ForEach(0...selectedTags.count, id: \.self) { level in
                     let availableTags = getAvailableTags(at: level)
                     
-                    // 只有当有可选标签时才显示该级
                     if !availableTags.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
-                                // "全部" 按钮
                                 FilterChip(
                                     title: "全部",
                                     isSelected: level >= selectedTags.count
@@ -428,7 +438,6 @@ struct TagFilterBar: View {
                                     selectAll(at: level)
                                 }
                                 
-                                // 各个标签筛选
                                 ForEach(availableTags, id: \.self) { tagName in
                                     FilterChip(
                                         title: tagName,
@@ -447,30 +456,30 @@ struct TagFilterBar: View {
         }
     }
     
-    /// 获取某一级可用的标签
+    /// 获取某一级可用的标签（基于搜索结果）
     private func getAvailableTags(at level: Int) -> [String] {
-        // 获取当前已选标签筛选后的结果
         let currentSelectedTags = Array(selectedTags.prefix(level))
-        let filteredItems = historyManager.getSavedItems(filteredBy: currentSelectedTags)
         
-        // 如果没有筛选结果，返回空
+        var filteredItems = availableItems
+        if !currentSelectedTags.isEmpty {
+            filteredItems = filteredItems.filter { item in
+                currentSelectedTags.allSatisfy { item.tags.contains($0) }
+            }
+        }
+        
         guard !filteredItems.isEmpty else { return [] }
         
-        // 收集筛选结果中所有标签，同时计算每个标签的出现次数
         var tagCounts: [String: Int] = [:]
         for item in filteredItems {
             for tag in item.tags {
-                // 排除已选标签
-                if !currentSelectedTags.contains(tag) {
+                if !currentSelectedTags.contains(tag) && availableTagsFromItems.contains(tag) {
                     tagCounts[tag, default: 0] += 1
                 }
             }
         }
         
-        // 如果没有可选标签，返回空
         guard !tagCounts.isEmpty else { return [] }
         
-        // 按计数降序排序，计数相同时按标签名排序以保证稳定性
         return tagCounts.keys.sorted { 
             let count0 = tagCounts[$0, default: 0]
             let count1 = tagCounts[$1, default: 0]
