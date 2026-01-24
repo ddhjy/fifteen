@@ -330,6 +330,7 @@ struct HistoryView: View {
                         isEditMode: isEditMode,
                         isSelected: selectedItems.contains(item.id),
                         filteredTags: selectedTags,
+                        searchText: effectiveSearchText,
                         onCopy: { copyItem(item) },
                         onToggleSelection: { toggleSelection(item) },
                         onTagTap: { tagPickerItem = item },
@@ -410,6 +411,7 @@ struct HistoryRowView: View {
     let isEditMode: Bool
     let isSelected: Bool
     var filteredTags: [String] = []
+    var searchText: String = ""
     let onCopy: () -> Void
     let onToggleSelection: () -> Void
     let onTagTap: () -> Void
@@ -449,7 +451,7 @@ struct HistoryRowView: View {
             
             // 主内容
             VStack(alignment: .leading, spacing: 8) {
-                Text(item.preview)
+                highlightedText(item.preview, searchText: searchText)
                     .font(.system(size: 17, weight: .regular))
                     .foregroundStyle(Color(.label))
                     .multilineTextAlignment(.leading)
@@ -546,6 +548,41 @@ struct HistoryRowView: View {
                 }
             }
         }
+    }
+    
+    /// 创建高亮显示搜索关键词的文本
+    @ViewBuilder
+    private func highlightedText(_ text: String, searchText: String) -> some View {
+        if searchText.isEmpty {
+            Text(text)
+        } else {
+            let attributedString = createHighlightedAttributedString(text: text, searchText: searchText)
+            Text(attributedString)
+        }
+    }
+    
+    /// 创建带高亮的 AttributedString
+    private func createHighlightedAttributedString(text: String, searchText: String) -> AttributedString {
+        var attributedString = AttributedString(text)
+        
+        // 使用不区分大小写的搜索
+        let lowercasedText = text.lowercased()
+        let lowercasedSearch = searchText.lowercased()
+        
+        var searchStartIndex = lowercasedText.startIndex
+        
+        while let range = lowercasedText.range(of: lowercasedSearch, range: searchStartIndex..<lowercasedText.endIndex) {
+            // 转换为 AttributedString 的范围
+            if let attributedRange = Range(NSRange(range, in: text), in: attributedString) {
+                attributedString[attributedRange].backgroundColor = Color(hex: 0x6366F1).opacity(0.25)
+                attributedString[attributedRange].foregroundColor = Color(hex: 0x6366F1)
+            }
+            
+            // 移动搜索起始位置
+            searchStartIndex = range.upperBound
+        }
+        
+        return attributedString
     }
     
     @ViewBuilder
