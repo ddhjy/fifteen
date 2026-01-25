@@ -23,6 +23,7 @@ struct HistoryView: View {
     @State private var searchText = ""
     @State private var committedSearchText = ""
     @State private var isSearchTextComposing = false
+    @State private var isSearchActive = false
     @State private var searchUpdateWorkItem: DispatchWorkItem?
     @State private var showStatistics = false
     @State private var isRandomMode = false
@@ -102,6 +103,10 @@ struct HistoryView: View {
 
     private var effectiveSearchText: String {
         committedSearchText
+    }
+
+    private var searchPrompt: String {
+        isSearchActive ? "多个关键词用空格分割" : "搜索标签、文本"
     }
     
     private func rebuildListCache() {
@@ -330,6 +335,9 @@ struct HistoryView: View {
                 historyList
             }
         }
+        .overlay {
+            SearchActiveDetector(isSearching: $isSearchActive)
+        }
         .safeAreaInset(edge: .top, spacing: 0) {
             TagFilterBar(
                 selectedTags: $selectedTags,
@@ -342,7 +350,7 @@ struct HistoryView: View {
                     .background(.bar)
             }
         }
-        .searchable(text: $searchText, prompt: "搜索记录")
+        .searchable(text: $searchText, prompt: searchPrompt)
         .onChange(of: searchText) { _, newValue in
             handleSearchTextChange(newValue)
         }
@@ -479,6 +487,21 @@ struct HistoryView: View {
                 }
             }
         }
+    }
+}
+
+private struct SearchActiveDetector: View {
+    @Binding var isSearching: Bool
+    @Environment(\.isSearching) private var envIsSearching
+
+    var body: some View {
+        Color.clear
+            .onChange(of: envIsSearching) { _, newValue in
+                isSearching = newValue
+            }
+            .onAppear {
+                isSearching = envIsSearching
+            }
     }
 }
 
