@@ -427,6 +427,7 @@ struct TagFilterBar: View {
     @Binding var selectedTags: [String]
     @Binding var isRandomMode: Bool
     var availableItems: [HistoryItem]
+    var isSearching: Bool = false
     var onRandomize: () -> Void
     
     @State private var tagManager = TagManager.shared
@@ -451,14 +452,16 @@ struct TagFilterBar: View {
         } else {
             VStack(spacing: 0) {
                 ForEach(0...selectedTags.count, id: \.self) { level in
-                    let availableTags = getAvailableTags(at: level, availableTagsFromItems: availableTagsFromItems)
+                    let filteredItemCount = getFilteredItemCount(at: level)
+                    let availableTagsWithCounts = getAvailableTagsWithCounts(at: level, availableTagsFromItems: availableTagsFromItems)
                     
-                    if !availableTags.isEmpty {
+                    if !availableTagsWithCounts.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
                                 FilterChip(
                                     title: "全部",
-                                    isSelected: level >= selectedTags.count && !(level == 0 && isRandomMode)
+                                    isSelected: level >= selectedTags.count && !(level == 0 && isRandomMode),
+                                    count: isSearching ? filteredItemCount : nil
                                 ) {
                                     selectAll(at: level)
                                 }
@@ -474,12 +477,13 @@ struct TagFilterBar: View {
                                     }
                                 }
                                 
-                                ForEach(availableTags, id: \.self) { tagName in
+                                ForEach(availableTagsWithCounts, id: \.tag) { item in
                                     FilterChip(
-                                        title: tagName,
-                                        isSelected: level < selectedTags.count && selectedTags[level] == tagName
+                                        title: item.tag,
+                                        isSelected: level < selectedTags.count && selectedTags[level] == item.tag,
+                                        count: isSearching ? item.count : nil
                                     ) {
-                                        selectTag(tagName, at: level)
+                                        selectTag(item.tag, at: level)
                                     }
                                 }
                             }
@@ -492,8 +496,19 @@ struct TagFilterBar: View {
         }
     }
     
-    /// 获取某一级可用的标签（基于搜索结果）
-    private func getAvailableTags(at level: Int, availableTagsFromItems: Set<String>) -> [String] {
+    private func getFilteredItemCount(at level: Int) -> Int {
+        let currentSelectedTags = Array(selectedTags.prefix(level))
+        if currentSelectedTags.isEmpty {
+            return availableItems.count
+        }
+        return availableItems.reduce(into: 0) { count, item in
+            if currentSelectedTags.allSatisfy({ item.tags.contains($0) }) {
+                count += 1
+            }
+        }
+    }
+    
+    private func getAvailableTagsWithCounts(at level: Int, availableTagsFromItems: Set<String>) -> [(tag: String, count: Int)] {
         let currentSelectedTags = Array(selectedTags.prefix(level))
         
         var filteredItems = availableItems
@@ -516,13 +531,11 @@ struct TagFilterBar: View {
         
         guard !tagCounts.isEmpty else { return [] }
         
-        return tagCounts.keys.sorted { 
-            let count0 = tagCounts[$0, default: 0]
-            let count1 = tagCounts[$1, default: 0]
-            if count0 != count1 {
-                return count0 > count1
+        return tagCounts.map { (tag: $0.key, count: $0.value) }.sorted {
+            if $0.count != $1.count {
+                return $0.count > $1.count
             }
-            return $0 < $1
+            return $0.tag < $1.tag
         }
     }
     
@@ -574,6 +587,7 @@ struct TagFilterBar: View {
 struct FilterChip: View {
     let title: String
     let isSelected: Bool
+    var count: Int? = nil
     let action: () -> Void
     
     var body: some View {
@@ -582,15 +596,23 @@ struct FilterChip: View {
             impactFeedback.impactOccurred()
             action()
         }) {
-            Text(title)
-                .font(.system(size: 13, weight: .medium))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    Capsule()
-                        .fill(isSelected ? Color(hex: 0x6366F1).opacity(0.15) : Color(.tertiarySystemFill))
-                )
-                .foregroundStyle(isSelected ? Color(hex: 0x6366F1) : Color(.secondaryLabel))
+            HStack(spacing: 4) {
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+                
+                if let count = count {
+                    Text("\(count)")
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundStyle(isSelected ? Color(hex: 0x6366F1).opacity(0.7) : Color(.tertiaryLabel))
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(isSelected ? Color(hex: 0x6366F1).opacity(0.15) : Color(.tertiarySystemFill))
+            )
+            .foregroundStyle(isSelected ? Color(hex: 0x6366F1) : Color(.secondaryLabel))
         }
         .buttonStyle(.plain)
         .animation(.none, value: isSelected)

@@ -343,6 +343,7 @@ struct HistoryView: View {
                 selectedTags: $selectedTags,
                 isRandomMode: $isRandomMode,
                 availableItems: listCache.searchFilteredItems,
+                isSearching: isSearchActive,
                 onRandomize: randomizeDisplayOrder
             )
             .background {
