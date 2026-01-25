@@ -36,6 +36,13 @@ struct HistoryView: View {
         var filteredItems: [HistoryItem] = []
         var displayedItems: [HistoryItem] = []
         
+        private static func tokenize(_ searchText: String) -> [String] {
+            let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed
+                .split(whereSeparator: { $0.isWhitespace })
+                .map(String.init)
+        }
+        
         static func build(
             savedItems: [HistoryItem],
             searchText: String,
@@ -44,13 +51,16 @@ struct HistoryView: View {
             randomShuffleSeed: UInt64
         ) -> HistoryListCache {
             let searchFilteredItems: [HistoryItem]
-            if searchText.isEmpty {
+            let tokens = tokenize(searchText)
+            if tokens.isEmpty {
                 searchFilteredItems = savedItems
             } else {
                 searchFilteredItems = savedItems.filter { item in
-                    let textMatch = item.text.localizedCaseInsensitiveContains(searchText)
-                    let tagMatch = item.tags.contains { $0.localizedCaseInsensitiveContains(searchText) }
-                    return textMatch || tagMatch
+                    tokens.allSatisfy { token in
+                        let textMatch = item.text.localizedCaseInsensitiveContains(token)
+                        let tagMatch = item.tags.contains { $0.localizedCaseInsensitiveContains(token) }
+                        return textMatch || tagMatch
+                    }
                 }
             }
             
@@ -667,19 +677,23 @@ struct HistoryRowView: View {
         
         // 使用不区分大小写的搜索
         let lowercasedText = text.lowercased()
-        let lowercasedSearch = searchText.lowercased()
+        let tokens = searchText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(whereSeparator: { $0.isWhitespace })
+            .map { $0.lowercased() }
+            .filter { !$0.isEmpty }
         
-        var searchStartIndex = lowercasedText.startIndex
+        guard !tokens.isEmpty else { return attributedString }
         
-        while let range = lowercasedText.range(of: lowercasedSearch, range: searchStartIndex..<lowercasedText.endIndex) {
-            // 转换为 AttributedString 的范围
-            if let attributedRange = Range(NSRange(range, in: text), in: attributedString) {
-                attributedString[attributedRange].backgroundColor = Color(hex: 0x6366F1).opacity(0.25)
-                attributedString[attributedRange].foregroundColor = Color(hex: 0x6366F1)
+        for token in tokens {
+            var searchStartIndex = lowercasedText.startIndex
+            while let range = lowercasedText.range(of: token, range: searchStartIndex..<lowercasedText.endIndex) {
+                if let attributedRange = Range(NSRange(range, in: text), in: attributedString) {
+                    attributedString[attributedRange].backgroundColor = Color(hex: 0x6366F1).opacity(0.25)
+                    attributedString[attributedRange].foregroundColor = Color(hex: 0x6366F1)
+                }
+                searchStartIndex = range.upperBound
             }
-            
-            // 移动搜索起始位置
-            searchStartIndex = range.upperBound
         }
         
         return attributedString
