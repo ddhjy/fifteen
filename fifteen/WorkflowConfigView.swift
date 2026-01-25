@@ -35,7 +35,6 @@ struct WorkflowConfigView: View {
                         showAddNode = true
                     } label: {
                         Label("添加节点", systemImage: "plus.circle")
-                            .foregroundStyle(primaryColor)
                     }
                     .tint(primaryColor)
                 }

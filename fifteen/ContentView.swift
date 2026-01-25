@@ -355,25 +355,28 @@ struct ContentView: View {
     }
     
     private func executeWorkflow() {
-        // 延迟显示 loading 态，0.1 秒内返回则不显示
-        let showLoadingTask = Task {
-            try? await Task.sleep(for: .milliseconds(100))
-            if !Task.isCancelled {
-                await MainActor.run {
-                    isProcessingWorkflow = true
-                }
-            }
+        isProcessingWorkflow = true
+        let startTime = Date()
+        let minimumLoadingDuration: TimeInterval = 0.5
+
+        let waitMinimumDurationIfNeeded: () async -> Void = {
+            let elapsed = Date().timeIntervalSince(startTime)
+            guard elapsed < minimumLoadingDuration else { return }
+            let remaining = minimumLoadingDuration - elapsed
+            guard remaining > 0 else { return }
+            let nanoseconds = UInt64((remaining * 1_000_000_000).rounded(.up))
+            try? await Task.sleep(nanoseconds: nanoseconds)
         }
-        
+
         Task {
             do {
                 let result = try await workflowManager.execute(
                     input: draftText,
                     tags: selectedTags
                 )
-                
-                showLoadingTask.cancel()
-                
+
+                await waitMinimumDurationIfNeeded()
+
                 await MainActor.run {
                     isProcessingWorkflow = false
                     
@@ -392,8 +395,8 @@ struct ContentView: View {
                     }
                 }
             } catch {
-                showLoadingTask.cancel()
-                
+                await waitMinimumDurationIfNeeded()
+
                 await MainActor.run {
                     isProcessingWorkflow = false
                     workflowError = error
