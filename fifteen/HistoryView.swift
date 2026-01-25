@@ -106,7 +106,7 @@ struct HistoryView: View {
     }
 
     private var searchPrompt: String {
-        isSearchActive ? "多个关键词用空格分割" : "搜索标签、文本"
+        isSearchActive ? "支持多关键词，用空格分隔" : "搜索标签、文本"
     }
     
     private func rebuildListCache() {
