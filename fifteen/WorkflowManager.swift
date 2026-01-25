@@ -17,7 +17,7 @@ enum WorkflowNodeType: String, Codable, CaseIterable {
     var displayName: String {
         switch self {
         case .aiProcess: return "AI 处理"
-        case .copyToClipboard: return "复制到剪贴板"
+        case .copyToClipboard: return "复制"
         case .save: return "保存记录"
         }
     }
