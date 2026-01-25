@@ -467,7 +467,8 @@ struct TagFilterBar: View {
                                     FilterIconChip(
                                         systemImage: "shuffle",
                                         accessibilityLabel: "随机",
-                                        isSelected: isRandomMode
+                                        isSelected: isRandomMode,
+                                        usesDiceHaptics: true
                                     ) {
                                         selectRandom()
                                     }
@@ -600,12 +601,17 @@ struct FilterIconChip: View {
     let systemImage: String
     let accessibilityLabel: String
     let isSelected: Bool
+    var usesDiceHaptics: Bool = false
     let action: () -> Void
 
     var body: some View {
         Button(action: {
-            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-            impactFeedback.impactOccurred()
+            if usesDiceHaptics {
+                playDiceHaptics()
+            } else {
+                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                impactFeedback.impactOccurred()
+            }
             action()
         }) {
             Image(systemName: systemImage)
@@ -622,6 +628,26 @@ struct FilterIconChip: View {
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)
         .animation(.none, value: isSelected)
+    }
+    
+    private func playDiceHaptics() {
+        let generator = UIImpactFeedbackGenerator(style: .rigid)
+        generator.prepare()
+        
+        let pattern: [(delay: Double, intensity: CGFloat)] = [
+            (0.00, 0.90),
+            (0.06, 0.55),
+            (0.12, 0.75),
+            (0.18, 0.50),
+            (0.24, 0.70),
+            (0.30, 0.45)
+        ]
+        
+        for step in pattern {
+            DispatchQueue.main.asyncAfter(deadline: .now() + step.delay) {
+                generator.impactOccurred(intensity: step.intensity)
+            }
+        }
     }
 }
 
