@@ -603,10 +603,9 @@ struct HistoryRowView: View {
                 }
                 .frame(height: 16)
                 .contentShape(Rectangle())
+                .allowsHitTesting(!isEditMode)
                 .onTapGesture {
-                    if !isEditMode {
-                        onTagTap()
-                    }
+                    onTagTap()
                 }
             }
         }
