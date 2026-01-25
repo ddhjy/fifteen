@@ -255,7 +255,7 @@ struct ContentView: View {
             }
             .frame(height: 20)
         }
-        .tint(selectedTags.isEmpty ? .primary : primaryColor)
+        .tint(.primary)
         .padding(.horizontal, selectedTags.isEmpty ? 14 : 16)
         .padding(.vertical, 14)
         .glassEffect(.regular.interactive(), in: Capsule())
