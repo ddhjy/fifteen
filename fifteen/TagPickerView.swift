@@ -15,6 +15,7 @@ struct TagPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showCreateTag = false
     @State private var editingTagName: String? = nil
+    @State private var searchText: String = ""
     
     /// 冻结的排序标签列表，只在视图首次出现时计算，避免编辑过程中顺序变化
     @State private var frozenSortedTags: [String] = []
@@ -40,6 +41,14 @@ struct TagPickerView: View {
     /// 使用冻结的排序列表，如果还没计算则返回空数组
     private var sortedTags: [String] {
         return frozenSortedTags
+    }
+
+    private var displayedTags: [String] {
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return sortedTags
+        }
+        return sortedTags.filter { $0.localizedCaseInsensitiveContains(trimmed) }
     }
     
     /// 计算初始排序：选中的标签优先，然后按出现次数排序
@@ -67,17 +76,28 @@ struct TagPickerView: View {
                     // 普通模式：选择标签
                     ScrollView {
                         VStack(spacing: 0) {
-                            ForEach(sortedTags, id: \.self) { tagName in
-                                TagRowView(
-                                    tagName: tagName,
-                                    isSelected: localSelectedTags.contains(tagName),
-                                    onToggle: { toggleTag(tagName) },
-                                    onEdit: { editingTagName = tagName }
-                                )
-                                
-                                if tagName != sortedTags.last {
-                                    Divider()
-                                        .padding(.leading, 52)
+                            if displayedTags.isEmpty {
+                                VStack(spacing: 8) {
+                                    Text("无匹配标签")
+                                        .font(.system(size: 15))
+                                        .foregroundStyle(Color(.secondaryLabel))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 60)
+                            } else {
+                                ForEach(displayedTags.indices, id: \.self) { index in
+                                    let tagName = displayedTags[index]
+                                    TagRowView(
+                                        tagName: tagName,
+                                        isSelected: localSelectedTags.contains(tagName),
+                                        onToggle: { toggleTag(tagName) },
+                                        onEdit: { editingTagName = tagName }
+                                    )
+                                    
+                                    if index != displayedTags.count - 1 {
+                                        Divider()
+                                            .padding(.leading, 52)
+                                    }
                                 }
                             }
                         }
@@ -92,6 +112,7 @@ struct TagPickerView: View {
             )
             .navigationTitle(selectedTagCount > 0 ? "标签 (\(selectedTagCount))" : "标签")
             .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索标签")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button(action: { showCreateTag = true }) {
@@ -135,7 +156,7 @@ struct TagPickerView: View {
                 }
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .onAppear {
             // 只在首次出现时初始化

@@ -341,11 +341,6 @@ struct HistoryView: View {
             isSearchTextComposing = false
             committedSearchText = searchText
         }
-        .toolbar {
-            if !isEditMode {
-                DefaultToolbarItem(kind: .search, placement: .bottomBar)
-            }
-        }
     }
     
     private var emptyStateView: some View {
@@ -355,7 +350,6 @@ struct HistoryView: View {
                 Circle()
                     .fill(.ultraThinMaterial)
                     .frame(width: 100, height: 100)
-                    .glassEffect(.regular, in: Circle())
                 
                 Image(systemName: "rectangle.stack")
                     .font(.system(size: 40, weight: .light))

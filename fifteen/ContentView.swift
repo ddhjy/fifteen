@@ -73,7 +73,7 @@ struct ContentView: View {
             .navigationDestination(isPresented: $showHistory) {
                 HistoryView()
             }
-            .safeAreaBar(edge: .bottom) {
+            .safeAreaInset(edge: .bottom) {
                 bottomToolbar
             }
             .sheet(isPresented: $showTagSelector) {
@@ -141,7 +141,7 @@ struct ContentView: View {
                 }
                 .tint(.primary)
                 .padding(14)
-                .glassEffect(.regular.interactive(), in: Circle())
+                .background(Circle().fill(.regularMaterial))
                 
                 Spacer()
                 
@@ -161,7 +161,7 @@ struct ContentView: View {
                         : (workflowManager.areTerminalNodesAllDisabled ? warningColor : .primary)
                 )
                 .padding(14)
-                .glassEffect(.regular.interactive(), in: Circle())
+                .background(Circle().fill(.regularMaterial))
                 
                 // 标签选择按钮
                 if !tagManager.tags.isEmpty {
@@ -174,7 +174,7 @@ struct ContentView: View {
                 }
                 .tint(primaryColor)
                 .padding(14)
-                .glassEffect(.regular.interactive(), in: Circle())
+                .background(Circle().fill(.regularMaterial))
             } else {
                 // 默认模式：发送和标签在左，删除按钮在右
                 Button(action: copyAndClear) {
@@ -183,7 +183,7 @@ struct ContentView: View {
                 }
                 .tint(primaryColor)
                 .padding(14)
-                .glassEffect(.regular.interactive(), in: Circle())
+                .background(Circle().fill(.regularMaterial))
                 
                 // 标签选择按钮
                 if !tagManager.tags.isEmpty {
@@ -206,7 +206,7 @@ struct ContentView: View {
                         : (workflowManager.areTerminalNodesAllDisabled ? warningColor : .primary)
                 )
                 .padding(14)
-                .glassEffect(.regular.interactive(), in: Circle())
+                .background(Circle().fill(.regularMaterial))
                 
                 Spacer()
                 
@@ -216,7 +216,7 @@ struct ContentView: View {
                 }
                 .tint(.primary)
                 .padding(14)
-                .glassEffect(.regular.interactive(), in: Circle())
+                .background(Circle().fill(.regularMaterial))
             }
         }
         .padding(.horizontal, 16)
@@ -258,7 +258,7 @@ struct ContentView: View {
         .tint(selectedTags.isEmpty ? .primary : primaryColor)
         .padding(.horizontal, selectedTags.isEmpty ? 14 : 16)
         .padding(.vertical, 14)
-        .glassEffect(.regular.interactive(), in: Capsule())
+        .background(Capsule().fill(.regularMaterial))
     }
     
     private var fullScreenEditor: some View {

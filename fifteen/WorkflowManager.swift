@@ -210,8 +210,9 @@ class WorkflowManager {
                 }
                 
             case .copyToClipboard:
+                let textToCopy = currentText
                 await MainActor.run {
-                    UIPasteboard.general.string = currentText
+                    UIPasteboard.general.string = textToCopy
                 }
                 didCopy = true
                 
