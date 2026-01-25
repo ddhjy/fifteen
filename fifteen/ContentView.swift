@@ -145,6 +145,11 @@ struct ContentView: View {
                 
                 Spacer()
                 
+                // 标签选择按钮
+                if !tagManager.tags.isEmpty {
+                    tagButton
+                }
+
                 // Workflow 配置按钮
                 Button(action: { showWorkflowConfig = true }) {
                     if isProcessingWorkflow {
@@ -162,11 +167,6 @@ struct ContentView: View {
                 )
                 .padding(14)
                 .glassEffect(.regular.interactive(), in: Circle())
-                
-                // 标签选择按钮
-                if !tagManager.tags.isEmpty {
-                    tagButton
-                }
                 
                 Button(action: copyAndClear) {
                     Image(systemName: "paperplane")
@@ -185,11 +185,6 @@ struct ContentView: View {
                 .padding(14)
                 .glassEffect(.regular.interactive(), in: Circle())
                 
-                // 标签选择按钮
-                if !tagManager.tags.isEmpty {
-                    tagButton
-                }
-                
                 // Workflow 配置按钮
                 Button(action: { showWorkflowConfig = true }) {
                     if isProcessingWorkflow {
@@ -207,6 +202,11 @@ struct ContentView: View {
                 )
                 .padding(14)
                 .glassEffect(.regular.interactive(), in: Circle())
+
+                // 标签选择按钮
+                if !tagManager.tags.isEmpty {
+                    tagButton
+                }
                 
                 Spacer()
                 
