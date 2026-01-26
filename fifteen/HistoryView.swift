@@ -16,7 +16,7 @@ struct HistoryView: View {
     @State private var appearAnimation = false
     @State private var isEditMode = false
     @State private var selectedItems: Set<UUID> = []
-    @State private var selectedTags: [String] = []
+    @State private var selectedTags: [TagSelection] = []
     @State private var tagPickerItem: HistoryItem? = nil
     @State private var isExporting = false
     @State private var exportedFileURL: URL? = nil
@@ -44,10 +44,22 @@ struct HistoryView: View {
                 .map(String.init)
         }
         
+        private static func matchesSelections(item: HistoryItem, selections: [TagSelection]) -> Bool {
+            for selection in selections {
+                switch selection.state {
+                case .positive:
+                    if !item.tags.contains(selection.tag) { return false }
+                case .negative:
+                    if item.tags.contains(selection.tag) { return false }
+                }
+            }
+            return true
+        }
+        
         static func build(
             savedItems: [HistoryItem],
             searchText: String,
-            selectedTags: [String],
+            selectedTags: [TagSelection],
             isRandomMode: Bool,
             randomShuffleSeed: UInt64
         ) -> HistoryListCache {
@@ -70,7 +82,7 @@ struct HistoryView: View {
                 filteredItems = searchFilteredItems
             } else {
                 filteredItems = searchFilteredItems.filter { item in
-                    selectedTags.allSatisfy { item.tags.contains($0) }
+                    matchesSelections(item: item, selections: selectedTags)
                 }
             }
             
@@ -439,7 +451,7 @@ struct HistoryView: View {
                                 isCopied: copiedItemId == item.id,
                                 isEditMode: isEditMode,
                                 isSelected: selectedItems.contains(item.id),
-                                filteredTags: selectedTags,
+                                filteredTags: selectedTags.filter { $0.state == .positive }.map { $0.tag },
                                 searchText: effectiveSearchText,
                                 onCopy: { copyItem(item) },
                                 onToggleSelection: { toggleSelection(item) },

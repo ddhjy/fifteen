@@ -461,10 +461,22 @@ struct TagBadgeView: View {
     }
 }
 
+// MARK: - Tag Selection Types
+
+enum TagSelectionState: Equatable {
+    case positive
+    case negative
+}
+
+struct TagSelection: Equatable {
+    var tag: String
+    var state: TagSelectionState
+}
+
 // MARK: - Tag Filter Bar (用于筛选)
 
 struct TagFilterBar: View {
-    @Binding var selectedTags: [String]
+    @Binding var selectedTags: [TagSelection]
     @Binding var isRandomMode: Bool
     var availableItems: [HistoryItem]
     var isSearching: Bool = false
@@ -473,7 +485,6 @@ struct TagFilterBar: View {
     @State private var tagManager = TagManager.shared
     let historyManager = HistoryManager.shared
     
-    /// 从搜索结果中提取可用标签
     private func computeAvailableTagsFromItems() -> Set<String> {
         var tags = Set<String>()
         for item in availableItems {
@@ -482,6 +493,12 @@ struct TagFilterBar: View {
             }
         }
         return tags
+    }
+    
+    private func selectionState(for tagName: String, at level: Int) -> TagSelectionState? {
+        guard level < selectedTags.count else { return nil }
+        let selection = selectedTags[level]
+        return selection.tag == tagName ? selection.state : nil
     }
     
     var body: some View {
@@ -500,7 +517,7 @@ struct TagFilterBar: View {
                             HStack(spacing: 8) {
                                 FilterChip(
                                     title: "全部",
-                                    isSelected: level >= selectedTags.count && !(level == 0 && isRandomMode),
+                                    selectionState: level >= selectedTags.count && !(level == 0 && isRandomMode) ? .positive : nil,
                                     count: isSearching ? filteredItemCount : nil
                                 ) {
                                     selectAll(at: level)
@@ -520,10 +537,10 @@ struct TagFilterBar: View {
                                 ForEach(availableTagsWithCounts, id: \.tag) { item in
                                     FilterChip(
                                         title: item.tag,
-                                        isSelected: level < selectedTags.count && selectedTags[level] == item.tag,
+                                        selectionState: selectionState(for: item.tag, at: level),
                                         count: isSearching ? item.count : nil
                                     ) {
-                                        selectTag(item.tag, at: level)
+                                        handleTagTap(item.tag, at: level)
                                     }
                                 }
                             }
@@ -537,24 +554,37 @@ struct TagFilterBar: View {
     }
     
     private func getFilteredItemCount(at level: Int) -> Int {
-        let currentSelectedTags = Array(selectedTags.prefix(level))
-        if currentSelectedTags.isEmpty {
+        let currentSelections = Array(selectedTags.prefix(level))
+        if currentSelections.isEmpty {
             return availableItems.count
         }
         return availableItems.reduce(into: 0) { count, item in
-            if currentSelectedTags.allSatisfy({ item.tags.contains($0) }) {
+            if matchesSelections(item: item, selections: currentSelections) {
                 count += 1
             }
         }
     }
     
+    private func matchesSelections(item: HistoryItem, selections: [TagSelection]) -> Bool {
+        for selection in selections {
+            switch selection.state {
+            case .positive:
+                if !item.tags.contains(selection.tag) { return false }
+            case .negative:
+                if item.tags.contains(selection.tag) { return false }
+            }
+        }
+        return true
+    }
+    
     private func getAvailableTagsWithCounts(at level: Int, availableTagsFromItems: Set<String>) -> [(tag: String, count: Int)] {
-        let currentSelectedTags = Array(selectedTags.prefix(level))
+        let currentSelections = Array(selectedTags.prefix(level))
+        let usedTags = Set(currentSelections.map { $0.tag })
         
         var filteredItems = availableItems
-        if !currentSelectedTags.isEmpty {
+        if !currentSelections.isEmpty {
             filteredItems = filteredItems.filter { item in
-                currentSelectedTags.allSatisfy { item.tags.contains($0) }
+                matchesSelections(item: item, selections: currentSelections)
             }
         }
         
@@ -563,7 +593,7 @@ struct TagFilterBar: View {
         var tagCounts: [String: Int] = [:]
         for item in filteredItems {
             for tag in item.tags {
-                if !currentSelectedTags.contains(tag) && availableTagsFromItems.contains(tag) {
+                if !usedTags.contains(tag) && availableTagsFromItems.contains(tag) {
                     tagCounts[tag, default: 0] += 1
                 }
             }
@@ -579,12 +609,10 @@ struct TagFilterBar: View {
         }
     }
     
-    /// 选择某一级的 "全部"
     private func selectAll(at level: Int) {
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            // 清除该级及之后的所有选择
             if level < selectedTags.count {
                 selectedTags = Array(selectedTags.prefix(level))
             }
@@ -592,25 +620,29 @@ struct TagFilterBar: View {
         }
     }
     
-    /// 选择某一级的标签
-    private func selectTag(_ tagName: String, at level: Int) {
+    private func handleTagTap(_ tagName: String, at level: Int) {
         var transaction = Transaction()
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            if level < selectedTags.count {
-                // 替换该级选择并清除后续选择
-                var newTags = Array(selectedTags.prefix(level))
-                newTags.append(tagName)
-                selectedTags = newTags
+            if level < selectedTags.count && selectedTags[level].tag == tagName {
+                let currentState = selectedTags[level].state
+                switch currentState {
+                case .positive:
+                    var newTags = Array(selectedTags.prefix(level))
+                    newTags.append(TagSelection(tag: tagName, state: .negative))
+                    selectedTags = newTags
+                case .negative:
+                    selectedTags = Array(selectedTags.prefix(level))
+                }
             } else {
-                // 添加新的选择
-                selectedTags.append(tagName)
+                var newTags = Array(selectedTags.prefix(level))
+                newTags.append(TagSelection(tag: tagName, state: .positive))
+                selectedTags = newTags
             }
             isRandomMode = false
         }
     }
 
-    /// 选择随机标签
     private func selectRandom() {
         var transaction = Transaction()
         transaction.disablesAnimations = true
@@ -626,9 +658,19 @@ struct TagFilterBar: View {
 
 struct FilterChip: View {
     let title: String
-    let isSelected: Bool
+    var selectionState: TagSelectionState? = nil
     var count: Int? = nil
     let action: () -> Void
+    
+    private var isSelected: Bool { selectionState != nil }
+    private var isNegative: Bool { selectionState == .negative }
+    
+    private var primaryColor: Color { Color(hex: 0x6366F1) }
+    private var negativeColor: Color { Color(hex: 0xEF4444) }
+    
+    private var activeColor: Color {
+        isNegative ? negativeColor : primaryColor
+    }
     
     var body: some View {
         Button(action: {
@@ -639,23 +681,24 @@ struct FilterChip: View {
             HStack(spacing: 4) {
                 Text(title)
                     .font(.system(size: 13, weight: .medium))
+                    .strikethrough(isNegative, color: negativeColor)
                 
                 if let count = count {
                     Text("\(count)")
                         .font(.system(size: 11, weight: .regular))
-                        .foregroundStyle(isSelected ? Color(hex: 0x6366F1).opacity(0.7) : Color(.tertiaryLabel))
+                        .foregroundStyle(isSelected ? activeColor.opacity(0.7) : Color(.tertiaryLabel))
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(
                 Capsule()
-                    .fill(isSelected ? Color(hex: 0x6366F1).opacity(0.15) : Color(.tertiarySystemFill))
+                    .fill(isSelected ? activeColor.opacity(0.15) : Color(.tertiarySystemFill))
             )
-            .foregroundStyle(isSelected ? Color(hex: 0x6366F1) : Color(.secondaryLabel))
+            .foregroundStyle(isSelected ? activeColor : Color(.secondaryLabel))
         }
         .buttonStyle(.plain)
-        .animation(.none, value: isSelected)
+        .animation(.none, value: selectionState)
     }
 }
 
