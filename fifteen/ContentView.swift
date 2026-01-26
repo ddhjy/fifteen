@@ -77,7 +77,7 @@ struct ContentView: View {
                 bottomToolbar
             }
             .sheet(isPresented: $showTagSelector) {
-                TagPickerView(itemId: historyManager.currentDraft.id)
+                TagPickerView(itemId: historyManager.currentDraft.id, reselectMode: true)
             }
             .sheet(isPresented: $showDebugView) {
                 DebugView()

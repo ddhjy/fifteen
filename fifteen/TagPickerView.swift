@@ -10,6 +10,9 @@ import UIKit
 
 struct TagPickerView: View {
     let itemId: UUID
+    /// 重选模式：初始选中用灰色显示，点击任意标签时清除旧选择
+    var reselectMode: Bool = false
+    
     @State private var historyManager = HistoryManager.shared
     @State private var tagManager = TagManager.shared
     @Environment(\.dismiss) private var dismiss
@@ -28,6 +31,12 @@ struct TagPickerView: View {
     
     /// 初始选中的标签（用于对比变化）
     @State private var initialSelectedTags: Set<String> = []
+    
+    /// 重选模式下，用于显示灰色"之前选中"状态的标签
+    @State private var previousSelectedTags: Set<String> = []
+    
+    /// 重选模式下，用户是否已开始新的选择（一旦开始，灰色状态清除）
+    @State private var hasStartedReselection: Bool = false
     
     private var currentItem: HistoryItem? {
         historyManager.items.first { $0.id == itemId }
@@ -87,9 +96,12 @@ struct TagPickerView: View {
                             } else {
                                 ForEach(displayedTags.indices, id: \.self) { index in
                                     let tagName = displayedTags[index]
+                                    let isCurrentlySelected = localSelectedTags.contains(tagName)
+                                    let isPreviouslySelected = reselectMode && !hasStartedReselection && previousSelectedTags.contains(tagName)
                                     TagRowView(
                                         tagName: tagName,
-                                        isSelected: localSelectedTags.contains(tagName),
+                                        isSelected: isCurrentlySelected,
+                                        isPreviousSelected: isPreviouslySelected,
                                         onToggle: { toggleTag(tagName) },
                                         onEdit: { editingTagName = tagName }
                                     )
@@ -163,8 +175,18 @@ struct TagPickerView: View {
             if frozenSortedTags.isEmpty {
                 // 初始化本地选中状态
                 let currentTags = Set(currentItem?.tags ?? [])
-                localSelectedTags = currentTags
                 initialSelectedTags = currentTags
+                
+                if reselectMode {
+                    // 重选模式：初始不选中任何标签，但记录之前的选择用于灰色显示
+                    localSelectedTags = []
+                    previousSelectedTags = currentTags
+                    hasStartedReselection = false
+                } else {
+                    // 普通模式：保持原有选中
+                    localSelectedTags = currentTags
+                }
+                
                 // 计算排序
                 frozenSortedTags = computeInitialSortedTags()
             }
@@ -199,7 +221,12 @@ struct TagPickerView: View {
         
         // 只更新本地状态，不立即同步到 historyManager
         withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-            if localSelectedTags.contains(tagName) {
+            if reselectMode && !hasStartedReselection {
+                // 重选模式首次点击：清除灰色状态，选中新标签
+                hasStartedReselection = true
+                previousSelectedTags = []
+                localSelectedTags = [tagName]
+            } else if localSelectedTags.contains(tagName) {
                 localSelectedTags.remove(tagName)
             } else {
                 localSelectedTags.insert(tagName)
@@ -213,20 +240,33 @@ struct TagPickerView: View {
 struct TagRowView: View {
     let tagName: String
     let isSelected: Bool
+    /// 重选模式下的"之前选中"状态（用灰色显示）
+    var isPreviousSelected: Bool = false
     let onToggle: () -> Void
     var onEdit: (() -> Void)? = nil
+    
+    /// 圆圈的颜色
+    private var circleColor: Color {
+        if isSelected {
+            return Color(hex: 0x6366F1)
+        } else if isPreviousSelected {
+            return Color(.systemGray3)
+        } else {
+            return Color(.secondaryLabel)
+        }
+    }
     
     var body: some View {
         HStack(spacing: 12) {
             // 选中状态
             ZStack {
                 Circle()
-                    .stroke(isSelected ? Color(hex: 0x6366F1) : Color(.secondaryLabel), lineWidth: 2)
+                    .stroke(circleColor, lineWidth: 2)
                     .frame(width: 22, height: 22)
                 
-                if isSelected {
+                if isSelected || isPreviousSelected {
                     Circle()
-                        .fill(Color(hex: 0x6366F1))
+                        .fill(circleColor)
                         .frame(width: 22, height: 22)
                     
                     Image(systemName: "checkmark")
