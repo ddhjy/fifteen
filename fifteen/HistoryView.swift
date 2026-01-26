@@ -425,37 +425,50 @@ struct HistoryView: View {
     }
     
     private var historyList: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(listCache.displayedItems) { item in
-                    HistoryRowView(
-                        item: item,
-                        isCopied: copiedItemId == item.id,
-                        isEditMode: isEditMode,
-                        isSelected: selectedItems.contains(item.id),
-                        filteredTags: selectedTags,
-                        searchText: effectiveSearchText,
-                        onCopy: { copyItem(item) },
-                        onToggleSelection: { toggleSelection(item) },
-                        onTagTap: { tagPickerItem = item },
-                        onEdit: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                isEditMode = true
-                                selectedItems.insert(item.id)
-                            }
-                        },
-                        onDelete: {
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                historyManager.deleteRecord(item)
-                            }
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 0) {
+                    Color.clear
+                        .frame(height: 0)
+                        .id("ListTopAnchor")
+                    
+                    LazyVStack(spacing: 12) {
+                        ForEach(listCache.displayedItems) { item in
+                            HistoryRowView(
+                                item: item,
+                                isCopied: copiedItemId == item.id,
+                                isEditMode: isEditMode,
+                                isSelected: selectedItems.contains(item.id),
+                                filteredTags: selectedTags,
+                                searchText: effectiveSearchText,
+                                onCopy: { copyItem(item) },
+                                onToggleSelection: { toggleSelection(item) },
+                                onTagTap: { tagPickerItem = item },
+                                onEdit: {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                        isEditMode = true
+                                        selectedItems.insert(item.id)
+                                    }
+                                },
+                                onDelete: {
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                        historyManager.deleteRecord(item)
+                                    }
+                                }
+                            )
                         }
-                    )
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .scrollIndicators(.hidden)
+            .onChange(of: selectedTags) { _, _ in
+                DispatchQueue.main.async {
+                    proxy.scrollTo("ListTopAnchor", anchor: .top)
+                }
+            }
         }
-        .scrollIndicators(.hidden)
     }
     
     private func toggleSelection(_ item: HistoryItem) {
