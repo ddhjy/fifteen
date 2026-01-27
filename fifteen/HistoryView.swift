@@ -210,13 +210,6 @@ struct HistoryView: View {
                     
                     Spacer()
                     
-                    Text("已选择 \(selectedItems.count) 项")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color(.secondaryLabel))
-                        .fixedSize()
-                    
-                    Spacer()
-                    
                     Button(action: { showClearConfirmation = true }) {
                         Image(systemName: "trash")
                             .font(.system(size: 20))
