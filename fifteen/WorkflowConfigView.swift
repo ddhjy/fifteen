@@ -121,10 +121,17 @@ struct AddNodeSheet: View {
                         workflowManager.addNode(newNode)
                         dismiss()
                     } label: {
-                        Label(type.displayName, systemImage: type.icon)
+                        HStack(spacing: 12) {
+                            Image(systemName: type.icon)
+                                .font(.system(size: 18))
+                                .foregroundStyle(primaryColor)
+                                .frame(width: 28)
+                            Text(type.displayName)
+                        }
                     }
                 }
             }
+            .listStyle(.insetGrouped)
             .tint(primaryColor)
             .navigationTitle("添加节点")
             .navigationBarTitleDisplayMode(.inline)

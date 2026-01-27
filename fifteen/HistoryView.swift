@@ -8,6 +8,41 @@
 import SwiftUI
 import UIKit
 
+// MARK: - Shake Gesture Detector
+
+struct ShakeDetectorView: UIViewControllerRepresentable {
+    let onShake: () -> Void
+    
+    func makeUIViewController(context: Context) -> ShakeDetectorViewController {
+        let controller = ShakeDetectorViewController()
+        controller.onShake = onShake
+        return controller
+    }
+    
+    func updateUIViewController(_ uiViewController: ShakeDetectorViewController, context: Context) {
+        uiViewController.onShake = onShake
+    }
+}
+
+class ShakeDetectorViewController: UIViewController {
+    var onShake: (() -> Void)?
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .clear
+        view.isUserInteractionEnabled = false
+        becomeFirstResponder()
+    }
+    
+    override var canBecomeFirstResponder: Bool { true }
+    
+    override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
+        if motion == .motionShake {
+            onShake?()
+        }
+    }
+}
+
 struct HistoryView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var historyManager = HistoryManager.shared
@@ -46,11 +81,20 @@ struct HistoryView: View {
         
         private static func matchesSelections(item: HistoryItem, selections: [TagSelection]) -> Bool {
             for selection in selections {
-                switch selection.state {
-                case .positive:
-                    if !item.tags.contains(selection.tag) { return false }
-                case .negative:
-                    if item.tags.contains(selection.tag) { return false }
+                if selection.isNoTagSelection {
+                    switch selection.state {
+                    case .positive:
+                        if !item.tags.isEmpty { return false }
+                    case .negative:
+                        if item.tags.isEmpty { return false }
+                    }
+                } else {
+                    switch selection.state {
+                    case .positive:
+                        if !item.tags.contains(selection.tag) { return false }
+                    case .negative:
+                        if item.tags.contains(selection.tag) { return false }
+                    }
                 }
             }
             return true
@@ -140,6 +184,11 @@ struct HistoryView: View {
                 emptyStateView
             } else {
                 historyContent
+            }
+        }
+        .background {
+            ShakeDetectorView {
+                handleShake()
             }
         }
         .navigationTitle("随心记")
@@ -323,6 +372,38 @@ struct HistoryView: View {
         isRandomMode = true
         randomShuffleSeed = UInt64.random(in: 1...UInt64.max)
         rebuildListCache()
+    }
+    
+    private func handleShake() {
+        guard !listCache.savedItems.isEmpty else { return }
+        
+        playDiceHaptics()
+        
+        // 清空标签筛选，与点击随机按钮逻辑保持一致
+        if !selectedTags.isEmpty {
+            selectedTags = []
+        }
+        randomizeDisplayOrder()
+    }
+    
+    private func playDiceHaptics() {
+        let generator = UIImpactFeedbackGenerator(style: .rigid)
+        generator.prepare()
+        
+        let pattern: [(delay: Double, intensity: CGFloat)] = [
+            (0.00, 0.90),
+            (0.06, 0.55),
+            (0.12, 0.75),
+            (0.18, 0.50),
+            (0.24, 0.70),
+            (0.30, 0.45)
+        ]
+        
+        for step in pattern {
+            DispatchQueue.main.asyncAfter(deadline: .now() + step.delay) {
+                generator.impactOccurred(intensity: step.intensity)
+            }
+        }
     }
     
     @ViewBuilder

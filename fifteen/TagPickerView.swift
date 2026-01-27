@@ -471,6 +471,12 @@ enum TagSelectionState: Equatable {
 struct TagSelection: Equatable {
     var tag: String
     var state: TagSelectionState
+    
+    static let noTagIdentifier = "__NO_TAG__"
+    
+    var isNoTagSelection: Bool {
+        tag == Self.noTagIdentifier
+    }
 }
 
 // MARK: - Tag Filter Bar (用于筛选)
@@ -524,6 +530,17 @@ struct TagFilterBar: View {
                                 }
 
                                 if level == 0 {
+                                    let noTagCount = getNoTagCount(at: level)
+                                    if noTagCount > 0 {
+                                        FilterIconChipWithState(
+                                            systemImage: "tag.slash",
+                                            accessibilityLabel: "无标签",
+                                            selectionState: selectionState(for: TagSelection.noTagIdentifier, at: level)
+                                        ) {
+                                            handleTagTap(TagSelection.noTagIdentifier, at: level)
+                                        }
+                                    }
+                                    
                                     FilterIconChip(
                                         systemImage: "shuffle",
                                         accessibilityLabel: "随机",
@@ -565,13 +582,31 @@ struct TagFilterBar: View {
         }
     }
     
+    private func getNoTagCount(at level: Int) -> Int {
+        let currentSelections = Array(selectedTags.prefix(level))
+        return availableItems.reduce(into: 0) { count, item in
+            if item.tags.isEmpty && matchesSelections(item: item, selections: currentSelections) {
+                count += 1
+            }
+        }
+    }
+    
     private func matchesSelections(item: HistoryItem, selections: [TagSelection]) -> Bool {
         for selection in selections {
-            switch selection.state {
-            case .positive:
-                if !item.tags.contains(selection.tag) { return false }
-            case .negative:
-                if item.tags.contains(selection.tag) { return false }
+            if selection.isNoTagSelection {
+                switch selection.state {
+                case .positive:
+                    if !item.tags.isEmpty { return false }
+                case .negative:
+                    if item.tags.isEmpty { return false }
+                }
+            } else {
+                switch selection.state {
+                case .positive:
+                    if !item.tags.contains(selection.tag) { return false }
+                case .negative:
+                    if item.tags.contains(selection.tag) { return false }
+                }
             }
         }
         return true
@@ -753,6 +788,51 @@ struct FilterIconChip: View {
                 generator.impactOccurred(intensity: step.intensity)
             }
         }
+    }
+}
+
+struct FilterIconChipWithState: View {
+    let systemImage: String
+    let accessibilityLabel: String
+    let selectionState: TagSelectionState?
+    let action: () -> Void
+    
+    private var isSelected: Bool { selectionState != nil }
+    private var isNegative: Bool { selectionState == .negative }
+    
+    private var primaryColor: Color { Color(hex: 0x6366F1) }
+    private var negativeColor: Color { Color(hex: 0xEF4444) }
+    
+    private var activeColor: Color {
+        isNegative ? negativeColor : primaryColor
+    }
+
+    var body: some View {
+        Button(action: {
+            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+            impactFeedback.impactOccurred()
+            action()
+        }) {
+            Image(systemName: systemImage)
+                .font(.system(size: 13, weight: .medium))
+                .frame(height: 16)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .fill(isSelected ? activeColor.opacity(0.15) : Color(.tertiarySystemFill))
+                )
+                .foregroundStyle(isSelected ? activeColor : Color(.secondaryLabel))
+                .overlay(
+                    isNegative ? 
+                        Capsule()
+                            .stroke(negativeColor.opacity(0.3), lineWidth: 1)
+                        : nil
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
+        .animation(.none, value: selectionState)
     }
 }
 
