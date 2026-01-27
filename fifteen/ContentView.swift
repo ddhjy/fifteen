@@ -169,7 +169,7 @@ struct ContentView: View {
                 .glassEffect(.regular.interactive(), in: Circle())
                 
                 Button(action: copyAndClear) {
-                    Image(systemName: "paperplane")
+                    Image(systemName: "paperplane.fill")
                         .font(.system(size: 20))
                 }
                 .tint(primaryColor)
@@ -178,7 +178,7 @@ struct ContentView: View {
             } else {
                 // 默认模式：发送和标签在左，删除按钮在右
                 Button(action: copyAndClear) {
-                    Image(systemName: "paperplane")
+                    Image(systemName: "paperplane.fill")
                         .font(.system(size: 20))
                 }
                 .tint(primaryColor)
