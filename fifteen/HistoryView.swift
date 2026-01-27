@@ -625,14 +625,15 @@ struct HistoryRowView: View {
                         let displayTags = item.tags.filter { !filteredTags.contains($0) }
                         if !displayTags.isEmpty && !isEditMode {
                             ForEach(displayTags.prefix(4), id: \.self) { tagName in
+                                let isTagHighlighted = isTagMatchingSearch(tagName: tagName, searchText: searchText)
                                 Text(tagName)
-                                    .font(.system(size: 10, weight: .medium))
-                                    .foregroundStyle(Color(hex: 0x6366F1))
+                                    .font(.system(size: 10, weight: isTagHighlighted ? .bold : .medium))
+                                    .foregroundStyle(isTagHighlighted ? .white : Color(hex: 0x6366F1))
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
                                     .background(
                                         Capsule()
-                                            .fill(Color(hex: 0x6366F1).opacity(0.08))
+                                            .fill(isTagHighlighted ? Color(hex: 0x6366F1) : Color(hex: 0x6366F1).opacity(0.08))
                                     )
                             }
                             
@@ -711,6 +712,17 @@ struct HistoryRowView: View {
             let attributedString = createHighlightedAttributedString(text: text, searchText: searchText)
             Text(attributedString)
         }
+    }
+    
+    /// 判断标签是否匹配搜索关键词
+    private func isTagMatchingSearch(tagName: String, searchText: String) -> Bool {
+        guard !searchText.isEmpty else { return false }
+        let tokens = searchText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(whereSeparator: { $0.isWhitespace })
+            .map { $0.lowercased() }
+            .filter { !$0.isEmpty }
+        return tokens.contains { tagName.lowercased().contains($0) }
     }
     
     /// 创建带高亮的 AttributedString
