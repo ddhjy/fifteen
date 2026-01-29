@@ -248,7 +248,7 @@ struct TagRowView: View {
     /// 圆圈的颜色
     private var circleColor: Color {
         if isSelected {
-            return .primary
+            return Color(hex: 0x6366F1)
         } else if isPreviousSelected {
             return Color(.systemGray3)
         } else {
