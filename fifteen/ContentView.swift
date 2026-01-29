@@ -357,7 +357,7 @@ struct ContentView: View {
     private func executeWorkflow() {
         isProcessingWorkflow = true
         let startTime = Date()
-        let minimumLoadingDuration: TimeInterval = 0.5
+        let minimumLoadingDuration: TimeInterval = 0.2
 
         let waitMinimumDurationIfNeeded: () async -> Void = {
             let elapsed = Date().timeIntervalSince(startTime)
