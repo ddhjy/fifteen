@@ -35,7 +35,7 @@ struct WorkflowConfigView: View {
                         showAddNode = true
                     } label: {
                         Label("添加节点", systemImage: "plus.circle")
-                            .foregroundStyle(primaryColor)
+                            .foregroundStyle(.primary)
                     }
                 }
             }
@@ -69,7 +69,7 @@ struct NodeRowView: View {
         HStack(spacing: 12) {
             Image(systemName: node.type.icon)
                 .font(.system(size: 18))
-                .foregroundStyle(node.isEnabled ? primaryColor : .secondary)
+                .foregroundStyle(node.isEnabled ? .primary : .secondary)
                 .frame(width: 28)
             
             VStack(alignment: .leading, spacing: 2) {
@@ -124,7 +124,7 @@ struct AddNodeSheet: View {
                         HStack(spacing: 12) {
                             Image(systemName: type.icon)
                                 .font(.system(size: 18))
-                                .foregroundStyle(primaryColor)
+                                .foregroundStyle(.primary)
                                 .frame(width: 28)
                             Text(type.displayName)
                         }
@@ -184,7 +184,7 @@ struct EditNodeSheet: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("保存") { saveChanges() }
                         .fontWeight(.semibold)
-                        .tint(primaryColor)
+                        .tint(.primary)
                 }
             }
             .onAppear {

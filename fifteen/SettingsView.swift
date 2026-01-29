@@ -50,7 +50,7 @@ struct SettingsView: View {
                         HStack(spacing: 12) {
                             Image(systemName: "hand.point.right")
                                 .font(.system(size: 20))
-                                .foregroundStyle(primaryColor)
+                                .foregroundStyle(.primary)
                                 .frame(width: 28)
                             
                             VStack(alignment: .leading, spacing: 2) {
@@ -89,7 +89,7 @@ struct SettingsView: View {
                         dismiss()
                     }
                     .font(.system(size: 16, weight: .semibold))
-                    .tint(primaryColor)
+                    .tint(.primary)
                 }
             }
         }

@@ -130,15 +130,15 @@ struct TagPickerView: View {
                     Button(action: { showCreateTag = true }) {
                         Image(systemName: "plus")
                     }
-                    .tint(Color(hex: 0x6366F1))
+                    .tint(.primary)
                 }
-                
+
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("完成") {
                         dismiss()
                     }
                     .font(.system(size: 16, weight: .semibold))
-                    .tint(Color(hex: 0x6366F1))
+                    .tint(.primary)
                 }
             }
             .sheet(isPresented: $showCreateTag, onDismiss: {
@@ -248,7 +248,7 @@ struct TagRowView: View {
     /// 圆圈的颜色
     private var circleColor: Color {
         if isSelected {
-            return Color(hex: 0x6366F1)
+            return .primary
         } else if isPreviousSelected {
             return Color(.systemGray3)
         } else {
@@ -349,7 +349,7 @@ struct TagEditSheet: View {
                         saveTag()
                     }
                     .font(.system(size: 16, weight: .semibold))
-                    .tint(Color(hex: 0x6366F1))
+                    .tint(.primary)
                     .disabled(newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
@@ -422,7 +422,7 @@ struct TagCreateSheet: View {
                         addTag()
                     }
                     .font(.system(size: 16, weight: .semibold))
-                    .tint(Color(hex: 0x6366F1))
+                    .tint(.primary)
                     .disabled(tagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
