@@ -69,7 +69,7 @@ struct NodeRowView: View {
         HStack(spacing: 12) {
             Image(systemName: node.type.icon)
                 .font(.system(size: 18))
-                .foregroundStyle(node.isEnabled ? .primary : .secondary)
+                .foregroundStyle(.primary)
                 .frame(width: 28)
             
             VStack(alignment: .leading, spacing: 2) {
