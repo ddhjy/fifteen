@@ -62,7 +62,7 @@ struct HistoryView: View {
     @State private var searchUpdateWorkItem: DispatchWorkItem?
     @State private var showStatistics = false
     @State private var isRandomMode = false
-    @State private var randomShuffleSeed: UInt64 = 0
+    @State private var randomScrollTargetId: UUID? = nil
     @State private var listCache = HistoryListCache()
     
     private struct HistoryListCache {
@@ -104,8 +104,7 @@ struct HistoryView: View {
             savedItems: [HistoryItem],
             searchText: String,
             selectedTags: [TagSelection],
-            isRandomMode: Bool,
-            randomShuffleSeed: UInt64
+            isRandomMode: Bool
         ) -> HistoryListCache {
             let searchFilteredItems: [HistoryItem]
             let tokens = tokenize(searchText)
@@ -131,9 +130,9 @@ struct HistoryView: View {
             }
             
             let displayedItems: [HistoryItem]
-            if isRandomMode, randomShuffleSeed != 0 {
-                var generator = SeededGenerator(seed: randomShuffleSeed)
-                displayedItems = filteredItems.shuffled(using: &generator)
+            if isRandomMode {
+                // 随机模式下按时间正序排列（旧的在上，新的在下）
+                displayedItems = filteredItems.sorted { $0.createdAt < $1.createdAt }
             } else {
                 displayedItems = filteredItems
             }
@@ -152,8 +151,7 @@ struct HistoryView: View {
             savedItems: HistoryManager.shared.savedItems,
             searchText: "",
             selectedTags: [],
-            isRandomMode: false,
-            randomShuffleSeed: 0
+            isRandomMode: false
         ))
     }
 
@@ -170,8 +168,7 @@ struct HistoryView: View {
             savedItems: historyManager.savedItems,
             searchText: effectiveSearchText,
             selectedTags: selectedTags,
-            isRandomMode: isRandomMode,
-            randomShuffleSeed: randomShuffleSeed
+            isRandomMode: isRandomMode
         )
     }
     
@@ -268,12 +265,7 @@ struct HistoryView: View {
             }
         }
         .toolbarBackgroundVisibility(.visible, for: .bottomBar)
-        .onChange(of: isRandomMode) { _, newValue in
-            if !newValue {
-                randomShuffleSeed = 0
-            } else if randomShuffleSeed == 0 {
-                randomShuffleSeed = UInt64.random(in: 1...UInt64.max)
-            }
+        .onChange(of: isRandomMode) { _, _ in
             rebuildListCache()
         }
         .onChange(of: selectedTags) { _, _ in
@@ -370,8 +362,12 @@ struct HistoryView: View {
 
     private func randomizeDisplayOrder() {
         isRandomMode = true
-        randomShuffleSeed = UInt64.random(in: 1...UInt64.max)
         rebuildListCache()
+        // 随机选择一个位置滚动
+        if !listCache.displayedItems.isEmpty {
+            let randomIndex = Int.random(in: 0..<listCache.displayedItems.count)
+            randomScrollTargetId = listCache.displayedItems[randomIndex].id
+        }
     }
     
     private func handleShake() {
@@ -542,6 +538,7 @@ struct HistoryView: View {
                                     }
                                 }
                             )
+                            .id(item.id)
                         }
                     }
                     .padding(.horizontal, 16)
@@ -552,6 +549,13 @@ struct HistoryView: View {
             .onChange(of: selectedTags) { _, _ in
                 DispatchQueue.main.async {
                     proxy.scrollTo("ListTopAnchor", anchor: .top)
+                }
+            }
+            .onChange(of: randomScrollTargetId) { _, newValue in
+                if let targetId = newValue {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        proxy.scrollTo(targetId, anchor: .center)
+                    }
                 }
             }
         }
@@ -602,22 +606,6 @@ private struct SearchActiveDetector: View {
             .onAppear {
                 isSearching = envIsSearching
             }
-    }
-}
-
-private struct SeededGenerator: RandomNumberGenerator {
-    private var state: UInt64
-
-    init(seed: UInt64) {
-        state = seed
-    }
-
-    mutating func next() -> UInt64 {
-        state &+= 0x9E3779B97F4A7C15
-        var z = state
-        z = (z ^ (z >> 30)) &* 0xBF58476D1CE4E5B9
-        z = (z ^ (z >> 27)) &* 0x94D049BB133111EB
-        return z ^ (z >> 31)
     }
 }
 
