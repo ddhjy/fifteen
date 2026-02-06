@@ -13,12 +13,14 @@ enum WorkflowNodeType: String, Codable, CaseIterable {
     case aiProcess = "ai_process"
     case copyToClipboard = "copy"
     case save = "save"
+    case httpPost = "http_post"
     
     var displayName: String {
         switch self {
         case .aiProcess: return "AI 处理"
         case .copyToClipboard: return "复制"
         case .save: return "保存记录"
+        case .httpPost: return "HTTP 发送"
         }
     }
     
@@ -27,6 +29,7 @@ enum WorkflowNodeType: String, Codable, CaseIterable {
         case .aiProcess: return "sparkles"
         case .copyToClipboard: return "doc.on.doc"
         case .save: return "square.and.arrow.down"
+        case .httpPost: return "paperplane.circle"
         }
     }
 }
@@ -42,6 +45,8 @@ struct WorkflowNode: Identifiable, Codable, Equatable {
     struct NodeConfig: Codable, Equatable {
         var aiPrompt: String?
         var skipConfirmation: Bool?
+        var httpHost: String?
+        var httpPort: Int?
     }
     
     init(id: UUID = UUID(), type: WorkflowNodeType, isEnabled: Bool = true, config: NodeConfig = NodeConfig()) {
@@ -209,6 +214,22 @@ class WorkflowManager {
                     currentText = try await AIService.shared.process(text: currentText, prompt: prompt)
                 }
                 
+            case .httpPost:
+                let host = node.config.httpHost ?? "localhost"
+                let port = node.config.httpPort ?? 9999
+                let urlString = "http://\(host):\(port)"
+                guard let url = URL(string: urlString) else {
+                    throw NSError(domain: "WorkflowManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "无效的 URL: \(urlString)"])
+                }
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.httpBody = currentText.data(using: .utf8)
+                request.setValue("text/plain; charset=utf-8", forHTTPHeaderField: "Content-Type")
+                let (_, response) = try await URLSession.shared.data(for: request)
+                if let httpResponse = response as? HTTPURLResponse, !(200...299).contains(httpResponse.statusCode) {
+                    throw NSError(domain: "WorkflowManager", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "HTTP 请求失败，状态码: \(httpResponse.statusCode)"])
+                }
+
             case .copyToClipboard:
                 let textToCopy = currentText
                 await MainActor.run {

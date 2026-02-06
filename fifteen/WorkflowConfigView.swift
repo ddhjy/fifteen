@@ -82,6 +82,15 @@ struct NodeRowView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
+                
+                if node.type == .httpPost {
+                    let host = node.config.httpHost ?? "localhost"
+                    let port = node.config.httpPort ?? 9999
+                    Text("\(host):\(port)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
             
             Spacer()
@@ -154,6 +163,8 @@ struct EditNodeSheet: View {
     @State private var workflowManager = WorkflowManager.shared
     @State private var aiPrompt: String = ""
     @State private var skipConfirmation: Bool = false
+    @State private var httpHost: String = ""
+    @State private var httpPort: String = ""
     
     private let primaryColor = Color(hex: 0x6366F1)
     
@@ -164,6 +175,21 @@ struct EditNodeSheet: View {
                     Section("提示词") {
                         TextEditor(text: $aiPrompt)
                             .frame(minHeight: 120)
+                    }
+                }
+                
+                if node.type == .httpPost {
+                    Section {
+                        TextField("主机地址", text: $httpHost)
+                            .autocapitalization(.none)
+                            .disableAutocorrection(true)
+                            .keyboardType(.URL)
+                        TextField("端口", text: $httpPort)
+                            .keyboardType(.numberPad)
+                    } header: {
+                        Text("HTTP 配置")
+                    } footer: {
+                        Text("将输入内容以 POST 请求发送到 http://主机地址:端口")
                     }
                 }
                 
@@ -190,6 +216,8 @@ struct EditNodeSheet: View {
             .onAppear {
                 aiPrompt = node.config.aiPrompt ?? ""
                 skipConfirmation = node.config.skipConfirmation ?? false
+                httpHost = node.config.httpHost ?? "localhost"
+                httpPort = "\(node.config.httpPort ?? 9999)"
             }
         }
         .presentationDetents([.medium])
@@ -199,6 +227,8 @@ struct EditNodeSheet: View {
         var updated = node
         updated.config.aiPrompt = aiPrompt.isEmpty ? nil : aiPrompt
         updated.config.skipConfirmation = skipConfirmation
+        updated.config.httpHost = httpHost.isEmpty ? nil : httpHost
+        updated.config.httpPort = Int(httpPort)
         workflowManager.updateNode(updated)
         dismiss()
     }
