@@ -332,10 +332,7 @@ struct AddNodeSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                ForEach(
-                    WorkflowNodeType.allCases.filter { $0 != .copyToClipboard && $0 != .save },
-                    id: \.self
-                ) { type in
+                ForEach(WorkflowNodeType.allCases, id: \.self) { type in
                     Button {
                         let newNode = WorkflowNode(type: type)
                         workflowManager.addNode(newNode)
@@ -446,36 +443,83 @@ struct IconPickerView: View {
     
     private let icons: [(category: String, symbols: [String])] = [
         ("常用", [
-            "arrow.triangle.branch", "bolt.fill", "wand.and.stars",
-            "sparkles", "gearshape.fill", "terminal.fill",
-            "text.bubble.fill", "envelope.fill", "paperplane.fill",
-            "doc.text.fill", "folder.fill", "tray.full.fill"
+            "arrow.triangle.branch", "bolt", "wand.and.stars",
+            "sparkles", "gearshape", "terminal",
+            "text.bubble", "envelope", "paperplane",
+            "doc.text", "folder", "tray.full",
+            "square.and.arrow.up", "square.and.arrow.down", "arrow.right.circle",
+            "arrow.2.circlepath", "arrow.up.forward.app", "play",
+            "stop", "forward", "backward",
+            "arrow.clockwise", "arrow.counterclockwise", "arrow.triangle.2.circlepath"
         ]),
         ("工作", [
-            "briefcase.fill", "chart.bar.fill", "calendar",
-            "clock.fill", "flag.fill", "bookmark.fill",
-            "link", "network", "externaldrive.fill",
-            "server.rack", "cpu.fill", "memorychip.fill"
+            "briefcase", "chart.bar", "calendar",
+            "clock", "flag", "bookmark",
+            "link", "network", "externaldrive",
+            "server.rack", "cpu", "memorychip",
+            "desktopcomputer", "laptopcomputer", "printer",
+            "doc.richtext", "doc.append", "list.bullet.clipboard",
+            "chart.pie", "chart.line.uptrend.xyaxis", "building.2",
+            "banknote", "creditcard", "cart"
         ]),
         ("创意", [
-            "paintbrush.fill", "pencil.and.outline", "scissors",
-            "wand.and.rays", "camera.fill", "photo.fill",
-            "music.note", "film.fill", "theatermasks.fill",
-            "lightbulb.fill", "star.fill", "heart.fill"
+            "paintbrush", "pencil.and.outline", "scissors",
+            "wand.and.rays", "camera", "photo",
+            "music.note", "film", "theatermasks",
+            "lightbulb", "star", "heart",
+            "paintpalette", "eyedropper.halffull", "swatchpalette",
+            "pianokeys", "guitars", "music.mic",
+            "photo.on.rectangle.angled", "camera.aperture", "wand.and.stars.inverse",
+            "sparkle", "flame", "leaf"
         ]),
         ("沟通", [
-            "bubble.left.fill", "bubble.left.and.bubble.right.fill",
-            "phone.fill", "video.fill", "mic.fill",
-            "megaphone.fill", "bell.fill", "hand.wave.fill",
-            "person.fill", "person.2.fill", "globe",
-            "antenna.radiowaves.left.and.right"
+            "bubble.left", "bubble.left.and.bubble.right",
+            "phone", "video", "mic",
+            "megaphone", "bell", "hand.wave",
+            "person", "person.2", "globe",
+            "antenna.radiowaves.left.and.right",
+            "bubble.middle.bottom", "ellipsis.bubble",
+            "phone.arrow.up.right", "envelope.open",
+            "person.3", "person.crop.circle",
+            "shared.with.you", "hand.thumbsup", "hand.raised",
+            "ear", "eye", "mouth"
         ]),
         ("符号", [
-            "checkmark.seal.fill", "xmark.octagon.fill",
-            "exclamationmark.triangle.fill", "info.circle.fill",
-            "questionmark.circle.fill", "plus.circle.fill",
-            "minus.circle.fill", "arrow.clockwise",
-            "shuffle", "repeat", "infinity", "number"
+            "checkmark.seal", "xmark.octagon",
+            "exclamationmark.triangle", "info.circle",
+            "questionmark.circle", "plus.circle",
+            "minus.circle", "shuffle",
+            "repeat", "infinity", "number",
+            "equal.circle", "lessthan.circle", "greaterthan.circle",
+            "chevron.left.forwardslash.chevron.right", "curlybraces",
+            "at", "hashtag", "percent", "textformat"
+        ]),
+        ("自然与天气", [
+            "sun.max", "moon", "cloud",
+            "cloud.rain", "cloud.bolt", "snowflake",
+            "wind", "tornado", "rainbow",
+            "drop", "leaf", "tree",
+            "mountain.2", "water.waves", "sun.haze"
+        ]),
+        ("出行与地图", [
+            "car", "bus", "tram",
+            "airplane", "ferry", "bicycle",
+            "figure.walk", "figure.run", "map",
+            "mappin.and.ellipse", "location", "compass.drawing",
+            "fuelpump", "ev.charger", "parking"
+        ]),
+        ("安全与隐私", [
+            "lock", "lock.open", "key",
+            "shield", "shield.checkered", "lock.shield",
+            "faceid", "touchid", "opticid",
+            "eye.slash", "hand.raised.slash", "exclamationmark.lock"
+        ]),
+        ("健康与生活", [
+            "heart.text.square", "cross.case", "pills",
+            "bed.double", "cup.and.saucer", "fork.knife",
+            "house", "sofa", "washer",
+            "dumbbell", "sportscourt", "figure.yoga",
+            "pawprint", "gift", "party.popper"
         ])
     ]
     

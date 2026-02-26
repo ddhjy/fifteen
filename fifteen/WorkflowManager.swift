@@ -106,8 +106,6 @@ class WorkflowManager {
     
     private let workflowsStorageKey = "workflows_v2"
     private let activeWorkflowIdKey = "activeWorkflowId"
-    private let mandatoryTerminalOrder: [WorkflowNodeType] = [.copyToClipboard, .save]
-    
     private init() {
         loadWorkflows()
     }
@@ -193,11 +191,7 @@ class WorkflowManager {
     
     func deleteNodes(at offsets: IndexSet) {
         guard let idx = workflows.firstIndex(where: { $0.id == activeWorkflow.id }) else { return }
-        let removable = offsets.filter { i in
-            guard workflows[idx].nodes.indices.contains(i) else { return false }
-            return !isMandatoryTerminal(workflows[idx].nodes[i].type)
-        }
-        workflows[idx].nodes.remove(atOffsets: IndexSet(removable))
+        workflows[idx].nodes.remove(atOffsets: offsets)
         saveWorkflows()
     }
     
@@ -235,28 +229,7 @@ class WorkflowManager {
         }
     }
     
-    private func isMandatoryTerminal(_ type: WorkflowNodeType) -> Bool {
-        mandatoryTerminalOrder.contains(type)
-    }
-    
     private func normalizeNodes(_ nodes: inout [WorkflowNode]) {
-        var seen = Set<WorkflowNodeType>()
-        nodes = nodes.filter { node in
-            guard isMandatoryTerminal(node.type) else { return true }
-            if seen.contains(node.type) { return false }
-            seen.insert(node.type)
-            return true
-        }
-        for type in mandatoryTerminalOrder {
-            if !nodes.contains(where: { $0.type == type }) {
-                nodes.append(WorkflowNode(type: type, isEnabled: false))
-            }
-        }
-        let others = nodes.filter { !isMandatoryTerminal($0.type) }
-        let terminal = mandatoryTerminalOrder.compactMap { type in
-            nodes.first(where: { $0.type == type })
-        }
-        nodes = others + terminal
     }
     
     func execute(input: String, tags: [String]) async throws -> WorkflowExecutionResult {
