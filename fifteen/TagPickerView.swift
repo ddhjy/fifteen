@@ -933,8 +933,6 @@ struct BatchTagPickerView: View {
                 tagStates[tagName] = true
             case nil:
                 tagStates[tagName] = true
-            default:
-                tagStates[tagName] = true
             }
         }
     }
