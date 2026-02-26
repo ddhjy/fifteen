@@ -787,6 +787,225 @@ struct FilterIconChipWithState: View {
     }
 }
 
+struct BatchTagPickerView: View {
+    let itemIds: Set<UUID>
+    
+    @State private var historyManager = HistoryManager.shared
+    @State private var tagManager = TagManager.shared
+    @Environment(\.dismiss) private var dismiss
+    @State private var showCreateTag = false
+    @State private var searchText: String = ""
+    @State private var frozenSortedTags: [String] = []
+    
+    @State private var tagStates: [String: Bool?] = [:]
+    @State private var initialTagStates: [String: Bool?] = [:]
+    
+    private var sortedTags: [String] { frozenSortedTags }
+    
+    private var displayedTags: [String] {
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return sortedTags }
+        return sortedTags.filter { $0.localizedCaseInsensitiveContains(trimmed) }
+    }
+    
+    private func computeTagStates() -> [String: Bool?] {
+        let items = historyManager.items.filter { itemIds.contains($0.id) }
+        var states: [String: Bool?] = [:]
+        for tag in tagManager.tags {
+            let count = items.filter { $0.tags.contains(tag) }.count
+            if count == 0 {
+                states[tag] = false
+            } else if count == items.count {
+                states[tag] = true
+            } else {
+                states[tag] = nil
+            }
+        }
+        return states
+    }
+    
+    private func computeSortedTags() -> [String] {
+        tagManager.tags.sorted { tag1, tag2 in
+            let s1 = tagStates[tag1] ?? nil
+            let s2 = tagStates[tag2] ?? nil
+            let order1 = s1 == true ? 0 : (s1 == nil ? 1 : 2)
+            let order2 = s2 == true ? 0 : (s2 == nil ? 1 : 2)
+            if order1 != order2 { return order1 < order2 }
+            return tagManager.count(for: tag1) > tagManager.count(for: tag2)
+        }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                if tagManager.tags.isEmpty {
+                    VStack(spacing: 8) {
+                        Text("暂无标签")
+                            .font(.system(size: 15))
+                            .foregroundStyle(Color(.secondaryLabel))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 60)
+                    Spacer()
+                } else {
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            if displayedTags.isEmpty {
+                                VStack(spacing: 8) {
+                                    Text("无匹配标签")
+                                        .font(.system(size: 15))
+                                        .foregroundStyle(Color(.secondaryLabel))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 60)
+                            } else {
+                                ForEach(displayedTags.indices, id: \.self) { index in
+                                    let tagName = displayedTags[index]
+                                    let state = tagStates[tagName] ?? nil
+                                    
+                                    BatchTagRowView(
+                                        tagName: tagName,
+                                        state: state,
+                                        onToggle: { toggleTag(tagName) }
+                                    )
+                                    
+                                    if index != displayedTags.count - 1 {
+                                        Divider().padding(.leading, 52)
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.top, 16)
+                    }
+                    Spacer()
+                }
+            }
+            .background(Color(hex: 0xF2F2F6).ignoresSafeArea())
+            .navigationTitle("批量标签 (\(itemIds.count)项)")
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索标签")
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: { showCreateTag = true }) {
+                        Image(systemName: "plus")
+                    }
+                    .tint(.primary)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") { dismiss() }
+                        .font(.system(size: 16, weight: .semibold))
+                        .tint(.primary)
+                }
+            }
+            .sheet(isPresented: $showCreateTag, onDismiss: {
+                let newStates = computeTagStates()
+                for tag in tagManager.tags where !frozenSortedTags.contains(tag) {
+                    frozenSortedTags.insert(tag, at: 0)
+                    tagStates[tag] = newStates[tag] ?? false
+                    initialTagStates[tag] = newStates[tag] ?? false
+                }
+            }) {
+                TagCreateSheet(itemId: itemIds.first ?? UUID())
+            }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .onAppear {
+            tagStates = computeTagStates()
+            initialTagStates = tagStates
+            frozenSortedTags = computeSortedTags()
+        }
+        .onDisappear {
+            applyChanges()
+        }
+    }
+    
+    private func toggleTag(_ tagName: String) {
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        impactFeedback.impactOccurred()
+        
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+            let current = tagStates[tagName] ?? nil
+            switch current {
+            case true:
+                tagStates[tagName] = false
+            case false:
+                tagStates[tagName] = true
+            case nil:
+                tagStates[tagName] = true
+            default:
+                tagStates[tagName] = true
+            }
+        }
+    }
+    
+    private func applyChanges() {
+        for (tag, newState) in tagStates {
+            let oldState = initialTagStates[tag] ?? false
+            guard newState != oldState else { continue }
+            
+            switch newState {
+            case true:
+                historyManager.batchAddTag(to: itemIds, tagName: tag)
+            case false:
+                historyManager.batchRemoveTag(from: itemIds, tagName: tag)
+            default:
+                break
+            }
+        }
+    }
+}
+
+struct BatchTagRowView: View {
+    let tagName: String
+    let state: Bool?
+    let onToggle: () -> Void
+    
+    private var circleColor: Color {
+        switch state {
+        case true: return Color(hex: 0x6366F1)
+        case nil: return Color(hex: 0x6366F1).opacity(0.5)
+        default: return Color(.secondaryLabel)
+        }
+    }
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .stroke(circleColor, lineWidth: 2)
+                    .frame(width: 22, height: 22)
+                
+                if state == true {
+                    Circle()
+                        .fill(circleColor)
+                        .frame(width: 22, height: 22)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
+                } else if state == nil {
+                    Circle()
+                        .fill(circleColor)
+                        .frame(width: 22, height: 22)
+                    Image(systemName: "minus")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+            }
+            
+            Text(tagName)
+                .font(.system(size: 16, weight: .regular))
+                .foregroundStyle(Color(.label))
+            
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .contentShape(Rectangle())
+        .onTapGesture { onToggle() }
+    }
+}
+
 #Preview {
     TagPickerView(itemId: UUID())
 }

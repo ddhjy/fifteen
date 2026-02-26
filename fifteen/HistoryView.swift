@@ -52,6 +52,7 @@ struct HistoryView: View {
     @State private var isSearchActive = false
     @State private var searchUpdateWorkItem: DispatchWorkItem?
     @State private var showStatistics = false
+    @State private var showBatchTagPicker = false
     @State private var isRandomMode = false
     @State private var randomScrollTargetId: UUID? = nil
     @State private var listCache = HistoryListCache()
@@ -241,6 +242,12 @@ struct HistoryView: View {
                     
                     Spacer()
                     
+                    Button(action: { showBatchTagPicker = true }) {
+                        Image(systemName: "tag")
+                            .font(.system(size: 20))
+                    }
+                    .tint(Color(hex: 0x6366F1))
+                    
                     Button(action: { showClearConfirmation = true }) {
                         Image(systemName: "trash")
                             .font(.system(size: 20))
@@ -274,6 +281,9 @@ struct HistoryView: View {
         }
         .sheet(item: $tagPickerItem) { item in
             TagPickerView(itemId: item.id)
+        }
+        .sheet(isPresented: $showBatchTagPicker) {
+            BatchTagPickerView(itemIds: selectedItems)
         }
         .sheet(isPresented: Binding(
             get: { exportedFileURL != nil },
@@ -638,7 +648,7 @@ struct HistoryRowView: View {
                                 LinearGradient(
                                     colors: [Color(hex: 0x6366F1), Color(hex: 0x818CF8)],
                                     startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
+                                    endPoint: .bottomTrailing卡片进入编辑态的时候，为什么没有显示那个 tag？这个是需要显示。
                                 )
                             )
                             .frame(width: 22, height: 22)

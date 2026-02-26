@@ -496,6 +496,37 @@ class HistoryManager {
         return items.filter { $0.tags.contains(tagName) }
     }
     
+    func batchAddTag(to itemIds: Set<UUID>, tagName: String) {
+        let trimmedTag = tagName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTag.isEmpty else { return }
+        
+        for index in items.indices {
+            guard itemIds.contains(items[index].id) else { continue }
+            guard !items[index].tags.contains(trimmedTag) else { continue }
+            items[index].tags.append(trimmedTag)
+            if items[index].isDraft {
+                saveDraft()
+            } else {
+                saveItem(items[index])
+            }
+        }
+        TagManager.shared.refreshTags(from: savedItems)
+    }
+    
+    func batchRemoveTag(from itemIds: Set<UUID>, tagName: String) {
+        for index in items.indices {
+            guard itemIds.contains(items[index].id) else { continue }
+            guard items[index].tags.contains(tagName) else { continue }
+            items[index].tags.removeAll { $0 == tagName }
+            if items[index].isDraft {
+                saveDraft()
+            } else {
+                saveItem(items[index])
+            }
+        }
+        TagManager.shared.refreshTags(from: savedItems)
+    }
+    
     func renameTag(from oldName: String, to newName: String) {
         let trimmedNewName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedNewName.isEmpty, oldName != trimmedNewName else { return }
