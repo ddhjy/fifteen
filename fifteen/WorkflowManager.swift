@@ -58,6 +58,19 @@ struct WorkflowNode: Identifiable, Codable, Equatable {
 }
 
 
+struct Workflow: Identifiable, Codable, Equatable {
+    let id: UUID
+    var name: String
+    var nodes: [WorkflowNode]
+    
+    init(id: UUID = UUID(), name: String = "默认 Workflow", nodes: [WorkflowNode] = WorkflowNode.defaultNodes()) {
+        self.id = id
+        self.name = name
+        self.nodes = nodes
+    }
+}
+
+
 struct WorkflowExecutionResult: Identifiable {
     let id = UUID()
     let finalText: String
@@ -73,21 +86,35 @@ struct WorkflowExecutionResult: Identifiable {
 class WorkflowManager {
     static let shared = WorkflowManager()
     
-    var nodes: [WorkflowNode] = []
+    var workflows: [Workflow] = []
+    var activeWorkflowId: UUID?
     var isExecuting: Bool = false
     var currentNodeIndex: Int = 0
     var executionError: Error?
     
-    private let storageKey = "workflowNodes"
+    private let workflowsStorageKey = "workflows_v2"
+    private let activeWorkflowIdKey = "activeWorkflowId"
     private let mandatoryTerminalOrder: [WorkflowNodeType] = [.copyToClipboard, .save]
     
     private init() {
-        loadNodes()
+        loadWorkflows()
     }
     
-        
-    private func isMandatoryTerminal(_ type: WorkflowNodeType) -> Bool {
-        mandatoryTerminalOrder.contains(type)
+    var activeWorkflow: Workflow {
+        if let id = activeWorkflowId,
+           let wf = workflows.first(where: { $0.id == id }) {
+            return wf
+        }
+        return workflows.first ?? Workflow()
+    }
+    
+    var nodes: [WorkflowNode] {
+        get { activeWorkflow.nodes }
+        set {
+            guard let idx = workflows.firstIndex(where: { $0.id == activeWorkflow.id }) else { return }
+            workflows[idx].nodes = newValue
+            saveWorkflows()
+        }
     }
     
     var areTerminalNodesAllDisabled: Bool {
@@ -95,7 +122,112 @@ class WorkflowManager {
         return !saveEnabled
     }
     
-    private func normalizeNodesIfNeeded() {
+    func setActiveWorkflow(_ id: UUID) {
+        activeWorkflowId = id
+        UserDefaults.standard.set(id.uuidString, forKey: activeWorkflowIdKey)
+    }
+    
+    func addWorkflow(_ workflow: Workflow) {
+        var wf = workflow
+        normalizeNodes(&wf.nodes)
+        workflows.append(wf)
+        saveWorkflows()
+    }
+    
+    func deleteWorkflow(_ id: UUID) {
+        guard workflows.count > 1 else { return }
+        workflows.removeAll { $0.id == id }
+        if activeWorkflowId == id {
+            activeWorkflowId = workflows.first?.id
+            if let newId = activeWorkflowId {
+                UserDefaults.standard.set(newId.uuidString, forKey: activeWorkflowIdKey)
+            }
+        }
+        saveWorkflows()
+    }
+    
+    func updateWorkflow(_ workflow: Workflow) {
+        if let idx = workflows.firstIndex(where: { $0.id == workflow.id }) {
+            workflows[idx] = workflow
+            saveWorkflows()
+        }
+    }
+    
+    func duplicateWorkflow(_ id: UUID) {
+        guard let source = workflows.first(where: { $0.id == id }) else { return }
+        let copy = Workflow(name: source.name + " 副本", nodes: source.nodes)
+        workflows.append(copy)
+        saveWorkflows()
+    }
+    
+    func addNode(_ node: WorkflowNode) {
+        guard let idx = workflows.firstIndex(where: { $0.id == activeWorkflow.id }) else { return }
+        workflows[idx].nodes.append(node)
+        saveWorkflows()
+    }
+    
+    func updateNode(_ node: WorkflowNode) {
+        guard let wIdx = workflows.firstIndex(where: { $0.id == activeWorkflow.id }),
+              let nIdx = workflows[wIdx].nodes.firstIndex(where: { $0.id == node.id }) else { return }
+        workflows[wIdx].nodes[nIdx] = node
+        saveWorkflows()
+    }
+    
+    func moveNode(from source: IndexSet, to destination: Int) {
+        guard let idx = workflows.firstIndex(where: { $0.id == activeWorkflow.id }) else { return }
+        workflows[idx].nodes.move(fromOffsets: source, toOffset: destination)
+        saveWorkflows()
+    }
+    
+    func deleteNodes(at offsets: IndexSet) {
+        guard let idx = workflows.firstIndex(where: { $0.id == activeWorkflow.id }) else { return }
+        let removable = offsets.filter { i in
+            guard workflows[idx].nodes.indices.contains(i) else { return false }
+            return !isMandatoryTerminal(workflows[idx].nodes[i].type)
+        }
+        workflows[idx].nodes.remove(atOffsets: IndexSet(removable))
+        saveWorkflows()
+    }
+    
+    func saveNodes() { saveWorkflows() }
+    
+    private func loadWorkflows() {
+        if let data = UserDefaults.standard.data(forKey: workflowsStorageKey),
+           let saved = try? JSONDecoder().decode([Workflow].self, from: data),
+           !saved.isEmpty {
+            workflows = saved
+        } else {
+            workflows = [Workflow()]
+        }
+        
+        if let idStr = UserDefaults.standard.string(forKey: activeWorkflowIdKey),
+           let id = UUID(uuidString: idStr),
+           workflows.contains(where: { $0.id == id }) {
+            activeWorkflowId = id
+        } else {
+            activeWorkflowId = workflows.first?.id
+        }
+        
+        for i in workflows.indices {
+            normalizeNodes(&workflows[i].nodes)
+        }
+        saveWorkflows()
+    }
+    
+    func saveWorkflows() {
+        for i in workflows.indices {
+            normalizeNodes(&workflows[i].nodes)
+        }
+        if let data = try? JSONEncoder().encode(workflows) {
+            UserDefaults.standard.set(data, forKey: workflowsStorageKey)
+        }
+    }
+    
+    private func isMandatoryTerminal(_ type: WorkflowNodeType) -> Bool {
+        mandatoryTerminalOrder.contains(type)
+    }
+    
+    private func normalizeNodes(_ nodes: inout [WorkflowNode]) {
         var seen = Set<WorkflowNodeType>()
         nodes = nodes.filter { node in
             guard isMandatoryTerminal(node.type) else { return true }
@@ -103,13 +235,11 @@ class WorkflowManager {
             seen.insert(node.type)
             return true
         }
-        
         for type in mandatoryTerminalOrder {
             if !nodes.contains(where: { $0.type == type }) {
                 nodes.append(WorkflowNode(type: type, isEnabled: false))
             }
         }
-        
         let others = nodes.filter { !isMandatoryTerminal($0.type) }
         let terminal = mandatoryTerminalOrder.compactMap { type in
             nodes.first(where: { $0.type == type })
@@ -117,60 +247,6 @@ class WorkflowManager {
         nodes = others + terminal
     }
     
-        
-    private func loadNodes() {
-        guard let data = UserDefaults.standard.data(forKey: storageKey),
-              let savedNodes = try? JSONDecoder().decode([WorkflowNode].self, from: data) else {
-            nodes = WorkflowNode.defaultNodes()
-            normalizeNodesIfNeeded()
-            saveNodes()
-            return
-        }
-        nodes = savedNodes
-        normalizeNodesIfNeeded()
-        saveNodes()
-    }
-    
-    func saveNodes() {
-        normalizeNodesIfNeeded()
-        if let data = try? JSONEncoder().encode(nodes) {
-            UserDefaults.standard.set(data, forKey: storageKey)
-        }
-    }
-    
-        
-    func addNode(_ node: WorkflowNode) {
-        nodes.append(node)
-        saveNodes()
-    }
-    
-    func removeNode(at index: Int) {
-        nodes.remove(at: index)
-        saveNodes()
-    }
-    
-    func moveNode(from source: IndexSet, to destination: Int) {
-        nodes.move(fromOffsets: source, toOffset: destination)
-        saveNodes()
-    }
-    
-    func updateNode(_ node: WorkflowNode) {
-        if let index = nodes.firstIndex(where: { $0.id == node.id }) {
-            nodes[index] = node
-            saveNodes()
-        }
-    }
-    
-    func deleteNodes(at offsets: IndexSet) {
-        let removable = offsets.filter { idx in
-            guard nodes.indices.contains(idx) else { return false }
-            return !isMandatoryTerminal(nodes[idx].type)
-        }
-        nodes.remove(atOffsets: IndexSet(removable))
-        saveNodes()
-    }
-    
-        
     func execute(input: String, tags: [String]) async throws -> WorkflowExecutionResult {
         await MainActor.run {
             isExecuting = true

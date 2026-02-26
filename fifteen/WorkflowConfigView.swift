@@ -5,6 +5,7 @@ struct WorkflowConfigView: View {
     @State private var workflowManager = WorkflowManager.shared
     @State private var showAddNode = false
     @State private var editingNode: WorkflowNode? = nil
+    @State private var showWorkflowList = false
     
     private let primaryColor = Color(hex: 0x6366F1)
     
@@ -12,13 +13,32 @@ struct WorkflowConfigView: View {
         NavigationStack {
             List {
                 Section {
+                    Button { showWorkflowList = true } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(workflowManager.activeWorkflow.name)
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(Color(.label))
+                                Text("\(workflowManager.workflows.count) 个 Workflow")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Color(.tertiaryLabel))
+                        }
+                    }
+                } header: {
+                    Text("当前 Workflow")
+                }
+                
+                Section {
                     ForEach(workflowManager.nodes) { node in
                         NodeRowView(node: node, onEdit: { editingNode = node })
                     }
                     .onMove { workflowManager.moveNode(from: $0, to: $1) }
-                    .onDelete { offsets in
-                        workflowManager.deleteNodes(at: offsets)
-                    }
+                    .onDelete { workflowManager.deleteNodes(at: $0) }
                 } header: {
                     Text("处理节点")
                 } footer: {
@@ -41,13 +61,111 @@ struct WorkflowConfigView: View {
                     Button("完成") { dismiss() }
                 }
             }
-            .sheet(isPresented: $showAddNode) {
-                AddNodeSheet()
+            .sheet(isPresented: $showAddNode) { AddNodeSheet() }
+            .sheet(item: $editingNode) { node in EditNodeSheet(node: node) }
+            .sheet(isPresented: $showWorkflowList) { WorkflowListView() }
+        }
+    }
+}
+
+
+struct WorkflowListView: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var workflowManager = WorkflowManager.shared
+    @State private var showRenameAlert = false
+    @State private var renameText = ""
+    @State private var renamingWorkflowId: UUID? = nil
+    
+    private let primaryColor = Color(hex: 0x6366F1)
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(workflowManager.workflows) { workflow in
+                    let isActive = workflow.id == workflowManager.activeWorkflowId
+                    
+                    HStack(spacing: 12) {
+                        Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(isActive ? primaryColor : Color(.tertiaryLabel))
+                            .font(.system(size: 20))
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(workflow.name)
+                                .font(.system(size: 16, weight: isActive ? .semibold : .regular))
+                            
+                            let enabledCount = workflow.nodes.filter { $0.isEnabled }.count
+                            let totalCount = workflow.nodes.count
+                            Text("\(enabledCount)/\(totalCount) 个节点启用")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        Spacer()
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        workflowManager.setActiveWorkflow(workflow.id)
+                        dismiss()
+                    }
+                    .contextMenu {
+                        Button {
+                            renamingWorkflowId = workflow.id
+                            renameText = workflow.name
+                            showRenameAlert = true
+                        } label: {
+                            Label("重命名", systemImage: "pencil")
+                        }
+                        
+                        Button {
+                            workflowManager.duplicateWorkflow(workflow.id)
+                        } label: {
+                            Label("复制", systemImage: "doc.on.doc")
+                        }
+                        
+                        if workflowManager.workflows.count > 1 {
+                            Divider()
+                            Button(role: .destructive) {
+                                withAnimation { workflowManager.deleteWorkflow(workflow.id) }
+                            } label: {
+                                Label("删除", systemImage: "trash")
+                            }
+                        }
+                    }
+                }
+                
+                Button {
+                    let count = workflowManager.workflows.count + 1
+                    let newWf = Workflow(name: "Workflow \(count)")
+                    workflowManager.addWorkflow(newWf)
+                    workflowManager.setActiveWorkflow(newWf.id)
+                    dismiss()
+                } label: {
+                    Label("新建 Workflow", systemImage: "plus.circle")
+                        .foregroundStyle(.primary)
+                }
             }
-            .sheet(item: $editingNode) { node in
-                EditNodeSheet(node: node)
+            .navigationTitle("所有 Workflow")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") { dismiss() }
+                }
+            }
+            .alert("重命名", isPresented: $showRenameAlert) {
+                TextField("名称", text: $renameText)
+                Button("取消", role: .cancel) {}
+                Button("确定") {
+                    guard let id = renamingWorkflowId,
+                          var wf = workflowManager.workflows.first(where: { $0.id == id }) else { return }
+                    let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty else { return }
+                    wf.name = trimmed
+                    workflowManager.updateWorkflow(wf)
+                }
             }
         }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 }
 

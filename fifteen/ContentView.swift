@@ -139,22 +139,7 @@ struct ContentView: View {
                     tagButton
                 }
 
-                Button(action: { showWorkflowConfig = true }) {
-                    if isProcessingWorkflow {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                    } else {
-                        Image(systemName: "arrow.triangle.branch")
-                            .font(.system(size: 18))
-                    }
-                }
-                .tint(
-                    isProcessingWorkflow
-                        ? primaryColor
-                        : (workflowManager.areTerminalNodesAllDisabled ? warningColor : .primary)
-                )
-                .padding(14)
-                .glassEffect(.regular.interactive(), in: Circle())
+                workflowButton
                 
                 Button(action: copyAndClear) {
                     Image(systemName: "paperplane.fill")
@@ -172,22 +157,7 @@ struct ContentView: View {
                 .padding(14)
                 .glassEffect(.regular.interactive(), in: Circle())
                 
-                Button(action: { showWorkflowConfig = true }) {
-                    if isProcessingWorkflow {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                    } else {
-                        Image(systemName: "arrow.triangle.branch")
-                            .font(.system(size: 18))
-                    }
-                }
-                .tint(
-                    isProcessingWorkflow
-                        ? primaryColor
-                        : (workflowManager.areTerminalNodesAllDisabled ? warningColor : .primary)
-                )
-                .padding(14)
-                .glassEffect(.regular.interactive(), in: Circle())
+                workflowButton
 
                 if !tagManager.tags.isEmpty {
                     tagButton
@@ -244,6 +214,51 @@ struct ContentView: View {
         .padding(.horizontal, selectedTags.isEmpty ? 14 : 16)
         .padding(.vertical, 14)
         .glassEffect(.regular.interactive(), in: Capsule())
+    }
+    
+    private var workflowButton: some View {
+        Menu {
+            ForEach(workflowManager.workflows) { workflow in
+                Button {
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                    impactFeedback.impactOccurred()
+                    workflowManager.setActiveWorkflow(workflow.id)
+                } label: {
+                    if workflow.id == workflowManager.activeWorkflowId {
+                        Label(workflow.name, systemImage: "checkmark")
+                    } else {
+                        Text(workflow.name)
+                    }
+                }
+            }
+            
+            Divider()
+            
+            Button {
+                showWorkflowConfig = true
+            } label: {
+                Label("管理 Workflow…", systemImage: "gear")
+            }
+        } label: {
+            Group {
+                if isProcessingWorkflow {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                } else {
+                    Image(systemName: "arrow.triangle.branch")
+                        .font(.system(size: 18))
+                }
+            }
+        } primaryAction: {
+            showWorkflowConfig = true
+        }
+        .tint(
+            isProcessingWorkflow
+                ? primaryColor
+                : (workflowManager.areTerminalNodesAllDisabled ? warningColor : .primary)
+        )
+        .padding(14)
+        .glassEffect(.regular.interactive(), in: Circle())
     }
     
     private var fullScreenEditor: some View {
