@@ -37,7 +37,6 @@ struct WorkflowNode: Identifiable, Codable, Equatable {
     
     struct NodeConfig: Codable, Equatable {
         var aiPrompt: String?
-        var skipConfirmation: Bool?
         var httpHost: String?
         var httpPort: Int?
     }
@@ -52,7 +51,7 @@ struct WorkflowNode: Identifiable, Codable, Equatable {
     static func defaultNodes() -> [WorkflowNode] {
         [
             WorkflowNode(type: .copyToClipboard, isEnabled: false),
-            WorkflowNode(type: .save, isEnabled: true, config: NodeConfig(skipConfirmation: false))
+            WorkflowNode(type: .save, isEnabled: true)
         ]
     }
 }
@@ -91,7 +90,6 @@ struct WorkflowExecutionResult: Identifiable {
     let originalText: String
     let tags: [String]
     let shouldSave: Bool
-    let skipConfirmation: Bool
     let didCopyToClipboard: Bool
 }
 
@@ -278,7 +276,6 @@ class WorkflowManager {
         let enabledNodes = nodes.filter { $0.isEnabled }
         var didCopy = false
         var shouldSave = false
-        var skipConfirmation = false
         
         for (index, node) in enabledNodes.enumerated() {
             await MainActor.run {
@@ -316,7 +313,6 @@ class WorkflowManager {
                 
             case .save:
                 shouldSave = true
-                skipConfirmation = node.config.skipConfirmation ?? false
             }
         }
         
@@ -325,7 +321,6 @@ class WorkflowManager {
             originalText: input,
             tags: tags,
             shouldSave: shouldSave,
-            skipConfirmation: skipConfirmation,
             didCopyToClipboard: didCopy
         )
     }

@@ -16,7 +16,6 @@ struct ContentView: View {
     @State private var showWorkflowConfig = false
     @State private var workflowManager = WorkflowManager.shared
     @State private var isProcessingWorkflow = false
-    @State private var workflowResult: WorkflowExecutionResult? = nil
     @State private var workflowError: Error? = nil
     
     @State private var isKeyboardAnimating: Bool = false
@@ -81,13 +80,6 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showWorkflowConfig) {
                 WorkflowConfigView()
-            }
-            .sheet(item: $workflowResult) { result in
-                WorkflowPreviewView(
-                    result: result,
-                    onSave: { performSave(text: result.finalText) },
-                    onCancel: { }
-                )
             }
             .alert("处理失败", isPresented: Binding(
                 get: { workflowError != nil },
@@ -350,11 +342,7 @@ struct ContentView: View {
                     isProcessingWorkflow = false
                     
                     if result.shouldSave {
-                        if result.skipConfirmation {
-                            performSave(text: result.finalText)
-                        } else {
-                            workflowResult = result
-                        }
+                        performSave(text: result.finalText)
                     } else {
                         if result.didCopyToClipboard {
                             historyManager.updateDraftText("")

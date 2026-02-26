@@ -372,7 +372,6 @@ struct EditNodeSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var workflowManager = WorkflowManager.shared
     @State private var aiPrompt: String = ""
-    @State private var skipConfirmation: Bool = false
     @State private var httpHost: String = ""
     @State private var httpPort: String = ""
     
@@ -403,13 +402,6 @@ struct EditNodeSheet: View {
                     }
                 }
                 
-                if node.type == .save {
-                    Section {
-                        Toggle("跳过确认直接保存", isOn: $skipConfirmation)
-                    } footer: {
-                        Text("开启后，处理完成将直接保存，不显示预览弹窗")
-                    }
-                }
             }
             .navigationTitle("编辑节点")
             .navigationBarTitleDisplayMode(.inline)
@@ -425,7 +417,6 @@ struct EditNodeSheet: View {
             }
             .onAppear {
                 aiPrompt = node.config.aiPrompt ?? ""
-                skipConfirmation = node.config.skipConfirmation ?? false
                 httpHost = node.config.httpHost ?? "localhost"
                 httpPort = "\(node.config.httpPort ?? 9999)"
             }
@@ -436,7 +427,6 @@ struct EditNodeSheet: View {
     private func saveChanges() {
         var updated = node
         updated.config.aiPrompt = aiPrompt.isEmpty ? nil : aiPrompt
-        updated.config.skipConfirmation = skipConfirmation
         updated.config.httpHost = httpHost.isEmpty ? nil : httpHost
         updated.config.httpPort = Int(httpPort)
         workflowManager.updateNode(updated)
