@@ -648,7 +648,7 @@ struct HistoryRowView: View {
                                 LinearGradient(
                                     colors: [Color(hex: 0x6366F1), Color(hex: 0x818CF8)],
                                     startPoint: .topLeading,
-                                    endPoint: .bottomTrailing卡片进入编辑态的时候，为什么没有显示那个 tag？这个是需要显示。
+                                    endPoint: .bottomTrailing
                                 )
                             )
                             .frame(width: 22, height: 22)
@@ -677,7 +677,7 @@ struct HistoryRowView: View {
                             .foregroundStyle(Color(.secondaryLabel))
                         
                         let displayTags = item.tags.filter { !filteredTags.contains($0) }
-                        if !displayTags.isEmpty && !isEditMode {
+                        if !displayTags.isEmpty {
                             ForEach(displayTags.prefix(4), id: \.self) { tagName in
                                 let isTagHighlighted = isTagMatchingSearch(tagName: tagName, searchText: searchText)
                                 Text(tagName)
