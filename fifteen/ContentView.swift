@@ -344,11 +344,7 @@ struct ContentView: View {
                     if result.shouldSave {
                         performSave(text: result.finalText)
                     } else {
-                        if result.didCopyToClipboard {
-                            historyManager.updateDraftText("")
-                        } else {
-                            historyManager.updateDraftText(result.finalText)
-                        }
+                        historyManager.updateDraftText("")
                     }
                 }
             } catch {
