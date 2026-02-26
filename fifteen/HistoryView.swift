@@ -969,7 +969,7 @@ struct StatisticsView: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.medium, .large], selection: .constant(.large))
     }
 }
 
