@@ -1,13 +1,12 @@
 {
-  "fill" : {
-    "automatic-gradient" : "extended-srgb:0.00000,0.47843,1.00000,1.00000"
-  },
+  "fill" : "automatic",
   "groups" : [
     {
       "layers" : [
         {
-          "blend-mode" : "soft-light",
-          "glass" : false,
+          "blend-mode" : "normal",
+          "fill" : "none",
+          "glass" : true,
           "hidden" : false,
           "image-name" : "AppIcon.png",
           "name" : "AppIcon",
