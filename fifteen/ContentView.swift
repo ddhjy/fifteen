@@ -217,28 +217,8 @@ struct ContentView: View {
     }
     
     private var workflowButton: some View {
-        Menu {
-            ForEach(workflowManager.workflows) { workflow in
-                Button {
-                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                    impactFeedback.impactOccurred()
-                    workflowManager.setActiveWorkflow(workflow.id)
-                } label: {
-                    if workflow.id == workflowManager.activeWorkflowId {
-                        Label(workflow.name, systemImage: "checkmark")
-                    } else {
-                        Label(workflow.name, systemImage: workflow.icon)
-                    }
-                }
-            }
-            
-            Divider()
-            
-            Button {
-                showWorkflowConfig = true
-            } label: {
-                Label("管理 Workflow…", systemImage: "gear")
-            }
+        Button {
+            showWorkflowConfig = true
         } label: {
             Group {
                 if isProcessingWorkflow {
@@ -249,8 +229,6 @@ struct ContentView: View {
                         .font(.system(size: 18))
                 }
             }
-        } primaryAction: {
-            showWorkflowConfig = true
         }
         .tint(
             isProcessingWorkflow
