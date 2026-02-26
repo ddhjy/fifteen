@@ -19,24 +19,19 @@ struct ContentView: View {
     @State private var workflowResult: WorkflowExecutionResult? = nil
     @State private var workflowError: Error? = nil
     
-    // 键盘动画期间禁用编辑框交互，避免用户误触导致 AutoFill 弹窗
     @State private var isKeyboardAnimating: Bool = false
     
-    // 使用静态变量存储键盘弹出任务，可以被取消
     private static var keyboardWorkItem: DispatchWorkItem?
     
-    // 追踪是否是首次启动，首次启动时直接弹出键盘无需延迟
     private static var isFirstLaunch: Bool = true
     
     private let primaryColor = Color(hex: 0x6366F1)
     private let warningColor = Color.yellow
     
-    // 从草稿获取当前文本
     private var draftText: String {
         historyManager.currentDraft.text
     }
     
-    // 从草稿获取当前标签
     private var selectedTags: [String] {
         historyManager.currentDraft.tags
     }
@@ -48,7 +43,6 @@ struct ContentView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    // 全屏编辑区域
                     fullScreenEditor
                 }
         }
@@ -107,7 +101,6 @@ struct ContentView: View {
         }
         .onAppear {
             if Self.isFirstLaunch {
-                // 首次启动时直接弹出键盘，无需延迟
                 Self.isFirstLaunch = false
                 isTextEditorFocused = true
             } else {
@@ -116,13 +109,11 @@ struct ContentView: View {
         }
         .onChange(of: showHistory) { _, isShowing in
             if isShowing {
-                // 跳转到历史页面时隐藏键盘并取消任务
                 Self.keyboardWorkItem?.cancel()
                 Self.keyboardWorkItem = nil
                 isTextEditorFocused = false
                 UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
             } else {
-                // 返回时延迟弹出键盘
                 scheduleKeyboardShow(delay: 0.5)
             }
         }
@@ -134,7 +125,6 @@ struct ContentView: View {
     private var bottomToolbar: some View {
         HStack {
             if settingsManager.isRightHandMode {
-                // 右手模式：删除按钮在左，发送和标签在右
                 Button(action: clearText) {
                     Image(systemName: "trash")
                         .font(.system(size: 20))
@@ -145,12 +135,10 @@ struct ContentView: View {
                 
                 Spacer()
                 
-                // 标签选择按钮
                 if !tagManager.tags.isEmpty {
                     tagButton
                 }
 
-                // Workflow 配置按钮
                 Button(action: { showWorkflowConfig = true }) {
                     if isProcessingWorkflow {
                         ProgressView()
@@ -176,7 +164,6 @@ struct ContentView: View {
                 .padding(14)
                 .glassEffect(.regular.interactive(), in: Circle())
             } else {
-                // 默认模式：发送和标签在左，删除按钮在右
                 Button(action: copyAndClear) {
                     Image(systemName: "paperplane.fill")
                         .font(.system(size: 20))
@@ -185,7 +172,6 @@ struct ContentView: View {
                 .padding(14)
                 .glassEffect(.regular.interactive(), in: Circle())
                 
-                // Workflow 配置按钮
                 Button(action: { showWorkflowConfig = true }) {
                     if isProcessingWorkflow {
                         ProgressView()
@@ -203,7 +189,6 @@ struct ContentView: View {
                 .padding(14)
                 .glassEffect(.regular.interactive(), in: Circle())
 
-                // 标签选择按钮
                 if !tagManager.tags.isEmpty {
                     tagButton
                 }
@@ -263,7 +248,6 @@ struct ContentView: View {
     
     private var fullScreenEditor: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // 正文输入区
             ZStack(alignment: .topLeading) {
                 if draftText.isEmpty {
                     Text("开始输入...")
@@ -289,13 +273,9 @@ struct ContentView: View {
         }
     }
     
-
-    
-    /// 安全地调度键盘弹出任务，使用 DispatchWorkItem 实现可取消的延迟任务
     private func scheduleKeyboardShow(delay: Double) {
         Self.keyboardWorkItem?.cancel()
         
-        // 动画期间禁用编辑框点击
         isKeyboardAnimating = true
         
         let workItem = DispatchWorkItem { [self] in
@@ -305,7 +285,6 @@ struct ContentView: View {
             }
             isTextEditorFocused = true
             
-            // 重试机制，确保视图完全就绪后焦点能正确设置
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [self] in
                 guard !showHistory, !isTextEditorFocused else { return }
                 isTextEditorFocused = true
@@ -315,7 +294,6 @@ struct ContentView: View {
                 isTextEditorFocused = true
             }
             
-            // 键盘动画完成后恢复编辑框交互（iOS 键盘动画约 0.25-0.3 秒）
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [self] in
                 isKeyboardAnimating = false
             }
@@ -343,14 +321,12 @@ struct ContentView: View {
         
         guard !draftText.isEmpty else { return }
         
-        // 检测是否是调试模式触发命令
         if draftText.hasPrefix("打开调试模式") {
             historyManager.updateDraftText("")
             showDebugView = true
             return
         }
         
-        // 执行 Workflow
         executeWorkflow()
     }
     
@@ -406,9 +382,7 @@ struct ContentView: View {
     }
     
     private func performSave(text: String) {
-        // 更新草稿文本为处理后的结果
         historyManager.updateDraftText(text)
-        // 调用原有的保存逻辑
         historyManager.finalizeDraft()
     }
 }

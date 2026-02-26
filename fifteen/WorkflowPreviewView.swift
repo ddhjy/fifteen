@@ -1,8 +1,3 @@
-//
-//  WorkflowPreviewView.swift
-//  fifteen
-//
-
 import SwiftUI
 
 struct WorkflowPreviewView: View {

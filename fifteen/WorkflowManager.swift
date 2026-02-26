@@ -1,13 +1,7 @@
-//
-//  WorkflowManager.swift
-//  fifteen
-//
-
 import Foundation
 import SwiftUI
 import UIKit
 
-// MARK: - Node Types
 
 enum WorkflowNodeType: String, Codable, CaseIterable {
     case aiProcess = "ai_process"
@@ -34,7 +28,6 @@ enum WorkflowNodeType: String, Codable, CaseIterable {
     }
 }
 
-// MARK: - Workflow Node
 
 struct WorkflowNode: Identifiable, Codable, Equatable {
     let id: UUID
@@ -64,7 +57,6 @@ struct WorkflowNode: Identifiable, Codable, Equatable {
     }
 }
 
-// MARK: - Workflow Execution Result
 
 struct WorkflowExecutionResult: Identifiable {
     let id = UUID()
@@ -76,7 +68,6 @@ struct WorkflowExecutionResult: Identifiable {
     let didCopyToClipboard: Bool
 }
 
-// MARK: - Workflow Manager
 
 @Observable
 class WorkflowManager {
@@ -94,8 +85,7 @@ class WorkflowManager {
         loadNodes()
     }
     
-    // MARK: - Terminal Node Helpers
-    
+        
     private func isMandatoryTerminal(_ type: WorkflowNodeType) -> Bool {
         mandatoryTerminalOrder.contains(type)
     }
@@ -127,8 +117,7 @@ class WorkflowManager {
         nodes = others + terminal
     }
     
-    // MARK: - Persistence
-    
+        
     private func loadNodes() {
         guard let data = UserDefaults.standard.data(forKey: storageKey),
               let savedNodes = try? JSONDecoder().decode([WorkflowNode].self, from: data) else {
@@ -149,8 +138,7 @@ class WorkflowManager {
         }
     }
     
-    // MARK: - Node Management
-    
+        
     func addNode(_ node: WorkflowNode) {
         nodes.append(node)
         saveNodes()
@@ -182,8 +170,7 @@ class WorkflowManager {
         saveNodes()
     }
     
-    // MARK: - Execution
-    
+        
     func execute(input: String, tags: [String]) async throws -> WorkflowExecutionResult {
         await MainActor.run {
             isExecuting = true

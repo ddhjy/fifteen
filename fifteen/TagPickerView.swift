@@ -1,16 +1,8 @@
-//
-//  TagPickerView.swift
-//  fifteen
-//
-//  Created by zengkai on 2026/1/12.
-//
-
 import SwiftUI
 import UIKit
 
 struct TagPickerView: View {
     let itemId: UUID
-    /// 重选模式：初始选中用灰色显示，点击任意标签时清除旧选择
     var reselectMode: Bool = false
     
     @State private var historyManager = HistoryManager.shared
@@ -20,34 +12,26 @@ struct TagPickerView: View {
     @State private var editingTagName: String? = nil
     @State private var searchText: String = ""
     
-    /// 冻结的排序标签列表，只在视图首次出现时计算，避免编辑过程中顺序变化
     @State private var frozenSortedTags: [String] = []
     
-    /// 待执行的标签重命名操作（编辑框关闭后执行）
     @State private var pendingRenameOperation: (from: String, to: String)? = nil
     
-    /// 本地选中的标签（页面关闭时才同步到 historyManager）
     @State private var localSelectedTags: Set<String> = []
     
-    /// 初始选中的标签（用于对比变化）
     @State private var initialSelectedTags: Set<String> = []
     
-    /// 重选模式下，用于显示灰色"之前选中"状态的标签
     @State private var previousSelectedTags: Set<String> = []
     
-    /// 重选模式下，用户是否已开始新的选择（一旦开始，灰色状态清除）
     @State private var hasStartedReselection: Bool = false
     
     private var currentItem: HistoryItem? {
         historyManager.items.first { $0.id == itemId }
     }
     
-    /// 当前选中的标签数量（使用本地状态）
     private var selectedTagCount: Int {
         localSelectedTags.count
     }
     
-    /// 使用冻结的排序列表，如果还没计算则返回空数组
     private var sortedTags: [String] {
         return frozenSortedTags
     }
@@ -60,17 +44,14 @@ struct TagPickerView: View {
         return sortedTags.filter { $0.localizedCaseInsensitiveContains(trimmed) }
     }
     
-    /// 计算初始排序：选中的标签优先，然后按出现次数排序
     private func computeInitialSortedTags() -> [String] {
         let selectedTagsSet = Set(currentItem?.tags ?? [String]())
         return tagManager.tags.sorted { tag1, tag2 in
             let tag1Selected = selectedTagsSet.contains(tag1)
             let tag2Selected = selectedTagsSet.contains(tag2)
-            // 选中的标签优先
             if tag1Selected != tag2Selected {
                 return tag1Selected
             }
-            // 其次按出现次数排序
             return tagManager.count(for: tag1) > tagManager.count(for: tag2)
         }
     }
@@ -82,7 +63,6 @@ struct TagPickerView: View {
                     emptyTagsView
                     Spacer()
                 } else {
-                    // 普通模式：选择标签
                     ScrollView {
                         VStack(spacing: 0) {
                             if displayedTags.isEmpty {
@@ -142,7 +122,6 @@ struct TagPickerView: View {
                 }
             }
             .sheet(isPresented: $showCreateTag, onDismiss: {
-                // 新增标签后，将新标签添加到列表顶部
                 for tag in tagManager.tags {
                     if !frozenSortedTags.contains(tag) {
                         frozenSortedTags.insert(tag, at: 0)
@@ -152,10 +131,8 @@ struct TagPickerView: View {
                 TagCreateSheet(itemId: itemId)
             }
             .sheet(item: $editingTagName, onDismiss: {
-                // 编辑框消失后再执行重命名操作，避免编辑过程中列表实时刷新
                 if let operation = pendingRenameOperation {
                     historyManager.renameTag(from: operation.from, to: operation.to)
-                    // 更新冻结的标签列表
                     if let index = frozenSortedTags.firstIndex(of: operation.from) {
                         frozenSortedTags[index] = operation.to
                     }
@@ -163,7 +140,6 @@ struct TagPickerView: View {
                 }
             }) { tagName in
                 TagEditSheet(tagName: tagName) { newName in
-                    // 保存重命名操作，延迟到 sheet 关闭后执行
                     pendingRenameOperation = (from: tagName, to: newName)
                 }
             }
@@ -171,28 +147,22 @@ struct TagPickerView: View {
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .onAppear {
-            // 只在首次出现时初始化
             if frozenSortedTags.isEmpty {
-                // 初始化本地选中状态
                 let currentTags = Set(currentItem?.tags ?? [])
                 initialSelectedTags = currentTags
                 
                 if reselectMode {
-                    // 重选模式：初始不选中任何标签，但记录之前的选择用于灰色显示
                     localSelectedTags = []
                     previousSelectedTags = currentTags
                     hasStartedReselection = false
                 } else {
-                    // 普通模式：保持原有选中
                     localSelectedTags = currentTags
                 }
                 
-                // 计算排序
                 frozenSortedTags = computeInitialSortedTags()
             }
         }
         .onDisappear {
-            // 页面关闭时，同步标签变更到 historyManager
             let addedTags = localSelectedTags.subtracting(initialSelectedTags)
             let removedTags = initialSelectedTags.subtracting(localSelectedTags)
             
@@ -219,10 +189,8 @@ struct TagPickerView: View {
         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
         impactFeedback.impactOccurred()
         
-        // 只更新本地状态，不立即同步到 historyManager
         withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
             if reselectMode && !hasStartedReselection {
-                // 重选模式首次点击：清除灰色状态，选中新标签
                 hasStartedReselection = true
                 previousSelectedTags = []
                 localSelectedTags = [tagName]
@@ -235,17 +203,13 @@ struct TagPickerView: View {
     }
 }
 
-// MARK: - Tag Row View
-
 struct TagRowView: View {
     let tagName: String
     let isSelected: Bool
-    /// 重选模式下的"之前选中"状态（用灰色显示）
     var isPreviousSelected: Bool = false
     let onToggle: () -> Void
     var onEdit: (() -> Void)? = nil
     
-    /// 圆圈的颜色
     private var circleColor: Color {
         if isSelected {
             return Color(hex: 0x6366F1)
@@ -258,7 +222,6 @@ struct TagRowView: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            // 选中状态
             ZStack {
                 Circle()
                     .stroke(circleColor, lineWidth: 2)
@@ -300,8 +263,6 @@ struct TagRowView: View {
         }
     }
 }
-
-// MARK: - Tag Edit Sheet
 
 extension String: @retroactive Identifiable {
     public var id: String { self }
@@ -368,17 +329,13 @@ struct TagEditSheet: View {
         
         let trimmedName = newTagName.trimmingCharacters(in: .whitespacesAndNewlines)
         if let onSave = onSave {
-            // 使用回调延迟执行
             onSave(trimmedName)
         } else {
-            // 兼容直接调用的情况
             HistoryManager.shared.renameTag(from: tagName, to: trimmedName)
         }
         dismiss()
     }
 }
-
-// MARK: - Tag Create Sheet
 
 struct TagCreateSheet: View {
     let itemId: UUID
@@ -443,8 +400,6 @@ struct TagCreateSheet: View {
     }
 }
 
-// MARK: - Tag Badge View (用于在历史记录行中显示)
-
 struct TagBadgeView: View {
     let tagName: String
     
@@ -461,8 +416,6 @@ struct TagBadgeView: View {
     }
 }
 
-// MARK: - Tag Selection Types
-
 enum TagSelectionState: Equatable {
     case positive
     case negative
@@ -478,8 +431,6 @@ struct TagSelection: Equatable {
         tag == Self.noTagIdentifier
     }
 }
-
-// MARK: - Tag Filter Bar (用于筛选)
 
 struct TagFilterBar: View {
     @Binding var selectedTags: [TagSelection]

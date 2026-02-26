@@ -1,14 +1,5 @@
-//
-//  HistoryView.swift
-//  fifteen
-//
-//  Created by zengkai on 2026/1/12.
-//
-
 import SwiftUI
 import UIKit
-
-// MARK: - Shake Gesture Detector
 
 struct ShakeDetectorView: UIViewControllerRepresentable {
     let onShake: () -> Void
@@ -67,7 +58,6 @@ struct HistoryView: View {
     
     private struct HistoryListCache {
         var savedItems: [HistoryItem] = []
-        /// 仅应用搜索过滤、不应用标签筛选的记录（用于计算可选标签）
         var searchFilteredItems: [HistoryItem] = []
         var filteredItems: [HistoryItem] = []
         var displayedItems: [HistoryItem] = []
@@ -131,7 +121,6 @@ struct HistoryView: View {
             
             let displayedItems: [HistoryItem]
             if isRandomMode {
-                // 随机模式下按时间正序排列（旧的在上，新的在下）
                 displayedItems = filteredItems.sorted { $0.createdAt < $1.createdAt }
             } else {
                 displayedItems = filteredItems
@@ -194,7 +183,6 @@ struct HistoryView: View {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 if !listCache.savedItems.isEmpty {
                     if isEditMode {
-                        // 编辑模式下显示完成按钮
                         Button(action: {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                 isEditMode = false
@@ -206,8 +194,6 @@ struct HistoryView: View {
                         }
                         .tint(.primary)
                     } else {
-                        
-                        // 更多菜单
                         Menu {
                             Button(action: {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -239,7 +225,6 @@ struct HistoryView: View {
                 }
             }
             
-            // 编辑模式底部工具栏
             ToolbarItemGroup(placement: .bottomBar) {
                 if isEditMode && !selectedItems.isEmpty {
                     Button(action: {
@@ -310,7 +295,6 @@ struct HistoryView: View {
     }
     
     private func deleteSelectedItems() {
-        // 使用批量删除接口，一次性删除所有选中项，避免循环调用
         historyManager.deleteRecords(ids: selectedItems)
         selectedItems.removeAll()
         if historyManager.savedItems.isEmpty {
@@ -363,7 +347,6 @@ struct HistoryView: View {
     private func randomizeDisplayOrder() {
         isRandomMode = true
         rebuildListCache()
-        // 随机选择一个位置滚动
         if !listCache.displayedItems.isEmpty {
             let randomIndex = Int.random(in: 0..<listCache.displayedItems.count)
             randomScrollTargetId = listCache.displayedItems[randomIndex].id
@@ -375,7 +358,6 @@ struct HistoryView: View {
         
         playDiceHaptics()
         
-        // 清空标签筛选，与点击随机按钮逻辑保持一致
         if !selectedTags.isEmpty {
             selectedTags = []
         }
@@ -446,7 +428,6 @@ struct HistoryView: View {
     
     private var emptyStateView: some View {
         VStack(spacing: 20) {
-            // 图标容器 - Liquid Glass 风格
             ZStack {
                 Circle()
                     .fill(.ultraThinMaterial)
@@ -642,7 +623,6 @@ struct HistoryRowView: View {
     
     var body: some View {
         HStack(spacing: 14) {
-            // 编辑模式下的选择圆圈
             if isEditMode {
                 ZStack {
                     Circle()
@@ -671,26 +651,21 @@ struct HistoryRowView: View {
                 .transition(.scale.combined(with: .opacity))
             }
             
-            // 主内容
             VStack(alignment: .leading, spacing: 8) {
                 highlightedText(item.preview, searchText: searchText)
                     .font(.system(size: 17, weight: .regular))
                     .foregroundStyle(Color(.label))
                     .multilineTextAlignment(.leading)
                     
-                    // 分割线
                     Rectangle()
                         .fill(Color(.separator).opacity(0.5))
                         .frame(height: 1)
                     
-                    // 底部信息区 - 固定高度防止标签增减时抖动
                     HStack(spacing: 8) {
-                        // 日期
                         Text(item.formattedDate)
                             .font(.system(size: 11, weight: .regular))
                             .foregroundStyle(Color(.secondaryLabel))
                         
-                        // 标签 (内联显示，排除当前筛选的标签)
                         let displayTags = item.tags.filter { !filteredTags.contains($0) }
                         if !displayTags.isEmpty && !isEditMode {
                             ForEach(displayTags.prefix(4), id: \.self) { tagName in
@@ -715,7 +690,6 @@ struct HistoryRowView: View {
                         
                         Spacer()
                         
-                        // 更多按钮
                         if !isEditMode {
                             Image(systemName: "ellipsis")
                                 .font(.system(size: 14, weight: .semibold))
@@ -772,7 +746,6 @@ struct HistoryRowView: View {
         }
     }
     
-    /// 创建高亮显示搜索关键词的文本
     @ViewBuilder
     private func highlightedText(_ text: String, searchText: String) -> some View {
         if searchText.isEmpty {
@@ -783,7 +756,6 @@ struct HistoryRowView: View {
         }
     }
     
-    /// 判断标签是否匹配搜索关键词
     private func isTagMatchingSearch(tagName: String, searchText: String) -> Bool {
         guard !searchText.isEmpty else { return false }
         let tokens = searchText
@@ -794,11 +766,9 @@ struct HistoryRowView: View {
         return tokens.contains { tagName.lowercased().contains($0) }
     }
     
-    /// 创建带高亮的 AttributedString
     private func createHighlightedAttributedString(text: String, searchText: String) -> AttributedString {
         var attributedString = AttributedString(text)
         
-        // 使用不区分大小写的搜索
         let lowercasedText = text.lowercased()
         let tokens = searchText
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -825,7 +795,6 @@ struct HistoryRowView: View {
     @ViewBuilder
     private var rowBackground: some View {
         if isSelected {
-            // 选中状态：带边框的高亮背景
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(Color(hex: 0x6366F1).opacity(0.06))
                 .overlay(
@@ -833,7 +802,6 @@ struct HistoryRowView: View {
                         .strokeBorder(Color(hex: 0x6366F1).opacity(0.25), lineWidth: 1.5)
                 )
         } else {
-            // 默认状态：使用轻量级白色背景
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(Color(.systemBackground))
                 .shadow(color: Color.black.opacity(0.03), radius: 10, x: 0, y: 2)
@@ -847,8 +815,6 @@ struct HistoryRowView: View {
     }
 }
 
-// MARK: - Share Sheet
-
 struct ShareSheet: UIViewControllerRepresentable {
     let items: [Any]
     
@@ -859,8 +825,6 @@ struct ShareSheet: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
-// MARK: - Statistics View
-
 struct StatisticsView: View {
     @Environment(\.dismiss) private var dismiss
     let items: [HistoryItem]
@@ -869,7 +833,6 @@ struct StatisticsView: View {
     
     private let calendar = Calendar.current
     
-    /// 根据选中日期过滤后的记录
     private var filteredItems: [HistoryItem] {
         guard let selectedDate = selectedDate else { return items }
         return items.filter { calendar.isDate($0.createdAt, inSameDayAs: selectedDate) }
@@ -898,7 +861,6 @@ struct StatisticsView: View {
         filteredItems.filter { $0.tags.isEmpty }.count
     }
     
-    /// 按日期统计记录数（用于日历显示）
     private var recordsByDate: [Date: Int] {
         var counts: [Date: Int] = [:]
         for item in items {
@@ -918,7 +880,6 @@ struct StatisticsView: View {
     var body: some View {
         NavigationStack {
             List {
-                // 日历
                 Section {
                     CalendarGridView(
                         displayedMonth: $displayedMonth,
@@ -941,7 +902,6 @@ struct StatisticsView: View {
                     }
                 }
                 
-                // 总览
                 Section {
                     HStack {
                         Label("记录数", systemImage: "doc.text")
@@ -963,7 +923,6 @@ struct StatisticsView: View {
                     }
                 }
                 
-                // 标签统计
                 if !tagStatistics.isEmpty || untaggedCount > 0 {
                     Section {
                         ForEach(tagStatistics, id: \.tag) { stat in
@@ -1003,8 +962,6 @@ struct StatisticsView: View {
     }
 }
 
-// MARK: - Calendar Grid View
-
 struct CalendarGridView: View {
     @Binding var displayedMonth: Date
     @Binding var selectedDate: Date?
@@ -1040,7 +997,6 @@ struct CalendarGridView: View {
     
     var body: some View {
         VStack(spacing: 12) {
-            // 月份导航
             HStack {
                 Button {
                     withAnimation {
@@ -1071,7 +1027,6 @@ struct CalendarGridView: View {
             }
             .padding(.horizontal, 8)
             
-            // 星期标题
             LazyVGrid(columns: columns, spacing: 4) {
                 ForEach(weekdaySymbols, id: \.self) { symbol in
                     Text(symbol)
@@ -1081,7 +1036,6 @@ struct CalendarGridView: View {
                 }
             }
             
-            // 日期格子
             LazyVGrid(columns: columns, spacing: 4) {
                 ForEach(Array(daysInMonth.enumerated()), id: \.offset) { _, date in
                     if let date = date {

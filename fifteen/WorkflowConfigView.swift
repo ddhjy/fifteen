@@ -1,8 +1,3 @@
-//
-//  WorkflowConfigView.swift
-//  fifteen
-//
-
 import SwiftUI
 
 struct WorkflowConfigView: View {
@@ -56,7 +51,6 @@ struct WorkflowConfigView: View {
     }
 }
 
-// MARK: - Node Row
 
 struct NodeRowView: View {
     let node: WorkflowNode
@@ -110,7 +104,6 @@ struct NodeRowView: View {
     }
 }
 
-// MARK: - Add Node Sheet
 
 struct AddNodeSheet: View {
     @Environment(\.dismiss) private var dismiss
@@ -155,7 +148,6 @@ struct AddNodeSheet: View {
     }
 }
 
-// MARK: - Edit Node Sheet
 
 struct EditNodeSheet: View {
     let node: WorkflowNode

@@ -1,23 +1,14 @@
-//
-//  HistoryManager.swift
-//  fifteen
-//
-//  Created by zengkai on 2026/1/12.
-//
-
 import Foundation
 import SwiftUI
 
-// MARK: - History Item
-
 struct HistoryItem: Identifiable, Equatable {
     let id: UUID
-    var fileName: String      // var: 草稿保存时需要更新文件名
-    var text: String          // var: 编辑时需要更新
+    var fileName: String
+    var text: String
     let createdAt: Date
     var description: String
     var tags: [String]
-    var isDraft: Bool         // 标记是否为草稿
+    var isDraft: Bool
     
     init(id: UUID = UUID(), fileName: String = "", text: String = "", createdAt: Date = Date(), description: String = "", tags: [String] = [], isDraft: Bool = false) {
         self.id = id
@@ -36,7 +27,6 @@ struct HistoryItem: Identifiable, Equatable {
         return String(text.prefix(200)) + "..."
     }
     
-    // 静态 DateFormatter 缓存，避免重复创建
     private static let relativeDateFormatter: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
@@ -48,7 +38,6 @@ struct HistoryItem: Identifiable, Equatable {
         let now = Date()
         let interval = now.timeIntervalSince(createdAt)
         
-        // 1 小时以内统一显示"刚刚"
         if interval < 3600 {
             return "刚刚"
         }
@@ -57,24 +46,19 @@ struct HistoryItem: Identifiable, Equatable {
     }
 }
 
-// MARK: - Tag Manager (从记录中动态聚合标签)
-
 @Observable
 class TagManager {
     static let shared = TagManager()
     
     var tags: [String] = []
     
-    /// 标签使用次数缓存（性能优化：避免每次排序时重复遍历）
     private(set) var tagCounts: [String: Int] = [:]
     
-    /// 上次选择的标签（用于新草稿默认标签）
     private(set) var lastSelectedTags: [String] = []
     
     private let lastSelectedTagsKey = "lastSelectedTags"
     private let lastSelectedTagsTimeKey = "lastSelectedTagsTime"
     
-    /// 标签记忆过期时间（30分钟）
     private let tagMemoryExpiration: TimeInterval = 30 * 60
     
     private init() {
@@ -96,7 +80,6 @@ class TagManager {
         tagCounts = counts
     }
     
-    /// 获取标签的使用次数（用于排序）
     func count(for tag: String) -> Int {
         return tagCounts[tag, default: 0]
     }
@@ -105,15 +88,11 @@ class TagManager {
         tags.first { $0 == name }
     }
     
-    // MARK: - Last Selected Tags
-    
     private func loadLastSelectedTags() {
-        // 检查是否已过期（超过30分钟）
         let savedTime = UserDefaults.standard.double(forKey: lastSelectedTagsTimeKey)
         if savedTime > 0 {
             let elapsed = Date().timeIntervalSince1970 - savedTime
             if elapsed > tagMemoryExpiration {
-                // 已过期，不使用记忆的标签
                 lastSelectedTags = []
                 return
             }
@@ -131,13 +110,10 @@ class TagManager {
         lastSelectedTags = tags
         if let data = try? JSONEncoder().encode(tags) {
             UserDefaults.standard.set(data, forKey: lastSelectedTagsKey)
-            // 同时保存时间戳
             UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastSelectedTagsTimeKey)
         }
     }
 }
-
-// MARK: - History Manager
 
 @Observable
 class HistoryManager {
@@ -146,7 +122,6 @@ class HistoryManager {
     var items: [HistoryItem] = []
     var isLoading = false
     
-    // 缓存存储目录，避免重复检查 iCloud 和目录存在性
     private var _cachedStorageURL: URL?
     
     private let fileManager = FileManager.default
@@ -161,22 +136,17 @@ class HistoryManager {
         ensureDraftExists()
     }
     
-    // MARK: - Draft Management
-    
     private let draftFileName = "_draft.md"
     
-    /// 当前草稿（始终存在唯一一个）
     var currentDraft: HistoryItem {
         if let draft = items.first(where: { $0.isDraft }) {
             return draft
         }
-        // 理论上不应该到这里，因为 ensureDraftExists 会确保存在
         let newDraft = createNewDraft()
         items.insert(newDraft, at: 0)
         return newDraft
     }
     
-    /// 确保草稿存在
     private func ensureDraftExists() {
         if !items.contains(where: { $0.isDraft }) {
             let newDraft = createNewDraft()
@@ -184,29 +154,24 @@ class HistoryManager {
         }
     }
     
-    /// 创建新的空草稿（使用上次选择的标签作为默认值）
     private func createNewDraft() -> HistoryItem {
         return HistoryItem(tags: TagManager.shared.lastSelectedTags, isDraft: true)
     }
     
-    /// 更新草稿文本内容
     func updateDraftText(_ text: String) {
         guard let index = items.firstIndex(where: { $0.isDraft }) else { return }
         items[index].text = text
         saveDraft()
     }
     
-    /// 完成草稿（发送按钮行为）
     func finalizeDraft() {
         guard let draftIndex = items.firstIndex(where: { $0.isDraft }),
               !items[draftIndex].text.isEmpty else { return }
         
         let draft = items[draftIndex]
         
-        // 保存当前选择的标签，用于下次创建草稿时作为默认值
         TagManager.shared.saveLastSelectedTags(draft.tags)
         
-        // 生成正式文件名并保存
         let now = Date()
         let fileName = generateFileName(for: now)
         let finalItem = HistoryItem(
@@ -219,26 +184,21 @@ class HistoryManager {
             isDraft: false
         )
         
-        // 替换草稿为正式记录
         items[draftIndex] = finalItem
         saveItem(finalItem)
         
-        // 删除草稿文件
         deleteDraftFile()
         
-        // 创建新草稿并插入到最前面（会自动使用上次选择的标签）
         let newDraft = createNewDraft()
         items.insert(newDraft, at: 0)
         
         TagManager.shared.refreshTags(from: savedItems)
     }
     
-    /// 获取已保存的记录（排除草稿）
     var savedItems: [HistoryItem] {
         items.filter { !$0.isDraft }
     }
     
-    /// 获取已保存的记录（带标签筛选）
     func getSavedItems(filteredBy tagName: String?) -> [HistoryItem] {
         var result = savedItems
         if let tagName = tagName {
@@ -247,16 +207,13 @@ class HistoryManager {
         return result
     }
     
-    /// 获取已保存的记录（带多标签交集筛选）
     func getSavedItems(filteredBy tags: [String]) -> [HistoryItem] {
         guard !tags.isEmpty else { return savedItems }
         return savedItems.filter { item in
-            // 记录必须包含所有选中的标签
             tags.allSatisfy { item.tags.contains($0) }
         }
     }
     
-    /// 保存草稿到磁盘
     private func saveDraft() {
         guard let draft = items.first(where: { $0.isDraft }) else { return }
         
@@ -271,7 +228,6 @@ class HistoryManager {
         try? content.write(to: fileURL, atomically: true, encoding: .utf8)
     }
     
-    /// 加载草稿
     private func loadDraft() -> HistoryItem? {
         let fileURL = storageURL.appendingPathComponent(draftFileName)
         
@@ -288,16 +244,12 @@ class HistoryManager {
         )
     }
     
-    /// 删除草稿文件
     private func deleteDraftFile() {
         let fileURL = storageURL.appendingPathComponent(draftFileName)
         try? fileManager.removeItem(at: fileURL)
     }
     
-    // MARK: - Storage Directory (iCloud 优先，本地回退)
-    
     private var storageURL: URL {
-        // 使用缓存的存储路径，避免重复检查
         if let cached = _cachedStorageURL {
             return cached
         }
@@ -307,13 +259,10 @@ class HistoryManager {
         return url
     }
     
-    /// 解析存储目录（仅在首次调用时执行）
     private func resolveStorageURL() -> URL {
-        // 优先尝试 iCloud
         if let containerURL = fileManager.url(forUbiquityContainerIdentifier: nil) {
             let documentsURL = containerURL.appendingPathComponent("Documents")
             
-            // 确保目录存在
             if !fileManager.fileExists(atPath: documentsURL.path) {
                 try? fileManager.createDirectory(at: documentsURL, withIntermediateDirectories: true)
             }
@@ -322,7 +271,6 @@ class HistoryManager {
             return documentsURL
         }
         
-        // 回退到本地存储
         let localURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Records")
         
@@ -334,8 +282,6 @@ class HistoryManager {
         return localURL
     }
     
-    // MARK: - File Name Generation
-    
     private func generateFileName(for date: Date) -> String {
         return dateFormatter.string(from: date) + ".md"
     }
@@ -345,17 +291,13 @@ class HistoryManager {
         return dateFormatter.date(from: name)
     }
     
-    // MARK: - Markdown Parsing & Generation
-    
     private func parseMarkdownFile(content: String) -> (description: String, tags: [String], body: String)? {
         let lines = content.components(separatedBy: "\n")
         
         guard lines.first == "---" else {
-            // 没有 front matter，整个内容就是 body
             return ("", [], content)
         }
         
-        // 查找结束的 ---
         var endIndex = -1
         for i in 1..<lines.count {
             if lines[i] == "---" {
@@ -368,7 +310,6 @@ class HistoryManager {
             return ("", [], content)
         }
         
-        // 解析 front matter
         let frontMatterLines = Array(lines[1..<endIndex])
         var description = ""
         var tags: [String] = []
@@ -392,7 +333,6 @@ class HistoryManager {
             }
         }
         
-        // 获取 body（跳过 front matter 后的空行）
         var bodyStartIndex = endIndex + 1
         while bodyStartIndex < lines.count && lines[bodyStartIndex].trimmingCharacters(in: .whitespaces).isEmpty {
             bodyStartIndex += 1
@@ -421,13 +361,10 @@ class HistoryManager {
         return content
     }
     
-    // MARK: - Record Management
-    
     func addRecord(_ text: String, tags: [String] = []) {
         guard !text.isEmpty else { return }
         let documentsURL = storageURL
         
-        // 避免重复添加相同内容
         if let existingItem = items.first(where: { $0.text == text }) {
             deleteRecord(existingItem)
         }
@@ -468,13 +405,12 @@ class HistoryManager {
             TagManager.shared.refreshTags(from: items)
         } catch {
             print("Failed to delete record: \(error)")
-            // 即使文件删除失败，也从内存中移除
             items.removeAll { $0.id == item.id }
         }
     }
     
     func deleteRecords(at offsets: IndexSet) {
-        let documentsURL = storageURL  // 仅获取一次
+        let documentsURL = storageURL
         for index in offsets {
             let item = items[index]
             let fileURL = documentsURL.appendingPathComponent(item.fileName)
@@ -484,22 +420,18 @@ class HistoryManager {
         TagManager.shared.refreshTags(from: items)
     }
     
-    /// 批量删除记录（优化版本：一次性删除多条记录）
     func deleteRecords(ids: Set<UUID>) {
         guard !ids.isEmpty else { return }
         
         let documentsURL = storageURL
         
-        // 删除文件
         for item in items where ids.contains(item.id) {
             let fileURL = documentsURL.appendingPathComponent(item.fileName)
             try? fileManager.removeItem(at: fileURL)
         }
         
-        // 批量从内存移除
         items.removeAll { ids.contains($0.id) }
         
-        // 只刷新一次标签
         TagManager.shared.refreshTags(from: items)
     }
     
@@ -513,8 +445,6 @@ class HistoryManager {
         items.removeAll()
         TagManager.shared.refreshTags(from: items)
     }
-    
-    // MARK: - Tag Management
     
     func addTag(to itemId: UUID, tagName: String) {
         guard let index = items.firstIndex(where: { $0.id == itemId }) else { return }
@@ -570,7 +500,6 @@ class HistoryManager {
         let trimmedNewName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedNewName.isEmpty, oldName != trimmedNewName else { return }
         
-        // 更新所有包含该标签的 items
         for index in items.indices {
             if let tagIndex = items[index].tags.firstIndex(of: oldName) {
                 items[index].tags[tagIndex] = trimmedNewName
@@ -580,8 +509,6 @@ class HistoryManager {
         
         TagManager.shared.refreshTags(from: items)
     }
-    
-    // MARK: - Save Item
     
     private func saveItem(_ item: HistoryItem) {
         let documentsURL = storageURL
@@ -602,8 +529,6 @@ class HistoryManager {
         }
     }
     
-    // MARK: - Load Items
-    
     func loadItems() {
         let documentsURL = storageURL
         
@@ -623,7 +548,6 @@ class HistoryManager {
                 
                 let fileName = fileURL.lastPathComponent
                 
-                // 跳过草稿文件，草稿会单独加载
                 if fileName == draftFileName { continue }
                 
                 guard let createdAt = parseDate(from: fileName) else { continue }
@@ -646,10 +570,8 @@ class HistoryManager {
                 }
             }
             
-            // 按创建时间降序排序
             items = loadedItems.sorted { $0.createdAt > $1.createdAt }
             
-            // 加载草稿并插入到最前面
             if let draft = loadDraft() {
                 items.insert(draft, at: 0)
             }
@@ -663,22 +585,16 @@ class HistoryManager {
         isLoading = false
     }
     
-    // MARK: - Refresh (for pull-to-refresh)
-    
     func refresh() {
         loadItems()
     }
     
-    // MARK: - Export All Notes
-    
     func exportAllNotes() throws -> URL {
         let documentsURL = storageURL
         
-        // 创建临时目录
         let tempDir = fileManager.temporaryDirectory.appendingPathComponent("NotesExport_\(UUID().uuidString)")
         try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
         
-        // 复制所有 md 文件到临时目录
         let fileURLs = try fileManager.contentsOfDirectory(
             at: documentsURL,
             includingPropertiesForKeys: nil,
@@ -691,16 +607,13 @@ class HistoryManager {
             try fileManager.copyItem(at: fileURL, to: destURL)
         }
         
-        // 创建 zip 文件
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd_HHmmss"
         let zipName = "Notes_\(dateFormatter.string(from: Date())).zip"
         let zipURL = fileManager.temporaryDirectory.appendingPathComponent(zipName)
         
-        // 删除可能存在的旧文件
         try? fileManager.removeItem(at: zipURL)
         
-        // 使用 FileManager 的 zipItem 方法创建 zip
         let coordinator = NSFileCoordinator()
         var error: NSError?
         
@@ -708,7 +621,6 @@ class HistoryManager {
             try? fileManager.copyItem(at: zippedURL, to: zipURL)
         }
         
-        // 清理临时目录
         try? fileManager.removeItem(at: tempDir)
         
         if let error = error {

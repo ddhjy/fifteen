@@ -1,8 +1,3 @@
-//
-//  AIService.swift
-//  fifteen
-//
-
 import Foundation
 
 @Observable
@@ -28,7 +23,6 @@ class AIService {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 60
         
-        // 将提示词和用户文本组合成一条消息，确保 AI 能理解要处理的内容
         let combinedMessage = "\(prompt)\n\n---\n\n\(text)"
         
         let body: [String: Any] = [
@@ -60,8 +54,6 @@ class AIService {
     }
 }
 
-// MARK: - Error Types
-
 enum AIServiceError: LocalizedError {
     case missingToken
     case invalidURL
@@ -77,8 +69,6 @@ enum AIServiceError: LocalizedError {
         }
     }
 }
-
-// MARK: - Response Models
 
 struct AIResponse: Codable {
     let choices: [Choice]

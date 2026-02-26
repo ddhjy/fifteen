@@ -1,8 +1,3 @@
-//
-//  SettingsView.swift
-//  fifteen
-//
-
 import SwiftUI
 
 @Observable
@@ -38,9 +33,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var settingsManager = SettingsManager.shared
     
-    // 假设项目中已定义类似 Color(hex:) 的扩展，或者我们可以直接使用系统颜色
-    // 如果没有 hex 扩展，这里可以使用 Color.indigo 替代
-    private let primaryColor = Color(red: 99/255, green: 102/255, blue: 241/255) // #6366F1
+    private let primaryColor = Color(red: 99/255, green: 102/255, blue: 241/255)
     
     var body: some View {
         NavigationStack {
