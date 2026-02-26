@@ -61,12 +61,26 @@ struct WorkflowNode: Identifiable, Codable, Equatable {
 struct Workflow: Identifiable, Codable, Equatable {
     let id: UUID
     var name: String
+    var icon: String
     var nodes: [WorkflowNode]
     
-    init(id: UUID = UUID(), name: String = "默认 Workflow", nodes: [WorkflowNode] = WorkflowNode.defaultNodes()) {
+    enum CodingKeys: String, CodingKey {
+        case id, name, icon, nodes
+    }
+    
+    init(id: UUID = UUID(), name: String = "默认 Workflow", icon: String = "arrow.triangle.branch", nodes: [WorkflowNode] = WorkflowNode.defaultNodes()) {
         self.id = id
         self.name = name
+        self.icon = icon
         self.nodes = nodes
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        icon = try container.decodeIfPresent(String.self, forKey: .icon) ?? "arrow.triangle.branch"
+        nodes = try container.decode([WorkflowNode].self, forKey: .nodes)
     }
 }
 
@@ -155,7 +169,7 @@ class WorkflowManager {
     
     func duplicateWorkflow(_ id: UUID) {
         guard let source = workflows.first(where: { $0.id == id }) else { return }
-        let copy = Workflow(name: source.name + " 副本", nodes: source.nodes)
+        let copy = Workflow(name: source.name + " 副本", icon: source.icon, nodes: source.nodes)
         workflows.append(copy)
         saveWorkflows()
     }

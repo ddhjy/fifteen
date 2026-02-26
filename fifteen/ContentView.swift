@@ -227,7 +227,7 @@ struct ContentView: View {
                     if workflow.id == workflowManager.activeWorkflowId {
                         Label(workflow.name, systemImage: "checkmark")
                     } else {
-                        Text(workflow.name)
+                        Label(workflow.name, systemImage: workflow.icon)
                     }
                 }
             }
@@ -245,7 +245,7 @@ struct ContentView: View {
                     ProgressView()
                         .scaleEffect(0.8)
                 } else {
-                    Image(systemName: "arrow.triangle.branch")
+                    Image(systemName: workflowManager.activeWorkflow.icon)
                         .font(.system(size: 18))
                 }
             }

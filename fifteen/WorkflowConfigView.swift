@@ -15,6 +15,11 @@ struct WorkflowConfigView: View {
                 Section {
                     Button { showWorkflowList = true } label: {
                         HStack {
+                            Image(systemName: workflowManager.activeWorkflow.icon)
+                                .font(.system(size: 22))
+                                .foregroundStyle(primaryColor)
+                                .frame(width: 32)
+                            
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(workflowManager.activeWorkflow.name)
                                     .font(.system(size: 16, weight: .medium))
@@ -75,6 +80,7 @@ struct WorkflowListView: View {
     @State private var showRenameAlert = false
     @State private var renameText = ""
     @State private var renamingWorkflowId: UUID? = nil
+    @State private var iconPickerWorkflowId: UUID? = nil
     
     private let primaryColor = Color(hex: 0x6366F1)
     
@@ -85,9 +91,10 @@ struct WorkflowListView: View {
                     let isActive = workflow.id == workflowManager.activeWorkflowId
                     
                     HStack(spacing: 12) {
-                        Image(systemName: isActive ? "checkmark.circle.fill" : "circle")
+                        Image(systemName: workflow.icon)
                             .foregroundStyle(isActive ? primaryColor : Color(.tertiaryLabel))
                             .font(.system(size: 20))
+                            .frame(width: 28)
                         
                         VStack(alignment: .leading, spacing: 2) {
                             Text(workflow.name)
@@ -108,6 +115,12 @@ struct WorkflowListView: View {
                         dismiss()
                     }
                     .contextMenu {
+                        Button {
+                            iconPickerWorkflowId = workflow.id
+                        } label: {
+                            Label("更换图标", systemImage: "square.grid.2x2")
+                        }
+                        
                         Button {
                             renamingWorkflowId = workflow.id
                             renameText = workflow.name
@@ -163,10 +176,25 @@ struct WorkflowListView: View {
                     workflowManager.updateWorkflow(wf)
                 }
             }
+            .sheet(item: $iconPickerWorkflowId) { workflowId in
+                IconPickerView(selectedIcon: currentIcon(for: workflowId)) { newIcon in
+                    guard var wf = workflowManager.workflows.first(where: { $0.id == workflowId }) else { return }
+                    wf.icon = newIcon
+                    workflowManager.updateWorkflow(wf)
+                }
+            }
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
     }
+    
+    private func currentIcon(for id: UUID) -> String {
+        workflowManager.workflows.first(where: { $0.id == id })?.icon ?? "arrow.triangle.branch"
+    }
+}
+
+extension UUID: @retroactive Identifiable {
+    public var id: UUID { self }
 }
 
 
@@ -341,5 +369,110 @@ struct EditNodeSheet: View {
         updated.config.httpPort = Int(httpPort)
         workflowManager.updateNode(updated)
         dismiss()
+    }
+}
+
+
+struct IconPickerView: View {
+    let selectedIcon: String
+    let onSelect: (String) -> Void
+    
+    @Environment(\.dismiss) private var dismiss
+    @State private var searchText = ""
+    
+    private let primaryColor = Color(hex: 0x6366F1)
+    
+    private let icons: [(category: String, symbols: [String])] = [
+        ("常用", [
+            "arrow.triangle.branch", "bolt.fill", "wand.and.stars",
+            "sparkles", "gearshape.fill", "terminal.fill",
+            "text.bubble.fill", "envelope.fill", "paperplane.fill",
+            "doc.text.fill", "folder.fill", "tray.full.fill"
+        ]),
+        ("工作", [
+            "briefcase.fill", "chart.bar.fill", "calendar",
+            "clock.fill", "flag.fill", "bookmark.fill",
+            "link", "network", "externaldrive.fill",
+            "server.rack", "cpu.fill", "memorychip.fill"
+        ]),
+        ("创意", [
+            "paintbrush.fill", "pencil.and.outline", "scissors",
+            "wand.and.rays", "camera.fill", "photo.fill",
+            "music.note", "film.fill", "theatermasks.fill",
+            "lightbulb.fill", "star.fill", "heart.fill"
+        ]),
+        ("沟通", [
+            "bubble.left.fill", "bubble.left.and.bubble.right.fill",
+            "phone.fill", "video.fill", "mic.fill",
+            "megaphone.fill", "bell.fill", "hand.wave.fill",
+            "person.fill", "person.2.fill", "globe",
+            "antenna.radiowaves.left.and.right"
+        ]),
+        ("符号", [
+            "checkmark.seal.fill", "xmark.octagon.fill",
+            "exclamationmark.triangle.fill", "info.circle.fill",
+            "questionmark.circle.fill", "plus.circle.fill",
+            "minus.circle.fill", "arrow.clockwise",
+            "shuffle", "repeat", "infinity", "number"
+        ])
+    ]
+    
+    private var filteredIcons: [(category: String, symbols: [String])] {
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !trimmed.isEmpty else { return icons }
+        return icons.compactMap { group in
+            let filtered = group.symbols.filter { $0.lowercased().contains(trimmed) }
+            return filtered.isEmpty ? nil : (group.category, filtered)
+        }
+    }
+    
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 6)
+    
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    ForEach(filteredIcons, id: \.category) { group in
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text(group.category)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 4)
+                            
+                            LazyVGrid(columns: columns, spacing: 12) {
+                                ForEach(group.symbols, id: \.self) { symbol in
+                                    let isSelected = symbol == selectedIcon
+                                    Button {
+                                        onSelect(symbol)
+                                        dismiss()
+                                    } label: {
+                                        Image(systemName: symbol)
+                                            .font(.system(size: 22))
+                                            .frame(width: 48, height: 48)
+                                            .foregroundStyle(isSelected ? .white : .primary)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                    .fill(isSelected ? primaryColor : Color(.tertiarySystemFill))
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(16)
+            }
+            .navigationTitle("选择图标")
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, prompt: "搜索图标名称")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 }
