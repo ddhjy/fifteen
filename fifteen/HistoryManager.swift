@@ -58,11 +58,21 @@ class TagManager {
     
     private let lastSelectedTagsKey = "lastSelectedTags"
     private let lastSelectedTagsTimeKey = "lastSelectedTagsTime"
+    private let cachedTagsKey = "cachedTags"
     
     private let tagMemoryExpiration: TimeInterval = 30 * 60
     
     private init() {
         loadLastSelectedTags()
+        loadCachedTags()
+    }
+    
+    private func loadCachedTags() {
+        guard let data = UserDefaults.standard.data(forKey: cachedTagsKey),
+              let saved = try? JSONDecoder().decode([String].self, from: data) else {
+            return
+        }
+        tags = saved
     }
     
     func refreshTags(from items: [HistoryItem]) {
@@ -78,6 +88,10 @@ class TagManager {
         
         tags = Array(uniqueTags)
         tagCounts = counts
+        
+        if let data = try? JSONEncoder().encode(tags) {
+            UserDefaults.standard.set(data, forKey: cachedTagsKey)
+        }
     }
     
     func count(for tag: String) -> Int {
