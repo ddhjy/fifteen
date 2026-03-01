@@ -297,6 +297,7 @@ struct HistoryView: View {
             StatisticsView(items: listCache.savedItems)
         }
         .onAppear {
+            historyManager.loadItemsIfNeeded()
             rebuildListCache()
             withAnimation(.easeOut(duration: 0.4)) {
                 appearAnimation = true

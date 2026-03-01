@@ -92,6 +92,7 @@ struct ContentView: View {
 
         }
         .onAppear {
+            historyManager.loadItemsIfNeeded()
             if Self.isFirstLaunch {
                 Self.isFirstLaunch = false
                 isTextEditorFocused = true

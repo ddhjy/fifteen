@@ -121,6 +121,7 @@ class HistoryManager {
     
     var items: [HistoryItem] = []
     var isLoading = false
+    private(set) var hasLoadedHistory = false
     
     private var _cachedStorageURL: URL?
     
@@ -132,7 +133,6 @@ class HistoryManager {
     }()
     
     private init() {
-        loadItems()
         ensureDraftExists()
     }
     
@@ -260,6 +260,10 @@ class HistoryManager {
     }
     
     private func resolveStorageURL() -> URL {
+        Self.resolveStorageURL(using: fileManager)
+    }
+
+    private static func resolveStorageURL(using fileManager: FileManager) -> URL {
         if let containerURL = fileManager.url(forUbiquityContainerIdentifier: nil) {
             let documentsURL = containerURL.appendingPathComponent("Documents")
             
@@ -292,6 +296,10 @@ class HistoryManager {
     }
     
     private func parseMarkdownFile(content: String) -> (description: String, tags: [String], body: String)? {
+        Self.parseMarkdownFile(content: content)
+    }
+
+    private static func parseMarkdownFile(content: String) -> (description: String, tags: [String], body: String)? {
         let lines = content.components(separatedBy: "\n")
         
         guard lines.first == "---" else {
@@ -341,6 +349,87 @@ class HistoryManager {
         let body = lines[bodyStartIndex...].joined(separator: "\n")
         
         return (description, tags, body)
+    }
+
+    private struct DiskLoadResult {
+        let storageURL: URL
+        let loadedItems: [HistoryItem]
+        let draft: HistoryItem?
+    }
+
+    private static func loadItemsFromDisk(
+        fileManager: FileManager,
+        cachedStorageURL: URL?,
+        draftFileName: String
+    ) -> DiskLoadResult {
+        let documentsURL = cachedStorageURL ?? resolveStorageURL(using: fileManager)
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd-HHmm-ss"
+
+        var loadedItems: [HistoryItem] = []
+
+        if let fileURLs = try? fileManager.contentsOfDirectory(
+            at: documentsURL,
+            includingPropertiesForKeys: [.creationDateKey],
+            options: .skipsHiddenFiles
+        ) {
+            for fileURL in fileURLs {
+                guard fileURL.pathExtension == "md" else { continue }
+
+                let fileName = fileURL.lastPathComponent
+                if fileName == draftFileName { continue }
+
+                let name = fileName.replacingOccurrences(of: ".md", with: "")
+                guard let createdAt = dateFormatter.date(from: name) else { continue }
+
+                guard let content = try? String(contentsOf: fileURL, encoding: .utf8),
+                      let parsed = parseMarkdownFile(content: content) else {
+                    continue
+                }
+
+                loadedItems.append(
+                    HistoryItem(
+                        fileName: fileName,
+                        text: parsed.body,
+                        createdAt: createdAt,
+                        description: parsed.description,
+                        tags: parsed.tags
+                    )
+                )
+            }
+        }
+
+        let draftURL = documentsURL.appendingPathComponent(draftFileName)
+        var loadedDraft: HistoryItem?
+        if fileManager.fileExists(atPath: draftURL.path),
+           let content = try? String(contentsOf: draftURL, encoding: .utf8),
+           let parsed = parseMarkdownFile(content: content) {
+            loadedDraft = HistoryItem(
+                text: parsed.body,
+                tags: parsed.tags,
+                isDraft: true
+            )
+        }
+
+        return DiskLoadResult(
+            storageURL: documentsURL,
+            loadedItems: loadedItems.sorted { $0.createdAt > $1.createdAt },
+            draft: loadedDraft
+        )
+    }
+
+    private func mergeLoadedItems(_ result: DiskLoadResult) {
+        _cachedStorageURL = result.storageURL
+
+        // Keep any edits made before disk load finishes, otherwise adopt disk draft.
+        let liveDraft = currentDraft
+        let hasLiveDraftEdits = !liveDraft.text.isEmpty || !liveDraft.tags.isEmpty
+        let mergedDraft = hasLiveDraftEdits ? liveDraft : (result.draft ?? liveDraft)
+
+        items = [mergedDraft] + result.loadedItems
+        TagManager.shared.refreshTags(from: result.loadedItems)
+        hasLoadedHistory = true
+        isLoading = false
     }
     
     private func generateMarkdownContent(text: String, description: String, tags: [String], createdAt: Date) -> String {
@@ -561,63 +650,34 @@ class HistoryManager {
     }
     
     func loadItems() {
-        let documentsURL = storageURL
-        
+        loadItemsIfNeeded(force: true)
+    }
+
+    func loadItemsIfNeeded(force: Bool = false) {
+        if isLoading { return }
+        if hasLoadedHistory && !force { return }
+
         isLoading = true
-        
-        do {
-            let fileURLs = try fileManager.contentsOfDirectory(
-                at: documentsURL,
-                includingPropertiesForKeys: [.creationDateKey],
-                options: .skipsHiddenFiles
+
+        let fileManager = self.fileManager
+        let cachedStorageURL = self._cachedStorageURL
+        let draftFileName = self.draftFileName
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = Self.loadItemsFromDisk(
+                fileManager: fileManager,
+                cachedStorageURL: cachedStorageURL,
+                draftFileName: draftFileName
             )
-            
-            var loadedItems: [HistoryItem] = []
-            
-            for fileURL in fileURLs {
-                guard fileURL.pathExtension == "md" else { continue }
-                
-                let fileName = fileURL.lastPathComponent
-                
-                if fileName == draftFileName { continue }
-                
-                guard let createdAt = parseDate(from: fileName) else { continue }
-                
-                do {
-                    let content = try String(contentsOf: fileURL, encoding: .utf8)
-                    
-                    if let parsed = parseMarkdownFile(content: content) {
-                        let item = HistoryItem(
-                            fileName: fileName,
-                            text: parsed.body,
-                            createdAt: createdAt,
-                            description: parsed.description,
-                            tags: parsed.tags
-                        )
-                        loadedItems.append(item)
-                    }
-                } catch {
-                    print("Failed to read file \(fileName): \(error)")
-                }
+
+            DispatchQueue.main.async {
+                self.mergeLoadedItems(result)
             }
-            
-            items = loadedItems.sorted { $0.createdAt > $1.createdAt }
-            
-            if let draft = loadDraft() {
-                items.insert(draft, at: 0)
-            }
-            
-            TagManager.shared.refreshTags(from: savedItems)
-            
-        } catch {
-            print("Failed to list iCloud documents: \(error)")
         }
-        
-        isLoading = false
     }
     
     func refresh() {
-        loadItems()
+        loadItemsIfNeeded(force: true)
     }
     
     func exportAllNotes() throws -> URL {
