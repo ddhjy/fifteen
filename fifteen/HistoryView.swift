@@ -56,6 +56,9 @@ struct HistoryView: View {
     @State private var isRandomMode = false
     @State private var randomScrollTargetId: UUID? = nil
     @State private var listCache = HistoryListCache()
+    @State private var showBatchCopiedToast = false
+    @State private var batchCopiedCount: Int = 0
+    @State private var batchCopyToastWorkItem: DispatchWorkItem?
     
     private struct HistoryListCache {
         var savedItems: [HistoryItem] = []
@@ -173,6 +176,18 @@ struct HistoryView: View {
                 historyContent
             }
         }
+        .overlay(alignment: .top) {
+            if showBatchCopiedToast {
+                Text("已复制 \(batchCopiedCount) 条")
+                    .font(.system(size: 13, weight: .medium))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(.regularMaterial, in: Capsule())
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .zIndex(999)
+            }
+        }
         .background {
             ShakeDetectorView {
                 handleShake()
@@ -241,6 +256,12 @@ struct HistoryView: View {
                     .tint(Color(hex: 0x6366F1))
                     
                     Spacer()
+                    
+                    Button(action: copySelectedItems) {
+                        Image(systemName: "doc.on.doc")
+                            .font(.system(size: 20))
+                    }
+                    .tint(Color(hex: 0x6366F1))
                     
                     Button(action: { showBatchTagPicker = true }) {
                         Image(systemName: "tag")
@@ -564,6 +585,57 @@ struct HistoryView: View {
                 selectedItems.insert(item.id)
             }
         }
+    }
+    
+    private func copySelectedItems() {
+        guard !selectedItems.isEmpty else { return }
+        
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+        
+        let items = selectedHistoryItemsInCopyOrder()
+        let text = buildBatchCopyText(items: items)
+        
+        guard !text.isEmpty else { return }
+        
+        UIPasteboard.general.string = text
+        showBatchCopiedToast(count: items.count)
+    }
+    
+    private func selectedHistoryItemsInCopyOrder() -> [HistoryItem] {
+        let displayed = listCache.displayedItems.filter { selectedItems.contains($0.id) }
+        let displayedIds = Set(displayed.map { $0.id })
+        
+        let remaining = historyManager.savedItems
+            .filter { selectedItems.contains($0.id) && !displayedIds.contains($0.id) }
+            .sorted { $0.createdAt > $1.createdAt }
+        
+        return displayed + remaining
+    }
+    
+    private func buildBatchCopyText(items: [HistoryItem]) -> String {
+        let separator = "\n\n---\n\n"
+        return items
+            .map { $0.text.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: separator)
+    }
+    
+    private func showBatchCopiedToast(count: Int) {
+        batchCopiedCount = count
+        
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+            showBatchCopiedToast = true
+        }
+        
+        batchCopyToastWorkItem?.cancel()
+        let workItem = DispatchWorkItem {
+            withAnimation(.easeOut(duration: 0.25)) {
+                showBatchCopiedToast = false
+            }
+        }
+        batchCopyToastWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.6, execute: workItem)
     }
     
     private func copyItem(_ item: HistoryItem) {
