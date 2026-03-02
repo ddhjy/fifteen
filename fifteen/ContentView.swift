@@ -104,8 +104,7 @@ struct ContentView: View {
             if isShowing {
                 Self.keyboardWorkItem?.cancel()
                 Self.keyboardWorkItem = nil
-                isTextEditorFocused = false
-                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                isKeyboardAnimating = false
             } else {
                 scheduleKeyboardShow(delay: 0.5)
             }
@@ -289,7 +288,12 @@ struct ContentView: View {
     }
     
     private func navigateToHistory() {
-        showHistory = true
+        historyManager.loadItemsIfNeeded()
+        isTextEditorFocused = false
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        DispatchQueue.main.async {
+            showHistory = true
+        }
     }
     
     private func clearText() {

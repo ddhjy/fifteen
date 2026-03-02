@@ -59,12 +59,17 @@ struct HistoryView: View {
     @State private var showBatchCopiedToast = false
     @State private var batchCopiedCount: Int = 0
     @State private var batchCopyToastWorkItem: DispatchWorkItem?
+    @State private var isRebuildingCache = false
+    @State private var rebuildToken = UUID()
     
     private struct HistoryListCache {
         var savedItems: [HistoryItem] = []
         var searchFilteredItems: [HistoryItem] = []
         var filteredItems: [HistoryItem] = []
         var displayedItems: [HistoryItem] = []
+        var searchTagCounts: [String: Int] = [:]
+        var searchNoTagCount: Int = 0
+        var searchTagSet: Set<String> = []
         
         private static func tokenize(_ searchText: String) -> [String] {
             let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -95,11 +100,13 @@ struct HistoryView: View {
         }
         
         static func build(
-            savedItems: [HistoryItem],
+            items: [HistoryItem],
             searchText: String,
             selectedTags: [TagSelection],
             isRandomMode: Bool
         ) -> HistoryListCache {
+            let savedItems = items.filter { !$0.isDraft }
+            
             let searchFilteredItems: [HistoryItem]
             let tokens = tokenize(searchText)
             if tokens.isEmpty {
@@ -130,18 +137,30 @@ struct HistoryView: View {
                 displayedItems = filteredItems
             }
             
+            var tagCounts: [String: Int] = [:]
+            var noTagCount = 0
+            for item in searchFilteredItems {
+                if item.tags.isEmpty { noTagCount += 1 }
+                for tag in item.tags {
+                    tagCounts[tag, default: 0] += 1
+                }
+            }
+            
             return HistoryListCache(
                 savedItems: savedItems,
                 searchFilteredItems: searchFilteredItems,
                 filteredItems: filteredItems,
-                displayedItems: displayedItems
+                displayedItems: displayedItems,
+                searchTagCounts: tagCounts,
+                searchNoTagCount: noTagCount,
+                searchTagSet: Set(tagCounts.keys)
             )
         }
     }
     
     init() {
         _listCache = State(initialValue: HistoryListCache.build(
-            savedItems: HistoryManager.shared.savedItems,
+            items: HistoryManager.shared.items,
             searchText: "",
             selectedTags: [],
             isRandomMode: false
@@ -156,13 +175,30 @@ struct HistoryView: View {
         isSearchActive ? "支持多关键词，用空格分隔" : "搜索标签、文本"
     }
     
-    private func rebuildListCache() {
-        listCache = HistoryListCache.build(
-            savedItems: historyManager.savedItems,
-            searchText: effectiveSearchText,
-            selectedTags: selectedTags,
-            isRandomMode: isRandomMode
-        )
+    private func rebuildListCacheAsync() {
+        let token = UUID()
+        rebuildToken = token
+        isRebuildingCache = true
+
+        let itemsSnapshot = historyManager.items
+        let searchTextSnapshot = effectiveSearchText
+        let selectedTagsSnapshot = selectedTags
+        let randomModeSnapshot = isRandomMode
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            let cache = HistoryListCache.build(
+                items: itemsSnapshot,
+                searchText: searchTextSnapshot,
+                selectedTags: selectedTagsSnapshot,
+                isRandomMode: randomModeSnapshot
+            )
+
+            DispatchQueue.main.async {
+                guard self.rebuildToken == token else { return }
+                self.listCache = cache
+                self.isRebuildingCache = false
+            }
+        }
     }
     
     var body: some View {
@@ -170,7 +206,9 @@ struct HistoryView: View {
             Color(.secondarySystemBackground)
                 .ignoresSafeArea()
             
-            if listCache.savedItems.isEmpty {
+            if (historyManager.isLoading || isRebuildingCache) && listCache.savedItems.isEmpty {
+                loadingStateView
+            } else if listCache.savedItems.isEmpty {
                 emptyStateView
             } else {
                 historyContent
@@ -279,16 +317,16 @@ struct HistoryView: View {
         }
         .toolbarBackgroundVisibility(.visible, for: .bottomBar)
         .onChange(of: isRandomMode) { _, _ in
-            rebuildListCache()
+            rebuildListCacheAsync()
         }
         .onChange(of: selectedTags) { _, _ in
-            rebuildListCache()
+            rebuildListCacheAsync()
         }
         .onChange(of: committedSearchText) { _, _ in
-            rebuildListCache()
+            rebuildListCacheAsync()
         }
         .onChange(of: historyManager.items) { _, _ in
-            rebuildListCache()
+            rebuildListCacheAsync()
         }
         .alert("确定要删除选中的 \(selectedItems.count) 条记录吗？", isPresented: $showClearConfirmation) {
             Button("取消", role: .cancel) { }
@@ -319,7 +357,7 @@ struct HistoryView: View {
         }
         .onAppear {
             historyManager.loadItemsIfNeeded()
-            rebuildListCache()
+            rebuildListCacheAsync()
             withAnimation(.easeOut(duration: 0.4)) {
                 appearAnimation = true
             }
@@ -378,7 +416,7 @@ struct HistoryView: View {
 
     private func randomizeDisplayOrder() {
         isRandomMode = true
-        rebuildListCache()
+        rebuildListCacheAsync()
         if !listCache.displayedItems.isEmpty {
             let randomIndex = Int.random(in: 0..<listCache.displayedItems.count)
             randomScrollTargetId = listCache.displayedItems[randomIndex].id
@@ -439,6 +477,9 @@ struct HistoryView: View {
                 selectedTags: $selectedTags,
                 isRandomMode: $isRandomMode,
                 availableItems: listCache.searchFilteredItems,
+                availableTagSet: listCache.searchTagSet,
+                level0TagCounts: listCache.searchTagCounts,
+                level0NoTagCount: listCache.searchNoTagCount,
                 isSearching: isSearchActive,
                 onRandomize: randomizeDisplayOrder
             )
@@ -456,6 +497,16 @@ struct HistoryView: View {
             isSearchTextComposing = false
             committedSearchText = searchText
         }
+    }
+    
+    private var loadingStateView: some View {
+        VStack(spacing: 12) {
+            ProgressView()
+            Text("正在加载记录…")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     private var emptyStateView: some View {

@@ -436,6 +436,9 @@ struct TagFilterBar: View {
     @Binding var selectedTags: [TagSelection]
     @Binding var isRandomMode: Bool
     var availableItems: [HistoryItem]
+    var availableTagSet: Set<String> = []
+    var level0TagCounts: [String: Int] = [:]
+    var level0NoTagCount: Int = 0
     var isSearching: Bool = false
     var onRandomize: () -> Void
     
@@ -459,7 +462,9 @@ struct TagFilterBar: View {
     }
     
     var body: some View {
-        let availableTagsFromItems = computeAvailableTagsFromItems()
+        let availableTagsFromItems = availableTagSet.isEmpty
+            ? computeAvailableTagsFromItems()
+            : availableTagSet
         
         if availableTagsFromItems.isEmpty {
             EmptyView()
@@ -535,6 +540,9 @@ struct TagFilterBar: View {
     
     private func getNoTagCount(at level: Int) -> Int {
         let currentSelections = Array(selectedTags.prefix(level))
+        if currentSelections.isEmpty {
+            return level0NoTagCount
+        }
         return availableItems.reduce(into: 0) { count, item in
             if item.tags.isEmpty && matchesSelections(item: item, selections: currentSelections) {
                 count += 1
@@ -566,6 +574,16 @@ struct TagFilterBar: View {
     private func getAvailableTagsWithCounts(at level: Int, availableTagsFromItems: Set<String>) -> [(tag: String, count: Int)] {
         let currentSelections = Array(selectedTags.prefix(level))
         let usedTags = Set(currentSelections.map { $0.tag })
+        
+        if currentSelections.isEmpty {
+            return level0TagCounts
+                .filter { !usedTags.contains($0.key) && availableTagsFromItems.contains($0.key) }
+                .map { (tag: $0.key, count: $0.value) }
+                .sorted {
+                    if $0.count != $1.count { return $0.count > $1.count }
+                    return $0.tag < $1.tag
+                }
+        }
         
         var filteredItems = availableItems
         if !currentSelections.isEmpty {

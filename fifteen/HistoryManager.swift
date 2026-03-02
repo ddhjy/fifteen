@@ -75,23 +75,36 @@ class TagManager {
         tags = saved
     }
     
-    func refreshTags(from items: [HistoryItem]) {
+    struct Snapshot {
+        let tags: [String]
+        let counts: [String: Int]
+    }
+
+    static func snapshot(from items: [HistoryItem]) -> Snapshot {
         var uniqueTags = Set<String>()
         var counts: [String: Int] = [:]
-        
+
         for item in items {
             for tag in item.tags {
                 uniqueTags.insert(tag)
                 counts[tag, default: 0] += 1
             }
         }
-        
-        tags = Array(uniqueTags)
-        tagCounts = counts
-        
+
+        return Snapshot(tags: Array(uniqueTags), counts: counts)
+    }
+
+    func apply(snapshot: Snapshot) {
+        tags = snapshot.tags
+        tagCounts = snapshot.counts
+
         if let data = try? JSONEncoder().encode(tags) {
             UserDefaults.standard.set(data, forKey: cachedTagsKey)
         }
+    }
+
+    func refreshTags(from items: [HistoryItem]) {
+        apply(snapshot: Self.snapshot(from: items))
     }
     
     func count(for tag: String) -> Int {
@@ -369,6 +382,7 @@ class HistoryManager {
         let storageURL: URL
         let loadedItems: [HistoryItem]
         let draft: HistoryItem?
+        let tagSnapshot: TagManager.Snapshot
     }
 
     private static func loadItemsFromDisk(
@@ -425,10 +439,14 @@ class HistoryManager {
             )
         }
 
+        let sortedItems = loadedItems.sorted { $0.createdAt > $1.createdAt }
+        let tagSnapshot = TagManager.snapshot(from: sortedItems)
+
         return DiskLoadResult(
             storageURL: documentsURL,
-            loadedItems: loadedItems.sorted { $0.createdAt > $1.createdAt },
-            draft: loadedDraft
+            loadedItems: sortedItems,
+            draft: loadedDraft,
+            tagSnapshot: tagSnapshot
         )
     }
 
@@ -441,7 +459,7 @@ class HistoryManager {
         let mergedDraft = hasLiveDraftEdits ? liveDraft : (result.draft ?? liveDraft)
 
         items = [mergedDraft] + result.loadedItems
-        TagManager.shared.refreshTags(from: result.loadedItems)
+        TagManager.shared.apply(snapshot: result.tagSnapshot)
         hasLoadedHistory = true
         isLoading = false
     }
