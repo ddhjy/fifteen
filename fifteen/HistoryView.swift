@@ -789,7 +789,7 @@ struct HistoryRowView: View {
                 highlightedText(item.preview, searchText: searchText)
                     .font(.system(size: 17, weight: .regular))
                     .foregroundStyle(Color(.label))
-                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     
                     Rectangle()
                         .fill(Color(.separator).opacity(0.5))
@@ -883,12 +883,8 @@ struct HistoryRowView: View {
     
     @ViewBuilder
     private func highlightedText(_ text: String, searchText: String) -> some View {
-        if searchText.isEmpty {
-            Text(text)
-        } else {
-            let attributedString = createHighlightedAttributedString(text: text, searchText: searchText)
-            Text(attributedString)
-        }
+        let attributedString = createHighlightedAttributedString(text: text, searchText: searchText)
+        Text(attributedString)
     }
     
     private func isTagMatchingSearch(tagName: String, searchText: String) -> Bool {
@@ -903,6 +899,14 @@ struct HistoryRowView: View {
     
     private func createHighlightedAttributedString(text: String, searchText: String) -> AttributedString {
         var attributedString = AttributedString(text)
+        
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = .justified
+        paragraphStyle.lineBreakMode = .byWordWrapping
+        
+        var container = AttributeContainer()
+        container.paragraphStyle = paragraphStyle
+        attributedString.mergeAttributes(container)
         
         let lowercasedText = text.lowercased()
         let tokens = searchText
