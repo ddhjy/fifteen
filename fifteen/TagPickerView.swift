@@ -23,6 +23,9 @@ struct TagPickerView: View {
     @State private var previousSelectedTags: Set<String> = []
     
     @State private var hasStartedReselection: Bool = false
+
+    @State private var recommendedTags: [String] = []
+    @State private var recommendationTask: Task<Void, Never>? = nil
     
     private var currentItem: HistoryItem? {
         historyManager.items.first { $0.id == itemId }
@@ -44,15 +47,66 @@ struct TagPickerView: View {
         return sortedTags.filter { $0.localizedCaseInsensitiveContains(trimmed) }
     }
     
-    private func computeInitialSortedTags() -> [String] {
+    private func computeInitialSortedTags(recommendedTags: [String] = []) -> [String] {
         let selectedTagsSet = Set(currentItem?.tags ?? [String]())
+        var recommendationRank: [String: Int] = [:]
+        for (index, tag) in recommendedTags.enumerated() {
+            if recommendationRank[tag] == nil {
+                recommendationRank[tag] = index
+            }
+        }
         return tagManager.tags.sorted { tag1, tag2 in
             let tag1Selected = selectedTagsSet.contains(tag1)
             let tag2Selected = selectedTagsSet.contains(tag2)
             if tag1Selected != tag2Selected {
                 return tag1Selected
             }
-            return tagManager.count(for: tag1) > tagManager.count(for: tag2)
+
+            let tag1Rank = recommendationRank[tag1]
+            let tag2Rank = recommendationRank[tag2]
+            if let tag1Rank, let tag2Rank, tag1Rank != tag2Rank {
+                return tag1Rank < tag2Rank
+            }
+            if tag1Rank != nil || tag2Rank != nil {
+                return tag1Rank != nil
+            }
+
+            let tag1Count = tagManager.count(for: tag1)
+            let tag2Count = tagManager.count(for: tag2)
+            if tag1Count != tag2Count {
+                return tag1Count > tag2Count
+            }
+
+            return tag1.localizedCompare(tag2) == .orderedAscending
+        }
+    }
+
+    private func refreshSortedTags() {
+        frozenSortedTags = computeInitialSortedTags(recommendedTags: recommendedTags)
+    }
+
+    private func requestRecommendedTagsIfNeeded() {
+        guard recommendationTask == nil else { return }
+
+        guard let text = currentItem?.text.trimmingCharacters(in: .whitespacesAndNewlines),
+              !text.isEmpty,
+              !tagManager.tags.isEmpty else {
+            return
+        }
+
+        guard let token = SettingsManager.shared.aiApiToken,
+              !token.isEmpty else {
+            return
+        }
+
+        let availableTags = tagManager.tags
+        recommendationTask = Task {
+            let recommended = (try? await AIService.shared.recommendTags(for: text, from: availableTags)) ?? []
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                self.recommendedTags = recommended
+                self.refreshSortedTags()
+            }
         }
     }
     
@@ -122,20 +176,15 @@ struct TagPickerView: View {
                 }
             }
             .sheet(isPresented: $showCreateTag, onDismiss: {
-                for tag in tagManager.tags {
-                    if !frozenSortedTags.contains(tag) {
-                        frozenSortedTags.insert(tag, at: 0)
-                    }
-                }
+                refreshSortedTags()
             }) {
                 TagCreateSheet(itemId: itemId)
             }
             .sheet(item: $editingTagName, onDismiss: {
                 if let operation = pendingRenameOperation {
                     historyManager.renameTag(from: operation.from, to: operation.to)
-                    if let index = frozenSortedTags.firstIndex(of: operation.from) {
-                        frozenSortedTags[index] = operation.to
-                    }
+                    recommendedTags = recommendedTags.map { $0 == operation.from ? operation.to : $0 }
+                    refreshSortedTags()
                     pendingRenameOperation = nil
                 }
             }) { tagName in
@@ -159,10 +208,14 @@ struct TagPickerView: View {
                     localSelectedTags = currentTags
                 }
                 
-                frozenSortedTags = computeInitialSortedTags()
+                refreshSortedTags()
+                requestRecommendedTagsIfNeeded()
             }
         }
         .onDisappear {
+            recommendationTask?.cancel()
+            recommendationTask = nil
+
             let addedTags = localSelectedTags.subtracting(initialSelectedTags)
             let removedTags = initialSelectedTags.subtracting(localSelectedTags)
             
