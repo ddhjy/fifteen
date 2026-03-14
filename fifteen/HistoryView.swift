@@ -159,10 +159,13 @@ struct HistoryView: View {
         }
     }
     
-    init() {
+    init(initialSearchText: String = "") {
+        let trimmedSearchText = initialSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        _searchText = State(initialValue: trimmedSearchText)
+        _committedSearchText = State(initialValue: trimmedSearchText)
         _listCache = State(initialValue: HistoryListCache.build(
             items: HistoryManager.shared.items,
-            searchText: "",
+            searchText: trimmedSearchText,
             selectedTags: [],
             isRandomMode: false
         ))

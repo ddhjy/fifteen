@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var showHistory: Bool = false
+    @State private var historySearchText: String = ""
     @State private var showTagSelector: Bool = false
     @State private var showDebugView: Bool = false
     @State private var historyManager = HistoryManager.shared
@@ -33,6 +34,10 @@ struct ContentView: View {
         historyManager.currentDraft.tags
     }
 
+    private var trimmedDraftText: String {
+        draftText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -45,7 +50,9 @@ struct ContentView: View {
         }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("记录", systemImage: "rectangle.stack", action: navigateToHistory)
+                    Button("记录", systemImage: "rectangle.stack") {
+                        navigateToHistory()
+                    }
                         .labelStyle(.iconOnly)
                         .tint(.primary)
                 }
@@ -58,7 +65,7 @@ struct ContentView: View {
             }
 
             .navigationDestination(isPresented: $showHistory) {
-                HistoryView()
+                HistoryView(initialSearchText: historySearchText)
             }
             .safeAreaInset(edge: .bottom) {
                 bottomToolbar
@@ -121,9 +128,16 @@ struct ContentView: View {
             Button("清除", systemImage: "trash", action: clearText)
                 .labelStyle(.iconOnly)
                 .tint(.primary)
-            .padding(14)
-            .glassEffect(.regular.interactive(), in: Circle())
-            .disabled(processingWorkflowId != nil)
+                .padding(14)
+                .glassEffect(.regular.interactive(), in: Circle())
+                .disabled(processingWorkflowId != nil)
+
+            Button("搜索", systemImage: "magnifyingglass", action: searchDraftInHistory)
+                .labelStyle(.iconOnly)
+                .tint(.primary)
+                .padding(14)
+                .glassEffect(.regular.interactive(), in: Circle())
+                .disabled(processingWorkflowId != nil || trimmedDraftText.isEmpty)
         }
         .padding(.trailing, 16)
         .padding(.bottom, 8)
@@ -284,13 +298,20 @@ struct ContentView: View {
         }
     }
     
-    private func navigateToHistory() {
+    private func navigateToHistory(searchText: String = "") {
         historyManager.loadItemsIfNeeded()
+        historySearchText = searchText
         isTextEditorFocused = false
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         Task { @MainActor in
             showHistory = true
         }
+    }
+
+    private func searchDraftInHistory() {
+        guard !trimmedDraftText.isEmpty else { return }
+        hapticTrigger += 1
+        navigateToHistory(searchText: trimmedDraftText)
     }
     
     private func clearText() {
