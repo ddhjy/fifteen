@@ -117,11 +117,7 @@ struct ContentView: View {
         HStack(spacing: 12) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    workflowSettingsButton
-                    
-                    ForEach(workflowManager.openWorkflows) { workflow in
-                        workflowButton(for: workflow)
-                    }
+                    workflowControlGroup
                     
                     if !tagManager.tags.isEmpty {
                         tagButton
@@ -141,6 +137,19 @@ struct ContentView: View {
         }
         .padding(.trailing, 16)
         .padding(.bottom, 8)
+    }
+    
+    private var workflowControlGroup: some View {
+        HStack(spacing: 4) {
+            workflowSettingsButton
+            
+            ForEach(workflowManager.openWorkflows) { workflow in
+                workflowButton(for: workflow)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
+        .glassEffect(.regular.interactive(), in: Capsule())
     }
 
     private var tagButton: some View {
@@ -188,10 +197,12 @@ struct ContentView: View {
         } label: {
             Image(systemName: "slider.horizontal.3")
                 .font(.system(size: 18, weight: .medium))
+                .frame(width: 20, height: 20)
         }
         .tint(.primary)
-        .padding(14)
-        .glassEffect(.regular.interactive(), in: Circle())
+        .frame(minWidth: 44, minHeight: 44)
+        .contentShape(Circle())
+        .accessibilityLabel("工作流设置")
         .disabled(processingWorkflowId != nil)
     }
     
@@ -199,7 +210,7 @@ struct ContentView: View {
         Button {
             handleWorkflowTap(workflow)
         } label: {
-            HStack(spacing: 8) {
+            Group {
                 if processingWorkflowId == workflow.id {
                     ProgressView()
                         .scaleEffect(0.8)
@@ -207,18 +218,14 @@ struct ContentView: View {
                     Image(systemName: workflow.icon)
                         .font(.system(size: 18, weight: .medium))
                 }
-                
-                Text(workflow.name)
-                    .font(.system(size: 14, weight: .medium))
-                    .lineLimit(1)
             }
-            .frame(height: 20)
+            .frame(width: 20, height: 20)
         }
         .disabled(processingWorkflowId != nil)
         .tint(workflowTintColor(for: workflow))
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .glassEffect(.regular.interactive(), in: Capsule())
+        .frame(minWidth: 44, minHeight: 44)
+        .contentShape(Circle())
+        .accessibilityLabel(workflow.name)
     }
     
     private var fullScreenEditor: some View {
