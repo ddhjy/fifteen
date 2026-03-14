@@ -189,6 +189,11 @@ class HistoryManager {
         guard let index = items.firstIndex(where: { $0.isDraft }) else { return }
         items[index].text = text
         saveDraft()
+        notifyDraftDidChange(text)
+    }
+
+    func clearDraft() {
+        updateDraftText("")
     }
     
     func finalizeDraft() {
@@ -220,6 +225,7 @@ class HistoryManager {
         items.insert(newDraft, at: 0)
         
         TagManager.shared.refreshTags(from: savedItems)
+        notifyDraftDidChange(newDraft.text)
     }
     
     var savedItems: [HistoryItem] {
@@ -462,6 +468,7 @@ class HistoryManager {
         TagManager.shared.apply(snapshot: result.tagSnapshot)
         hasLoadedHistory = true
         isLoading = false
+        notifyDraftDidChange(mergedDraft.text)
     }
     
     private func generateMarkdownContent(text: String, description: String, tags: [String], createdAt: Date) -> String {
@@ -751,5 +758,11 @@ class HistoryManager {
         }
         
         return zipURL
+    }
+
+    private func notifyDraftDidChange(_ text: String) {
+        Task { @MainActor in
+            AutoPasteSyncManager.shared.scheduleDraftSync(text: text)
+        }
     }
 }

@@ -301,7 +301,7 @@ struct ContentView: View {
         impactFeedback.impactOccurred()
         
         withAnimation(.easeOut(duration: 0.25)) {
-            historyManager.updateDraftText("")
+            historyManager.clearDraft()
         }
     }
     
@@ -312,7 +312,7 @@ struct ContentView: View {
         guard !draftText.isEmpty else { return }
         
         if draftText.hasPrefix("打开调试模式") {
-            historyManager.updateDraftText("")
+            historyManager.clearDraft()
             showDebugView = true
             return
         }
@@ -349,7 +349,7 @@ struct ContentView: View {
                     if result.shouldSave {
                         performSave(text: result.finalText)
                     } else {
-                        historyManager.updateDraftText("")
+                        historyManager.clearDraft()
                     }
                 }
             } catch {
