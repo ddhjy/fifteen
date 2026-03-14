@@ -197,6 +197,14 @@ class HistoryManager {
     func clearDraft() {
         updateDraftText("")
     }
+
+    func clearDraftTags() {
+        guard let index = items.firstIndex(where: { $0.isDraft }) else { return }
+        guard !items[index].tags.isEmpty else { return }
+
+        items[index].tags.removeAll()
+        saveDraft()
+    }
     
     func finalizeDraft() {
         guard let draftIndex = items.firstIndex(where: { $0.isDraft }),

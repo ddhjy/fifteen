@@ -317,7 +317,11 @@ struct ContentView: View {
     private func clearText() {
         hapticTrigger += 1
         withAnimation(.easeOut(duration: 0.25)) {
-            historyManager.clearDraft()
+            if draftText.isEmpty {
+                historyManager.clearDraftTags()
+            } else {
+                historyManager.clearDraft()
+            }
         }
     }
     
