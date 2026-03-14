@@ -29,7 +29,7 @@ build:
 	@set -euo pipefail; \
 	device_name="$(DEVICE_NAME)"; \
 	if [[ -z "$$device_name" ]]; then \
-		device_name="$$(xcrun devicectl list devices --filter "$(DEVICE_FILTER)" --hide-default-columns --hide-headers --columns Name | sed -n '1p' | sed 's/[[:space:]]*$$//')"; \
+		device_name="$$(xcrun devicectl list devices --filter "$(DEVICE_FILTER)" --hide-default-columns --hide-headers --columns Name | sed 's/[[:space:]]*$$//' | awk 'NF && $$0 != "No devices found." { print; exit }')"; \
 	fi; \
 	if [[ -z "$$device_name" ]]; then \
 		echo "No paired, booted iOS device found. Run 'make devices' or pass DEVICE_NAME='...'" >&2; \
@@ -49,7 +49,7 @@ install:
 	@set -euo pipefail; \
 	device_name="$(DEVICE_NAME)"; \
 	if [[ -z "$$device_name" ]]; then \
-		device_name="$$(xcrun devicectl list devices --filter "$(DEVICE_FILTER)" --hide-default-columns --hide-headers --columns Name | sed -n '1p' | sed 's/[[:space:]]*$$//')"; \
+		device_name="$$(xcrun devicectl list devices --filter "$(DEVICE_FILTER)" --hide-default-columns --hide-headers --columns Name | sed 's/[[:space:]]*$$//' | awk 'NF && $$0 != "No devices found." { print; exit }')"; \
 	fi; \
 	if [[ -z "$$device_name" ]]; then \
 		echo "No paired, booted iOS device found. Run 'make devices' or pass DEVICE_NAME='...'" >&2; \
