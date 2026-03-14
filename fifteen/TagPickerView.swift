@@ -47,6 +47,10 @@ struct TagPickerView: View {
         }
         return sortedTags.filter { $0.localizedStandardContains(trimmed) }
     }
+
+    private var recommendedTagSet: Set<String> {
+        Set(recommendedTags)
+    }
     
     private func computeInitialSortedTags(recommendedTags: [String] = []) -> [String] {
         let selectedTagsSet = Set(currentItem?.tags ?? [String]())
@@ -137,6 +141,7 @@ struct TagPickerView: View {
                                         tagName: tagName,
                                         isSelected: isCurrentlySelected,
                                         isPreviousSelected: isPreviouslySelected,
+                                        markers: markers(for: tagName, isSelected: isCurrentlySelected, isPreviousSelected: isPreviouslySelected),
                                         onToggle: { toggleTag(tagName) },
                                         onEdit: { editingTagName = tagName }
                                     )
@@ -255,12 +260,48 @@ struct TagPickerView: View {
             }
         }
     }
+
+    private func markers(for tagName: String, isSelected: Bool, isPreviousSelected: Bool) -> [TagRowMarker] {
+        var markers: [TagRowMarker] = []
+
+        if isSelected {
+            markers.append(.selected)
+        } else if isPreviousSelected {
+            markers.append(.recent)
+        }
+
+        if recommendedTagSet.contains(tagName) {
+            markers.append(.aiRecommended)
+        }
+
+        return markers
+    }
+}
+
+enum TagRowMarker: String, Identifiable {
+    case selected = "已选"
+    case recent = "最近使用"
+    case aiRecommended = "AI 推荐"
+
+    var id: String { rawValue }
+
+    var tintColor: Color {
+        switch self {
+        case .selected:
+            return Design.primaryColor
+        case .recent:
+            return Color(.systemOrange)
+        case .aiRecommended:
+            return Color(.systemTeal)
+        }
+    }
 }
 
 struct TagRowView: View {
     let tagName: String
     let isSelected: Bool
     var isPreviousSelected: Bool = false
+    var markers: [TagRowMarker] = []
     let onToggle: () -> Void
     var onEdit: (() -> Void)? = nil
     
@@ -292,9 +333,19 @@ struct TagRowView: View {
                 }
             }
             
-            Text(tagName)
-                .font(.callout)
-                .foregroundStyle(Color(.label))
+            VStack(alignment: .leading, spacing: markers.isEmpty ? 0 : 6) {
+                Text(tagName)
+                    .font(.callout)
+                    .foregroundStyle(Color(.label))
+
+                if !markers.isEmpty {
+                    HStack(spacing: 6) {
+                        ForEach(markers) { marker in
+                            TagRowMarkerBadge(marker: marker)
+                        }
+                    }
+                }
+            }
             
             Spacer()
             
@@ -316,6 +367,22 @@ struct TagRowView: View {
             onToggle()
         }
         .accessibilityAddTraits(.isButton)
+    }
+}
+
+struct TagRowMarkerBadge: View {
+    let marker: TagRowMarker
+
+    var body: some View {
+        Text(marker.rawValue)
+            .font(.caption2.weight(.semibold))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(marker.tintColor.opacity(0.12))
+            )
+            .foregroundStyle(marker.tintColor)
     }
 }
 
