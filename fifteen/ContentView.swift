@@ -125,19 +125,19 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.leading, 16)
             
-            Button("清除", systemImage: "trash", action: clearText)
-                .labelStyle(.iconOnly)
-                .tint(.primary)
-                .padding(14)
-                .glassEffect(.regular.interactive(), in: Circle())
-                .disabled(processingWorkflowId != nil)
-
             Button("搜索", systemImage: "magnifyingglass", action: searchDraftInHistory)
                 .labelStyle(.iconOnly)
                 .tint(.primary)
                 .padding(14)
                 .glassEffect(.regular.interactive(), in: Circle())
                 .disabled(processingWorkflowId != nil || trimmedDraftText.isEmpty)
+
+            Button("清除", systemImage: "trash", action: clearText)
+                .labelStyle(.iconOnly)
+                .tint(.primary)
+                .padding(14)
+                .glassEffect(.regular.interactive(), in: Circle())
+                .disabled(processingWorkflowId != nil)
         }
         .padding(.trailing, 16)
         .padding(.bottom, 8)
