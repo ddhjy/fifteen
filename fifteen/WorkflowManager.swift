@@ -61,16 +61,24 @@ struct Workflow: Identifiable, Codable, Equatable {
     let id: UUID
     var name: String
     var icon: String
+    var isOpen: Bool
     var nodes: [WorkflowNode]
     
     enum CodingKeys: String, CodingKey {
-        case id, name, icon, nodes
+        case id, name, icon, isOpen, nodes
     }
     
-    init(id: UUID = UUID(), name: String = "默认 Workflow", icon: String = "arrow.triangle.branch", nodes: [WorkflowNode] = WorkflowNode.defaultNodes()) {
+    init(
+        id: UUID = UUID(),
+        name: String = "默认 Workflow",
+        icon: String = "arrow.triangle.branch",
+        isOpen: Bool = true,
+        nodes: [WorkflowNode] = WorkflowNode.defaultNodes()
+    ) {
         self.id = id
         self.name = name
         self.icon = icon
+        self.isOpen = isOpen
         self.nodes = nodes
     }
     
@@ -79,6 +87,7 @@ struct Workflow: Identifiable, Codable, Equatable {
         id = try container.decode(UUID.self, forKey: .id)
         name = try container.decode(String.self, forKey: .name)
         icon = try container.decodeIfPresent(String.self, forKey: .icon) ?? "arrow.triangle.branch"
+        isOpen = try container.decodeIfPresent(Bool.self, forKey: .isOpen) ?? false
         nodes = try container.decode([WorkflowNode].self, forKey: .nodes)
     }
 }
@@ -94,103 +103,128 @@ struct WorkflowExecutionResult: Identifiable {
 }
 
 
+@MainActor
 @Observable
 class WorkflowManager {
     static let shared = WorkflowManager()
     
     var workflows: [Workflow] = []
-    var activeWorkflowId: UUID?
+    var selectedWorkflowId: UUID?
     var isExecuting: Bool = false
     var currentNodeIndex: Int = 0
     var executionError: Error?
     
     private let workflowsStorageKey = "workflows_v2"
-    private let activeWorkflowIdKey = "activeWorkflowId"
+    private let selectedWorkflowIdKey = "selectedWorkflowId"
+    private let legacyActiveWorkflowIdKey = "activeWorkflowId"
     private init() {
         loadWorkflows()
     }
     
-    var activeWorkflow: Workflow {
-        if let id = activeWorkflowId,
+    var selectedWorkflow: Workflow {
+        if let id = selectedWorkflowId,
            let wf = workflows.first(where: { $0.id == id }) {
             return wf
         }
         return workflows.first ?? Workflow()
     }
     
+    var openWorkflows: [Workflow] {
+        workflows.filter(\.isOpen)
+    }
+    
     var nodes: [WorkflowNode] {
-        get { activeWorkflow.nodes }
+        get { selectedWorkflow.nodes }
         set {
-            guard let idx = workflows.firstIndex(where: { $0.id == activeWorkflow.id }) else { return }
+            guard let idx = workflows.firstIndex(where: { $0.id == selectedWorkflow.id }) else { return }
             workflows[idx].nodes = newValue
             saveWorkflows()
         }
     }
     
-    var areTerminalNodesAllDisabled: Bool {
-        let saveEnabled = nodes.first(where: { $0.type == .save })?.isEnabled ?? false
+    func areTerminalNodesAllDisabled(for workflow: Workflow) -> Bool {
+        let saveEnabled = workflow.nodes.first(where: { $0.type == .save })?.isEnabled ?? false
         return !saveEnabled
     }
     
-    func setActiveWorkflow(_ id: UUID) {
-        activeWorkflowId = id
-        UserDefaults.standard.set(id.uuidString, forKey: activeWorkflowIdKey)
+    func selectWorkflow(_ id: UUID) {
+        selectedWorkflowId = id
+        UserDefaults.standard.set(id.uuidString, forKey: selectedWorkflowIdKey)
+    }
+    
+    func canCloseWorkflow(_ id: UUID) -> Bool {
+        guard let workflow = workflows.first(where: { $0.id == id }), workflow.isOpen else {
+            return true
+        }
+        return openWorkflows.count > 1
+    }
+    
+    func toggleWorkflowOpen(_ id: UUID) {
+        guard let idx = workflows.firstIndex(where: { $0.id == id }) else { return }
+        let shouldOpen = !workflows[idx].isOpen
+        if !shouldOpen && !canCloseWorkflow(id) {
+            return
+        }
+        workflows[idx].isOpen = shouldOpen
+        saveWorkflows()
     }
     
     func addWorkflow(_ workflow: Workflow) {
         var wf = workflow
         normalizeNodes(&wf.nodes)
         workflows.append(wf)
+        if selectedWorkflowId == nil {
+            selectWorkflow(wf.id)
+        }
         saveWorkflows()
     }
     
     func deleteWorkflow(_ id: UUID) {
         guard workflows.count > 1 else { return }
         workflows.removeAll { $0.id == id }
-        if activeWorkflowId == id {
-            activeWorkflowId = workflows.first?.id
-            if let newId = activeWorkflowId {
-                UserDefaults.standard.set(newId.uuidString, forKey: activeWorkflowIdKey)
-            }
+        if selectedWorkflowId == id, let firstWorkflowId = workflows.first?.id {
+            selectWorkflow(firstWorkflowId)
         }
+        ensureOpenWorkflowExists()
         saveWorkflows()
     }
     
     func updateWorkflow(_ workflow: Workflow) {
         if let idx = workflows.firstIndex(where: { $0.id == workflow.id }) {
             workflows[idx] = workflow
+            ensureOpenWorkflowExists()
             saveWorkflows()
         }
     }
     
     func duplicateWorkflow(_ id: UUID) {
         guard let source = workflows.first(where: { $0.id == id }) else { return }
-        let copy = Workflow(name: source.name + " 副本", icon: source.icon, nodes: source.nodes)
+        let copy = Workflow(name: source.name + " 副本", icon: source.icon, isOpen: source.isOpen, nodes: source.nodes)
         workflows.append(copy)
         saveWorkflows()
     }
     
     func addNode(_ node: WorkflowNode) {
-        guard let idx = workflows.firstIndex(where: { $0.id == activeWorkflow.id }) else { return }
+        guard let idx = workflows.firstIndex(where: { $0.id == selectedWorkflow.id }) else { return }
         workflows[idx].nodes.append(node)
         saveWorkflows()
     }
     
     func updateNode(_ node: WorkflowNode) {
-        guard let wIdx = workflows.firstIndex(where: { $0.id == activeWorkflow.id }),
+        guard let wIdx = workflows.firstIndex(where: { $0.id == selectedWorkflow.id }),
               let nIdx = workflows[wIdx].nodes.firstIndex(where: { $0.id == node.id }) else { return }
         workflows[wIdx].nodes[nIdx] = node
         saveWorkflows()
     }
     
     func moveNode(from source: IndexSet, to destination: Int) {
-        guard let idx = workflows.firstIndex(where: { $0.id == activeWorkflow.id }) else { return }
+        guard let idx = workflows.firstIndex(where: { $0.id == selectedWorkflow.id }) else { return }
         workflows[idx].nodes.move(fromOffsets: source, toOffset: destination)
         saveWorkflows()
     }
     
     func deleteNodes(at offsets: IndexSet) {
-        guard let idx = workflows.firstIndex(where: { $0.id == activeWorkflow.id }) else { return }
+        guard let idx = workflows.firstIndex(where: { $0.id == selectedWorkflow.id }) else { return }
         workflows[idx].nodes.remove(atOffsets: offsets)
         saveWorkflows()
     }
@@ -206,17 +240,21 @@ class WorkflowManager {
             workflows = [Workflow()]
         }
         
-        if let idStr = UserDefaults.standard.string(forKey: activeWorkflowIdKey),
+        let persistedSelection = UserDefaults.standard.string(forKey: selectedWorkflowIdKey)
+            ?? UserDefaults.standard.string(forKey: legacyActiveWorkflowIdKey)
+        
+        if let idStr = persistedSelection,
            let id = UUID(uuidString: idStr),
            workflows.contains(where: { $0.id == id }) {
-            activeWorkflowId = id
+            selectedWorkflowId = id
         } else {
-            activeWorkflowId = workflows.first?.id
+            selectedWorkflowId = workflows.first?.id
         }
         
         for i in workflows.indices {
             normalizeNodes(&workflows[i].nodes)
         }
+        ensureOpenWorkflowExists()
         saveWorkflows()
     }
     
@@ -232,28 +270,30 @@ class WorkflowManager {
     private func normalizeNodes(_ nodes: inout [WorkflowNode]) {
     }
     
-    func execute(input: String, tags: [String]) async throws -> WorkflowExecutionResult {
-        await MainActor.run {
-            isExecuting = true
-            currentNodeIndex = 0
-            executionError = nil
+    func execute(workflowID: UUID, input: String, tags: [String]) async throws -> WorkflowExecutionResult {
+        guard let workflow = workflows.first(where: { $0.id == workflowID }) else {
+            throw NSError(
+                domain: "WorkflowManager",
+                code: -2,
+                userInfo: [NSLocalizedDescriptionKey: "未找到对应的 Workflow"]
+            )
         }
         
+        isExecuting = true
+        currentNodeIndex = 0
+        executionError = nil
+        
         defer {
-            Task { @MainActor in
-                isExecuting = false
-            }
+            isExecuting = false
         }
         
         var currentText = input
-        let enabledNodes = nodes.filter { $0.isEnabled }
+        let enabledNodes = workflow.nodes.filter { $0.isEnabled }
         var didCopy = false
         var shouldSave = false
         
         for (index, node) in enabledNodes.enumerated() {
-            await MainActor.run {
-                currentNodeIndex = index
-            }
+            currentNodeIndex = index
             
             switch node.type {
             case .aiProcess:
@@ -296,5 +336,17 @@ class WorkflowManager {
             shouldSave: shouldSave,
             didCopyToClipboard: didCopy
         )
+    }
+    
+    private func ensureOpenWorkflowExists() {
+        guard !workflows.isEmpty else { return }
+        guard !workflows.contains(where: \.isOpen) else { return }
+        
+        if let selectedWorkflowId,
+           let idx = workflows.firstIndex(where: { $0.id == selectedWorkflowId }) {
+            workflows[idx].isOpen = true
+        } else {
+            workflows[0].isOpen = true
+        }
     }
 }

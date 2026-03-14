@@ -17,38 +17,54 @@ struct WorkflowConfigView: View {
             List {
                 Section {
                     ForEach(workflowManager.workflows) { workflow in
-                        let isActive = workflow.id == workflowManager.activeWorkflowId
+                        let isSelected = workflow.id == workflowManager.selectedWorkflowId
                         
                         HStack(spacing: 12) {
                             Image(systemName: workflow.icon)
-                                .foregroundStyle(isActive ? primaryColor : Color(.tertiaryLabel))
+                                .foregroundStyle(isSelected ? primaryColor : Color(.tertiaryLabel))
                                 .font(.system(size: 20))
                                 .frame(width: 28)
                             
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(workflow.name)
-                                    .font(.system(size: 16, weight: isActive ? .semibold : .regular))
+                                    .font(.system(size: 16, weight: isSelected ? .semibold : .regular))
                                 
                                 let enabledCount = workflow.nodes.filter { $0.isEnabled }.count
                                 let totalCount = workflow.nodes.count
-                                Text("\(enabledCount)/\(totalCount) 个节点启用")
+                                Text(workflow.isOpen ? "外部已显示 · \(enabledCount)/\(totalCount) 个节点启用" : "仅配置中 · \(enabledCount)/\(totalCount) 个节点启用")
                                     .font(.system(size: 12))
                                     .foregroundStyle(.secondary)
                             }
                             
                             Spacer()
                             
-                            if isActive {
+                            if isSelected {
                                 Image(systemName: "checkmark")
                                     .font(.system(size: 14, weight: .semibold))
                                     .foregroundStyle(primaryColor)
                             }
+                            
+                            Button {
+                                workflowManager.toggleWorkflowOpen(workflow.id)
+                            } label: {
+                                Image(systemName: workflow.isOpen ? "eye" : "eye.slash")
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(workflow.isOpen ? primaryColor : .secondary)
+                                    .frame(width: 28, height: 28)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(!workflowManager.canCloseWorkflow(workflow.id))
                         }
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            workflowManager.setActiveWorkflow(workflow.id)
+                            workflowManager.selectWorkflow(workflow.id)
                         }
                         .contextMenu {
+                            Button {
+                                workflowManager.toggleWorkflowOpen(workflow.id)
+                            } label: {
+                                Label(workflow.isOpen ? "从外部隐藏" : "显示到外部", systemImage: workflow.isOpen ? "eye.slash" : "eye")
+                            }
                             Button {
                                 iconPickerWorkflowId = workflow.id
                             } label: {
@@ -81,13 +97,15 @@ struct WorkflowConfigView: View {
                         let count = workflowManager.workflows.count + 1
                         let newWf = Workflow(name: "Workflow \(count)")
                         workflowManager.addWorkflow(newWf)
-                        workflowManager.setActiveWorkflow(newWf.id)
+                        workflowManager.selectWorkflow(newWf.id)
                     } label: {
                         Label("新建 Workflow", systemImage: "plus.circle")
                             .foregroundStyle(.primary)
                     }
                 } header: {
-                    Text("Workflow")
+                    Text("所有 Workflow")
+                } footer: {
+                    Text("点选一个 Workflow 编辑节点，打开的 Workflow 会显示在外部工具栏中。")
                 }
                 
                 Section {
@@ -99,7 +117,7 @@ struct WorkflowConfigView: View {
                 } header: {
                     Text("处理节点")
                 } footer: {
-                    Text("拖动调整顺序，点击发送时将按顺序执行启用的节点")
+                    Text("拖动调整顺序，点击外部的 Workflow 按钮时将按顺序执行启用的节点。")
                 }
                 
                 Section {
@@ -160,21 +178,21 @@ struct WorkflowListView: View {
         NavigationStack {
             List {
                 ForEach(workflowManager.workflows) { workflow in
-                    let isActive = workflow.id == workflowManager.activeWorkflowId
+                    let isSelected = workflow.id == workflowManager.selectedWorkflowId
                     
                     HStack(spacing: 12) {
                         Image(systemName: workflow.icon)
-                            .foregroundStyle(isActive ? primaryColor : Color(.tertiaryLabel))
+                            .foregroundStyle(isSelected ? primaryColor : Color(.tertiaryLabel))
                             .font(.system(size: 20))
                             .frame(width: 28)
                         
                         VStack(alignment: .leading, spacing: 2) {
                             Text(workflow.name)
-                                .font(.system(size: 16, weight: isActive ? .semibold : .regular))
+                                .font(.system(size: 16, weight: isSelected ? .semibold : .regular))
                             
                             let enabledCount = workflow.nodes.filter { $0.isEnabled }.count
                             let totalCount = workflow.nodes.count
-                            Text("\(enabledCount)/\(totalCount) 个节点启用")
+                            Text(workflow.isOpen ? "外部已显示 · \(enabledCount)/\(totalCount) 个节点启用" : "仅配置中 · \(enabledCount)/\(totalCount) 个节点启用")
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
                         }
@@ -183,10 +201,15 @@ struct WorkflowListView: View {
                     }
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        workflowManager.setActiveWorkflow(workflow.id)
+                        workflowManager.selectWorkflow(workflow.id)
                         dismiss()
                     }
                     .contextMenu {
+                        Button {
+                            workflowManager.toggleWorkflowOpen(workflow.id)
+                        } label: {
+                            Label(workflow.isOpen ? "从外部隐藏" : "显示到外部", systemImage: workflow.isOpen ? "eye.slash" : "eye")
+                        }
                         Button {
                             iconPickerWorkflowId = workflow.id
                         } label: {
@@ -222,7 +245,7 @@ struct WorkflowListView: View {
                     let count = workflowManager.workflows.count + 1
                     let newWf = Workflow(name: "Workflow \(count)")
                     workflowManager.addWorkflow(newWf)
-                    workflowManager.setActiveWorkflow(newWf.id)
+                    workflowManager.selectWorkflow(newWf.id)
                     dismiss()
                 } label: {
                     Label("新建 Workflow", systemImage: "plus.circle")

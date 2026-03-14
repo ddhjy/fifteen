@@ -14,7 +14,7 @@ struct ContentView: View {
     
     @State private var showWorkflowConfig = false
     @State private var workflowManager = WorkflowManager.shared
-    @State private var isProcessingWorkflow = false
+    @State private var processingWorkflowId: UUID? = nil
     @State private var workflowError: Error? = nil
     
     @State private var isKeyboardAnimating: Bool = false
@@ -114,23 +114,22 @@ struct ContentView: View {
     }
     
     private var bottomToolbar: some View {
-        HStack {
-            Button(action: copyAndClear) {
-                Image(systemName: "paperplane.fill")
-                    .font(.system(size: 20))
+        HStack(spacing: 12) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    workflowSettingsButton
+                    
+                    ForEach(workflowManager.openWorkflows) { workflow in
+                        workflowButton(for: workflow)
+                    }
+                    
+                    if !tagManager.tags.isEmpty {
+                        tagButton
+                    }
+                }
+                .padding(.leading, 16)
             }
-            .tint(primaryColor)
-            .padding(14)
-            .glassEffect(.regular.interactive(), in: Circle())
-
-            workflowButton
-
-            if !tagManager.tags.isEmpty {
-                tagButton
-            }
-
-            Spacer()
-
+            
             Button(action: clearText) {
                 Image(systemName: "trash")
                     .font(.system(size: 20))
@@ -138,8 +137,9 @@ struct ContentView: View {
             .tint(.primary)
             .padding(14)
             .glassEffect(.regular.interactive(), in: Circle())
+            .disabled(processingWorkflowId != nil)
         }
-        .padding(.horizontal, 16)
+        .padding(.trailing, 16)
         .padding(.bottom, 8)
     }
 
@@ -179,29 +179,46 @@ struct ContentView: View {
         .padding(.horizontal, selectedTags.isEmpty ? 14 : 16)
         .padding(.vertical, 14)
         .glassEffect(.regular.interactive(), in: Capsule())
+        .disabled(processingWorkflowId != nil)
     }
     
-    private var workflowButton: some View {
+    private var workflowSettingsButton: some View {
         Button {
             showWorkflowConfig = true
         } label: {
-            Group {
-                if isProcessingWorkflow {
+            Image(systemName: "slider.horizontal.3")
+                .font(.system(size: 18, weight: .medium))
+        }
+        .tint(.primary)
+        .padding(14)
+        .glassEffect(.regular.interactive(), in: Circle())
+        .disabled(processingWorkflowId != nil)
+    }
+    
+    private func workflowButton(for workflow: Workflow) -> some View {
+        Button {
+            handleWorkflowTap(workflow)
+        } label: {
+            HStack(spacing: 8) {
+                if processingWorkflowId == workflow.id {
                     ProgressView()
                         .scaleEffect(0.8)
                 } else {
-                    Image(systemName: workflowManager.activeWorkflow.icon)
-                        .font(.system(size: 18))
+                    Image(systemName: workflow.icon)
+                        .font(.system(size: 18, weight: .medium))
                 }
+                
+                Text(workflow.name)
+                    .font(.system(size: 14, weight: .medium))
+                    .lineLimit(1)
             }
+            .frame(height: 20)
         }
-        .tint(
-            isProcessingWorkflow
-                ? primaryColor
-                : (workflowManager.areTerminalNodesAllDisabled ? warningColor : .primary)
-        )
-        .padding(14)
-        .glassEffect(.regular.interactive(), in: Circle())
+        .disabled(processingWorkflowId != nil)
+        .tint(workflowTintColor(for: workflow))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .glassEffect(.regular.interactive(), in: Capsule())
     }
     
     private var fullScreenEditor: some View {
@@ -278,7 +295,7 @@ struct ContentView: View {
         }
     }
     
-    private func copyAndClear() {
+    private func handleWorkflowTap(_ workflow: Workflow) {
         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
         impactFeedback.impactOccurred()
         
@@ -290,11 +307,11 @@ struct ContentView: View {
             return
         }
         
-        executeWorkflow()
+        executeWorkflow(workflow)
     }
     
-    private func executeWorkflow() {
-        isProcessingWorkflow = true
+    private func executeWorkflow(_ workflow: Workflow) {
+        processingWorkflowId = workflow.id
         let startTime = Date()
         let minimumLoadingDuration: TimeInterval = 0.2
 
@@ -310,6 +327,7 @@ struct ContentView: View {
         Task {
             do {
                 let result = try await workflowManager.execute(
+                    workflowID: workflow.id,
                     input: draftText,
                     tags: selectedTags
                 )
@@ -317,7 +335,7 @@ struct ContentView: View {
                 await waitMinimumDurationIfNeeded()
 
                 await MainActor.run {
-                    isProcessingWorkflow = false
+                    processingWorkflowId = nil
                     
                     if result.shouldSave {
                         performSave(text: result.finalText)
@@ -329,11 +347,19 @@ struct ContentView: View {
                 await waitMinimumDurationIfNeeded()
 
                 await MainActor.run {
-                    isProcessingWorkflow = false
+                    processingWorkflowId = nil
                     workflowError = error
                 }
             }
         }
+    }
+    
+    private func workflowTintColor(for workflow: Workflow) -> Color {
+        if processingWorkflowId == workflow.id {
+            return primaryColor
+        }
+        
+        return workflowManager.areTerminalNodesAllDisabled(for: workflow) ? warningColor : .primary
     }
     
     private func performSave(text: String) {
