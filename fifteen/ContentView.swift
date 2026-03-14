@@ -115,16 +115,15 @@ struct ContentView: View {
     
     private var bottomToolbar: some View {
         HStack(spacing: 12) {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    workflowControlGroup
-                    
-                    if !tagManager.tags.isEmpty {
-                        tagButton
-                    }
+            HStack(spacing: 12) {
+                workflowControlGroup
+
+                if !tagManager.tags.isEmpty {
+                    tagButton
                 }
-                .padding(.leading, 16)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, 16)
             
             Button(action: clearText) {
                 Image(systemName: "trash")
@@ -147,18 +146,30 @@ struct ContentView: View {
                 workflowButton(for: workflow)
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 7)
+        .frame(height: 46)
         .glassEffect(.regular.interactive(), in: Capsule())
     }
 
+    @ViewBuilder
     private var tagButton: some View {
-        Button(action: { showTagSelector = true }) {
-            HStack(spacing: 6) {
+        if selectedTags.isEmpty {
+            Button(action: { showTagSelector = true }) {
                 Image(systemName: "tag")
                     .font(.system(size: 18))
-                
-                if !selectedTags.isEmpty {
+                    .frame(width: 20, height: 20)
+            }
+            .tint(.primary)
+            .padding(14)
+            .glassEffect(.regular.interactive(), in: Circle())
+            .accessibilityLabel("标签")
+            .disabled(processingWorkflowId != nil)
+        } else {
+            Button(action: { showTagSelector = true }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "tag")
+                        .font(.system(size: 18))
+                    
                     let fontSize: CGFloat = selectedTags.count == 1 ? 13 : 11
                     
                     VStack(alignment: .leading, spacing: 1) {
@@ -181,14 +192,15 @@ struct ContentView: View {
                         }
                     }
                 }
+                .frame(height: 20)
             }
-            .frame(height: 20)
+            .tint(.primary)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .glassEffect(.regular.interactive(), in: Capsule())
+            .accessibilityLabel("标签")
+            .disabled(processingWorkflowId != nil)
         }
-        .tint(.primary)
-        .padding(.horizontal, selectedTags.isEmpty ? 14 : 16)
-        .padding(.vertical, 14)
-        .glassEffect(.regular.interactive(), in: Capsule())
-        .disabled(processingWorkflowId != nil)
     }
     
     private var workflowSettingsButton: some View {
@@ -200,7 +212,7 @@ struct ContentView: View {
                 .frame(width: 20, height: 20)
         }
         .tint(.primary)
-        .frame(minWidth: 44, minHeight: 44)
+        .frame(width: 44, height: 44)
         .contentShape(Circle())
         .accessibilityLabel("工作流设置")
         .disabled(processingWorkflowId != nil)
@@ -223,7 +235,7 @@ struct ContentView: View {
         }
         .disabled(processingWorkflowId != nil)
         .tint(workflowTintColor(for: workflow))
-        .frame(minWidth: 44, minHeight: 44)
+        .frame(width: 44, height: 44)
         .contentShape(Circle())
         .accessibilityLabel(workflow.name)
     }
