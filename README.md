@@ -13,7 +13,7 @@
 
 使用 Xcode 打开 `fifteen.xcodeproj` 即可开始开发。
 
-也可以直接用 `make` 编译并安装到已连接的真机：
+也可以直接用 `make` 编译、安装，并在已连接的真机上自动打开 App：
 
 ```bash
 make install

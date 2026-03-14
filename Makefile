@@ -14,7 +14,7 @@ XCODEBUILD_FLAGS ?= -allowProvisioningUpdates -allowProvisioningDeviceRegistrati
 help:
 	@printf "Targets:\\n"
 	@printf "  make build                      Build for the first connected real device\\n"
-	@printf "  make install                    Build and install on the first connected real device\\n"
+	@printf "  make install                    Build, install, and launch on the first connected real device\\n"
 	@printf "  make devices                    List connected devices detected by devicectl\\n"
 	@printf "  make clean                      Remove derived data\\n"
 	@printf "\\n"
@@ -68,8 +68,15 @@ install:
 		echo "Built app not found at $(APP_PATH)" >&2; \
 		exit 1; \
 	fi; \
+	bundle_id="$$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$(APP_PATH)/Info.plist" 2>/dev/null || true)"; \
+	if [[ -z "$$bundle_id" ]]; then \
+		echo "Unable to read CFBundleIdentifier from $(APP_PATH)/Info.plist" >&2; \
+		exit 1; \
+	fi; \
 	echo "Installing $(APP_PATH) to $$device_name..."; \
-	xcrun devicectl device install app --device "$$device_name" "$(APP_PATH)"
+	xcrun devicectl device install app --device "$$device_name" "$(APP_PATH)"; \
+	echo "Launching $$bundle_id on $$device_name..."; \
+	xcrun devicectl device process launch --device "$$device_name" --terminate-existing "$$bundle_id"
 
 clean:
 	@rm -rf "$(DERIVED_DATA_PATH)"
