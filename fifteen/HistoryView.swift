@@ -204,6 +204,52 @@ struct HistoryView: View {
             }
         }
     }
+
+    private func matchesSelections(item: HistoryItem, selections: [TagSelection]) -> Bool {
+        for selection in selections {
+            if selection.isNoTagSelection {
+                switch selection.state {
+                case .positive:
+                    if !item.tags.isEmpty { return false }
+                case .negative:
+                    if item.tags.isEmpty { return false }
+                }
+            } else {
+                switch selection.state {
+                case .positive:
+                    if !item.tags.contains(selection.tag) { return false }
+                case .negative:
+                    if item.tags.contains(selection.tag) { return false }
+                }
+            }
+        }
+        return true
+    }
+
+    private func applyListProjectionImmediately() {
+        let baseItems = listCache.searchFilteredItems
+        let filteredItems: [HistoryItem]
+
+        if selectedTags.isEmpty {
+            filteredItems = baseItems
+        } else {
+            filteredItems = baseItems.filter { item in
+                matchesSelections(item: item, selections: selectedTags)
+            }
+        }
+
+        let displayedItems: [HistoryItem]
+        if isRandomMode {
+            displayedItems = filteredItems.sorted { $0.createdAt < $1.createdAt }
+        } else {
+            displayedItems = filteredItems
+        }
+
+        var cache = listCache
+        cache.filteredItems = filteredItems
+        cache.displayedItems = displayedItems
+        listCache = cache
+    }
     
     var body: some View {
         ZStack {
@@ -323,10 +369,10 @@ struct HistoryView: View {
         }
         .toolbarBackgroundVisibility(.visible, for: .bottomBar)
         .onChange(of: isRandomMode) { _, _ in
-            rebuildListCacheAsync()
+            applyListProjectionImmediately()
         }
         .onChange(of: selectedTags) { _, _ in
-            rebuildListCacheAsync()
+            applyListProjectionImmediately()
         }
         .onChange(of: committedSearchText) { _, _ in
             rebuildListCacheAsync()
@@ -418,7 +464,7 @@ struct HistoryView: View {
 
     private func randomizeDisplayOrder() {
         isRandomMode = true
-        rebuildListCacheAsync()
+        applyListProjectionImmediately()
         if !listCache.displayedItems.isEmpty {
             let randomIndex = Int.random(in: 0..<listCache.displayedItems.count)
             randomScrollTargetId = listCache.displayedItems[randomIndex].id
