@@ -24,6 +24,7 @@ struct TagPickerView: View {
     @State private var hasStartedReselection: Bool = false
 
     @State private var hapticTrigger = 0
+    @State private var locallyCreatedTags: Set<String> = []
 
     @State private var recommendedTags: [String] = []
     @State private var recommendationTask: Task<Void, Never>? = nil
@@ -40,12 +41,19 @@ struct TagPickerView: View {
         return frozenSortedTags
     }
 
+    private var trimmedSearchText: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private var displayedTags: [String] {
-        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty {
+        if trimmedSearchText.isEmpty {
             return sortedTags
         }
-        return sortedTags.filter { $0.localizedStandardContains(trimmed) }
+        return sortedTags.filter { $0.localizedStandardContains(trimmedSearchText) }
+    }
+
+    private var canCreateTagFromSearch: Bool {
+        !trimmedSearchText.isEmpty && displayedTags.isEmpty && !sortedTags.contains(trimmedSearchText)
     }
 
     private var recommendedTagSet: Set<String> {
@@ -60,7 +68,8 @@ struct TagPickerView: View {
                 recommendationRank[tag] = index
             }
         }
-        return tagManager.tags.sorted { tag1, tag2 in
+        let availableTags = Array(Set(tagManager.tags).union(locallyCreatedTags))
+        return availableTags.sorted { tag1, tag2 in
             let tag1Selected = selectedTagsSet.contains(tag1)
             let tag2Selected = selectedTagsSet.contains(tag2)
             if tag1Selected != tag2Selected {
@@ -125,10 +134,21 @@ struct TagPickerView: View {
                     ScrollView {
                         VStack(spacing: 0) {
                             if displayedTags.isEmpty {
-                                VStack(spacing: 8) {
+                                VStack(spacing: 12) {
                                     Text("没有找到相关标签")
                                         .font(.subheadline)
                                         .foregroundStyle(Color(.secondaryLabel))
+
+                                    if canCreateTagFromSearch {
+                                        Button(action: createTagFromSearch) {
+                                            Label("新增标签 \"\(trimmedSearchText)\"", systemImage: "plus.circle.fill")
+                                                .font(.callout.weight(.medium))
+                                                .frame(maxWidth: .infinity)
+                                        }
+                                        .buttonStyle(.borderedProminent)
+                                        .tint(Design.primaryColor)
+                                        .padding(.horizontal, 16)
+                                    }
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 60)
@@ -236,10 +256,21 @@ struct TagPickerView: View {
     }
     
     private var emptyTagsView: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 12) {
             Text("点击左上角 + 创建第一个标签")
                 .font(.subheadline)
                 .foregroundStyle(Color(.secondaryLabel))
+
+            if canCreateTagFromSearch {
+                Button(action: createTagFromSearch) {
+                    Label("新增标签 \"\(trimmedSearchText)\"", systemImage: "plus.circle.fill")
+                        .font(.callout.weight(.medium))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Design.primaryColor)
+                .padding(.horizontal, 16)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 60)
@@ -249,15 +280,34 @@ struct TagPickerView: View {
         hapticTrigger += 1
         
         withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-            if reselectMode && !hasStartedReselection {
-                hasStartedReselection = true
-                previousSelectedTags = []
-                localSelectedTags = [tagName]
-            } else if localSelectedTags.contains(tagName) {
+            if localSelectedTags.contains(tagName) {
                 localSelectedTags.remove(tagName)
             } else {
-                localSelectedTags.insert(tagName)
+                selectTag(tagName)
             }
+        }
+    }
+
+    private func createTagFromSearch() {
+        let newTag = trimmedSearchText
+        guard !newTag.isEmpty else { return }
+
+        hapticTrigger += 1
+
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+            locallyCreatedTags.insert(newTag)
+            selectTag(newTag)
+            refreshSortedTags()
+        }
+    }
+
+    private func selectTag(_ tagName: String) {
+        if reselectMode && !hasStartedReselection {
+            hasStartedReselection = true
+            previousSelectedTags = []
+            localSelectedTags = [tagName]
+        } else {
+            localSelectedTags.insert(tagName)
         }
     }
 
@@ -943,16 +993,24 @@ struct BatchTagPickerView: View {
     @State private var searchText: String = ""
     @State private var frozenSortedTags: [String] = []
     @State private var hapticTrigger = 0
+    @State private var locallyCreatedTags: Set<String> = []
     
     @State private var tagStates: [String: Bool?] = [:]
     @State private var initialTagStates: [String: Bool?] = [:]
     
     private var sortedTags: [String] { frozenSortedTags }
+
+    private var trimmedSearchText: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
     
     private var displayedTags: [String] {
-        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty { return sortedTags }
-        return sortedTags.filter { $0.localizedStandardContains(trimmed) }
+        if trimmedSearchText.isEmpty { return sortedTags }
+        return sortedTags.filter { $0.localizedStandardContains(trimmedSearchText) }
+    }
+
+    private var canCreateTagFromSearch: Bool {
+        !trimmedSearchText.isEmpty && displayedTags.isEmpty && !sortedTags.contains(trimmedSearchText)
     }
     
     private func computeTagStates() -> [String: Bool?] {
@@ -972,7 +1030,7 @@ struct BatchTagPickerView: View {
     }
     
     private func computeSortedTags() -> [String] {
-        tagManager.tags.sorted { tag1, tag2 in
+        Array(Set(tagManager.tags).union(locallyCreatedTags)).sorted { tag1, tag2 in
             let s1 = tagStates[tag1] ?? nil
             let s2 = tagStates[tag2] ?? nil
             let order1 = s1 == true ? 0 : (s1 == nil ? 1 : 2)
@@ -986,10 +1044,21 @@ struct BatchTagPickerView: View {
         NavigationStack {
             VStack(spacing: 0) {
                 if tagManager.tags.isEmpty {
-                    VStack(spacing: 8) {
+                    VStack(spacing: 12) {
                         Text("还没有标签，点击 + 创建")
                             .font(.subheadline)
                             .foregroundStyle(Color(.secondaryLabel))
+
+                        if canCreateTagFromSearch {
+                            Button(action: createTagFromSearch) {
+                                Label("新增标签 \"\(trimmedSearchText)\"", systemImage: "plus.circle.fill")
+                                    .font(.callout.weight(.medium))
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(Design.primaryColor)
+                            .padding(.horizontal, 16)
+                        }
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 60)
@@ -998,10 +1067,21 @@ struct BatchTagPickerView: View {
                     ScrollView {
                         VStack(spacing: 0) {
                             if displayedTags.isEmpty {
-                                VStack(spacing: 8) {
+                                VStack(spacing: 12) {
                                     Text("没有找到相关标签")
                                         .font(.subheadline)
                                         .foregroundStyle(Color(.secondaryLabel))
+
+                                    if canCreateTagFromSearch {
+                                        Button(action: createTagFromSearch) {
+                                            Label("新增标签 \"\(trimmedSearchText)\"", systemImage: "plus.circle.fill")
+                                                .font(.callout.weight(.medium))
+                                                .frame(maxWidth: .infinity)
+                                        }
+                                        .buttonStyle(.borderedProminent)
+                                        .tint(Design.primaryColor)
+                                        .padding(.horizontal, 16)
+                                    }
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 60)
@@ -1081,6 +1161,20 @@ struct BatchTagPickerView: View {
             case nil:
                 tagStates[tagName] = true
             }
+        }
+    }
+
+    private func createTagFromSearch() {
+        let newTag = trimmedSearchText
+        guard !newTag.isEmpty else { return }
+
+        hapticTrigger += 1
+
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+            locallyCreatedTags.insert(newTag)
+            tagStates[newTag] = true
+            initialTagStates[newTag] = false
+            frozenSortedTags = computeSortedTags()
         }
     }
     
