@@ -133,6 +133,10 @@ class WorkflowManager {
         workflows.filter(\.isOpen)
     }
     
+    var closedWorkflows: [Workflow] {
+        workflows.filter { !$0.isOpen }
+    }
+    
     var nodes: [WorkflowNode] {
         get { selectedWorkflow.nodes }
         set {
@@ -226,6 +230,24 @@ class WorkflowManager {
     func deleteNodes(at offsets: IndexSet) {
         guard let idx = workflows.firstIndex(where: { $0.id == selectedWorkflow.id }) else { return }
         workflows[idx].nodes.remove(atOffsets: offsets)
+        saveWorkflows()
+    }
+    
+    func moveWorkflows(inOpenState isOpen: Bool, from source: IndexSet, to destination: Int) {
+        var subset = workflows.filter { $0.isOpen == isOpen }
+        subset.move(fromOffsets: source, toOffset: destination)
+        
+        let reorderedByID = Dictionary(uniqueKeysWithValues: subset.map { ($0.id, $0) })
+        var reorderedIDs = subset.map(\.id).makeIterator()
+        
+        workflows = workflows.map { workflow in
+            guard workflow.isOpen == isOpen,
+                  let nextID = reorderedIDs.next(),
+                  let replacement = reorderedByID[nextID] else {
+                return workflow
+            }
+            return replacement
+        }
         saveWorkflows()
     }
     

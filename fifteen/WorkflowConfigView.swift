@@ -16,82 +16,30 @@ struct WorkflowConfigView: View {
         NavigationStack {
             List {
                 Section {
-                    ForEach(workflowManager.workflows) { workflow in
-                        let isSelected = workflow.id == workflowManager.selectedWorkflowId
-                        
-                        HStack(spacing: 12) {
-                            Image(systemName: workflow.icon)
-                                .foregroundStyle(isSelected ? primaryColor : Color(.tertiaryLabel))
-                                .font(.system(size: 20))
-                                .frame(width: 28)
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(workflow.name)
-                                    .font(.system(size: 16, weight: isSelected ? .semibold : .regular))
-                                
-                                let enabledCount = workflow.nodes.filter { $0.isEnabled }.count
-                                let totalCount = workflow.nodes.count
-                                Text(workflow.isOpen ? "外部已显示 · \(enabledCount)/\(totalCount) 个节点启用" : "仅配置中 · \(enabledCount)/\(totalCount) 个节点启用")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            if isSelected {
-                                Image(systemName: "checkmark")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(primaryColor)
-                            }
-                            
-                            Button {
-                                workflowManager.toggleWorkflowOpen(workflow.id)
-                            } label: {
-                                Image(systemName: workflow.isOpen ? "eye" : "eye.slash")
-                                    .font(.system(size: 15, weight: .medium))
-                                    .foregroundStyle(workflow.isOpen ? primaryColor : .secondary)
-                                    .frame(width: 28, height: 28)
-                            }
-                            .buttonStyle(.plain)
-                            .disabled(!workflowManager.canCloseWorkflow(workflow.id))
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            workflowManager.selectWorkflow(workflow.id)
-                        }
-                        .contextMenu {
-                            Button {
-                                workflowManager.toggleWorkflowOpen(workflow.id)
-                            } label: {
-                                Label(workflow.isOpen ? "从外部隐藏" : "显示到外部", systemImage: workflow.isOpen ? "eye.slash" : "eye")
-                            }
-                            Button {
-                                iconPickerWorkflowId = workflow.id
-                            } label: {
-                                Label("更换图标", systemImage: "square.grid.2x2")
-                            }
-                            Button {
-                                renamingWorkflowId = workflow.id
-                                renameText = workflow.name
-                                showRenameAlert = true
-                            } label: {
-                                Label("重命名", systemImage: "pencil")
-                            }
-                            Button {
-                                workflowManager.duplicateWorkflow(workflow.id)
-                            } label: {
-                                Label("复制", systemImage: "doc.on.doc")
-                            }
-                            if workflowManager.workflows.count > 1 {
-                                Divider()
-                                Button(role: .destructive) {
-                                    withAnimation { workflowManager.deleteWorkflow(workflow.id) }
-                                } label: {
-                                    Label("删除", systemImage: "trash")
-                                }
-                            }
-                        }
+                    ForEach(workflowManager.openWorkflows) { workflow in
+                        workflowRow(for: workflow)
                     }
+                    .onMove { workflowManager.moveWorkflows(inOpenState: true, from: $0, to: $1) }
+                } header: {
+                    Text("已打开")
+                } footer: {
+                    Text("这些 Workflow 会显示在外部工具栏中，拖动可调整外部展示顺序。")
+                }
+                
+                if !workflowManager.closedWorkflows.isEmpty {
+                    Section {
+                        ForEach(workflowManager.closedWorkflows) { workflow in
+                            workflowRow(for: workflow)
+                        }
+                        .onMove { workflowManager.moveWorkflows(inOpenState: false, from: $0, to: $1) }
+                    } header: {
+                        Text("未打开")
+                    } footer: {
+                        Text("这些 Workflow 仅在配置中保留，不会显示在外部。")
+                    }
+                }
+                
+                Section {
                     
                     Button {
                         let count = workflowManager.workflows.count + 1
@@ -103,7 +51,7 @@ struct WorkflowConfigView: View {
                             .foregroundStyle(.primary)
                     }
                 } header: {
-                    Text("所有 Workflow")
+                    Text("管理")
                 } footer: {
                     Text("点选一个 Workflow 编辑节点，打开的 Workflow 会显示在外部工具栏中。")
                 }
@@ -132,6 +80,9 @@ struct WorkflowConfigView: View {
             .navigationTitle("Workflow 配置")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    EditButton()
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("完成") { dismiss() }
                 }
@@ -161,6 +112,84 @@ struct WorkflowConfigView: View {
             }
         }
     }
+    
+    @ViewBuilder
+    private func workflowRow(for workflow: Workflow) -> some View {
+        let isSelected = workflow.id == workflowManager.selectedWorkflowId
+        
+        HStack(spacing: 12) {
+            Image(systemName: workflow.icon)
+                .foregroundStyle(isSelected ? primaryColor : Color(.tertiaryLabel))
+                .font(.system(size: 20))
+                .frame(width: 28)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(workflow.name)
+                    .font(.system(size: 16, weight: isSelected ? .semibold : .regular))
+                
+                let enabledCount = workflow.nodes.filter { $0.isEnabled }.count
+                let totalCount = workflow.nodes.count
+                Text(workflow.isOpen ? "外部已显示 · \(enabledCount)/\(totalCount) 个节点启用" : "仅配置中 · \(enabledCount)/\(totalCount) 个节点启用")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+            
+            Spacer()
+            
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(primaryColor)
+            }
+            
+            Button {
+                workflowManager.toggleWorkflowOpen(workflow.id)
+            } label: {
+                Image(systemName: workflow.isOpen ? "eye" : "eye.slash")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(workflow.isOpen ? primaryColor : .secondary)
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.plain)
+            .disabled(!workflowManager.canCloseWorkflow(workflow.id))
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            workflowManager.selectWorkflow(workflow.id)
+        }
+        .contextMenu {
+            Button {
+                workflowManager.toggleWorkflowOpen(workflow.id)
+            } label: {
+                Label(workflow.isOpen ? "从外部隐藏" : "显示到外部", systemImage: workflow.isOpen ? "eye.slash" : "eye")
+            }
+            Button {
+                iconPickerWorkflowId = workflow.id
+            } label: {
+                Label("更换图标", systemImage: "square.grid.2x2")
+            }
+            Button {
+                renamingWorkflowId = workflow.id
+                renameText = workflow.name
+                showRenameAlert = true
+            } label: {
+                Label("重命名", systemImage: "pencil")
+            }
+            Button {
+                workflowManager.duplicateWorkflow(workflow.id)
+            } label: {
+                Label("复制", systemImage: "doc.on.doc")
+            }
+            if workflowManager.workflows.count > 1 {
+                Divider()
+                Button(role: .destructive) {
+                    withAnimation { workflowManager.deleteWorkflow(workflow.id) }
+                } label: {
+                    Label("删除", systemImage: "trash")
+                }
+            }
+        }
+    }
 }
 
 
@@ -177,7 +206,7 @@ struct WorkflowListView: View {
     var body: some View {
         NavigationStack {
             List {
-                ForEach(workflowManager.workflows) { workflow in
+                ForEach(workflowManager.openWorkflows) { workflow in
                     let isSelected = workflow.id == workflowManager.selectedWorkflowId
                     
                     HStack(spacing: 12) {
@@ -236,6 +265,46 @@ struct WorkflowListView: View {
                                 withAnimation { workflowManager.deleteWorkflow(workflow.id) }
                             } label: {
                                 Label("删除", systemImage: "trash")
+                            }
+                        }
+                    }
+                }
+                
+                if !workflowManager.closedWorkflows.isEmpty {
+                    Section("未打开") {
+                        ForEach(workflowManager.closedWorkflows) { workflow in
+                            let isSelected = workflow.id == workflowManager.selectedWorkflowId
+                            
+                            HStack(spacing: 12) {
+                                Image(systemName: workflow.icon)
+                                    .foregroundStyle(isSelected ? primaryColor : Color(.tertiaryLabel))
+                                    .font(.system(size: 20))
+                                    .frame(width: 28)
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(workflow.name)
+                                        .font(.system(size: 16, weight: isSelected ? .semibold : .regular))
+                                    
+                                    let enabledCount = workflow.nodes.filter { $0.isEnabled }.count
+                                    let totalCount = workflow.nodes.count
+                                    Text("仅配置中 · \(enabledCount)/\(totalCount) 个节点启用")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.secondary)
+                                }
+                                
+                                Spacer()
+                            }
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                workflowManager.selectWorkflow(workflow.id)
+                                dismiss()
+                            }
+                            .contextMenu {
+                                Button {
+                                    workflowManager.toggleWorkflowOpen(workflow.id)
+                                } label: {
+                                    Label("显示到外部", systemImage: "eye")
+                                }
                             }
                         }
                     }
