@@ -6,7 +6,7 @@ CONFIGURATION ?= Debug
 DERIVED_DATA_PATH ?= .build/DerivedData
 APP_NAME ?= $(SCHEME)
 APP_PATH ?= $(DERIVED_DATA_PATH)/Build/Products/$(CONFIGURATION)-iphoneos/$(APP_NAME).app
-DEVICE_FILTER ?= deviceProperties.bootState == 'booted' AND connectionProperties.pairingState == 'paired'
+DEVICE_FILTER ?= connectionProperties.pairingState == 'paired'
 XCODEBUILD_FLAGS ?= -allowProvisioningUpdates -allowProvisioningDeviceRegistration
 
 .PHONY: help build install devices clean
