@@ -19,9 +19,9 @@ struct WorkflowConfigView: View {
                     }
                     .onMove { workflowManager.moveWorkflows(inOpenState: true, from: $0, to: $1) }
                 } header: {
-                    Text("已打开")
+                    Text("显示中")
                 } footer: {
-                    Text("这些 Workflow 会显示在外部工具栏中，拖动可调整外部展示顺序。")
+                    Text("这些 Workflow 显示在主页工具栏，可拖动排序")
                 }
                 
                 if !workflowManager.closedWorkflows.isEmpty {
@@ -31,9 +31,9 @@ struct WorkflowConfigView: View {
                         }
                         .onMove { workflowManager.moveWorkflows(inOpenState: false, from: $0, to: $1) }
                     } header: {
-                        Text("未打开")
+                        Text("已隐藏")
                     } footer: {
-                        Text("这些 Workflow 仅在配置中保留，不会显示在外部。")
+                        Text("未显示在主页，仅在此处管理")
                     }
                 }
                 
@@ -51,7 +51,7 @@ struct WorkflowConfigView: View {
                 } header: {
                     Text("管理")
                 } footer: {
-                    Text("点选一个 Workflow 编辑节点，打开的 Workflow 会显示在外部工具栏中。")
+                    Text("点选 Workflow 可编辑其节点")
                 }
                 
                 Section {
@@ -63,7 +63,7 @@ struct WorkflowConfigView: View {
                 } header: {
                     Text("处理节点")
                 } footer: {
-                    Text("拖动调整顺序，点击外部的 Workflow 按钮时将按顺序执行启用的节点。")
+                    Text("拖动排序，执行时按从上到下顺序运行")
                 }
                 
                 Section {
@@ -127,7 +127,7 @@ struct WorkflowConfigView: View {
                 
                 let enabledCount = workflow.nodes.filter { $0.isEnabled }.count
                 let totalCount = workflow.nodes.count
-                Text(workflow.isOpen ? "外部已显示 · \(enabledCount)/\(totalCount) 个节点启用" : "仅配置中 · \(enabledCount)/\(totalCount) 个节点启用")
+                Text(workflow.isOpen ? "主页显示 · \(enabledCount)/\(totalCount) 节点启用" : "未在主页显示 · \(enabledCount)/\(totalCount) 节点启用")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -160,7 +160,7 @@ struct WorkflowConfigView: View {
             Button {
                 workflowManager.toggleWorkflowOpen(workflow.id)
             } label: {
-                Label(workflow.isOpen ? "从外部隐藏" : "显示到外部", systemImage: workflow.isOpen ? "eye.slash" : "eye")
+                Label(workflow.isOpen ? "从主页隐藏" : "显示到主页", systemImage: workflow.isOpen ? "eye.slash" : "eye")
             }
             Button {
                 iconPickerWorkflowId = workflow.id
@@ -177,7 +177,7 @@ struct WorkflowConfigView: View {
             Button {
                 workflowManager.duplicateWorkflow(workflow.id)
             } label: {
-                Label("复制", systemImage: "doc.on.doc")
+                Label("创建副本", systemImage: "doc.on.doc")
             }
             if workflowManager.workflows.count > 1 {
                 Divider()
@@ -218,7 +218,7 @@ struct WorkflowListView: View {
                             
                             let enabledCount = workflow.nodes.filter { $0.isEnabled }.count
                             let totalCount = workflow.nodes.count
-                            Text(workflow.isOpen ? "外部已显示 · \(enabledCount)/\(totalCount) 个节点启用" : "仅配置中 · \(enabledCount)/\(totalCount) 个节点启用")
+                            Text(workflow.isOpen ? "主页显示 · \(enabledCount)/\(totalCount) 节点启用" : "未在主页显示 · \(enabledCount)/\(totalCount) 节点启用")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -235,7 +235,7 @@ struct WorkflowListView: View {
                         Button {
                             workflowManager.toggleWorkflowOpen(workflow.id)
                         } label: {
-                            Label(workflow.isOpen ? "从外部隐藏" : "显示到外部", systemImage: workflow.isOpen ? "eye.slash" : "eye")
+                            Label(workflow.isOpen ? "从主页隐藏" : "显示到主页", systemImage: workflow.isOpen ? "eye.slash" : "eye")
                         }
                         Button {
                             iconPickerWorkflowId = workflow.id
@@ -254,7 +254,7 @@ struct WorkflowListView: View {
                         Button {
                             workflowManager.duplicateWorkflow(workflow.id)
                         } label: {
-                            Label("复制", systemImage: "doc.on.doc")
+                            Label("创建副本", systemImage: "doc.on.doc")
                         }
                         
                         if workflowManager.workflows.count > 1 {
@@ -269,7 +269,7 @@ struct WorkflowListView: View {
                 }
                 
                 if !workflowManager.closedWorkflows.isEmpty {
-                    Section("未打开") {
+                    Section("已隐藏") {
                         ForEach(workflowManager.closedWorkflows) { workflow in
                             let isSelected = workflow.id == workflowManager.selectedWorkflowId
                             
@@ -285,7 +285,7 @@ struct WorkflowListView: View {
                                     
                                     let enabledCount = workflow.nodes.filter { $0.isEnabled }.count
                                     let totalCount = workflow.nodes.count
-                                    Text("仅配置中 · \(enabledCount)/\(totalCount) 个节点启用")
+                                    Text("未在主页显示 · \(enabledCount)/\(totalCount) 节点启用")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
@@ -302,7 +302,7 @@ struct WorkflowListView: View {
                                 Button {
                                     workflowManager.toggleWorkflowOpen(workflow.id)
                                 } label: {
-                                    Label("显示到外部", systemImage: "eye")
+                                    Label("显示到主页", systemImage: "eye")
                                 }
                             }
                         }
@@ -465,7 +465,7 @@ struct EditNodeSheet: View {
             Form {
                 if node.type == .aiProcess {
                     Section("提示词") {
-                        TextField("请输入提示词", text: $aiPrompt, axis: .vertical)
+                        TextField("输入 AI 提示词", text: $aiPrompt, axis: .vertical)
                             .lineLimit(5...)
                     }
                 }
@@ -481,7 +481,7 @@ struct EditNodeSheet: View {
                     } header: {
                         Text("HTTP 配置")
                     } footer: {
-                        Text("将输入内容以 POST 请求发送到 http://主机地址:端口")
+                        Text("内容将发送到以下地址")
                     }
                 }
                 

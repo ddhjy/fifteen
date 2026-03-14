@@ -86,7 +86,7 @@ struct SettingsView: View {
                 } header: {
                     Text("AI 配置")
                 } footer: {
-                    Text("用于 Workflow 中的 AI 处理节点")
+                    Text("填写后可在 Workflow 中使用 AI 能力")
                 }
 
                 Section {
@@ -101,7 +101,7 @@ struct SettingsView: View {
                                 Text("实时同步到 AutoPaste")
                                     .font(.callout)
 
-                                Text("把当前草稿实时镜像到同局域网 Mac")
+                                Text("输入时自动同步到局域网内的 Mac")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -118,7 +118,7 @@ struct SettingsView: View {
                 } header: {
                     Text("AutoPaste Sync")
                 } footer: {
-                    Text("填写运行 AutoPaste 的 Mac 局域网 IP 和端口。默认端口为 7788。")
+                    Text("填写 Mac 的局域网 IP，默认端口 7788")
                 }
             }
             .navigationTitle("设置")

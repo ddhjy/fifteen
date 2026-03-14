@@ -122,7 +122,7 @@ struct TagPickerView: View {
                         VStack(spacing: 0) {
                             if displayedTags.isEmpty {
                                 VStack(spacing: 8) {
-                                    Text("无匹配标签")
+                                    Text("没有找到相关标签")
                                         .font(.subheadline)
                                         .foregroundStyle(Color(.secondaryLabel))
                                 }
@@ -232,7 +232,7 @@ struct TagPickerView: View {
     
     private var emptyTagsView: some View {
         VStack(spacing: 8) {
-            Text("暂无标签")
+            Text("点击左上角 + 创建第一个标签")
                 .font(.subheadline)
                 .foregroundStyle(Color(.secondaryLabel))
         }
@@ -920,7 +920,7 @@ struct BatchTagPickerView: View {
             VStack(spacing: 0) {
                 if tagManager.tags.isEmpty {
                     VStack(spacing: 8) {
-                        Text("暂无标签")
+                        Text("还没有标签，点击 + 创建")
                             .font(.subheadline)
                             .foregroundStyle(Color(.secondaryLabel))
                     }
@@ -932,7 +932,7 @@ struct BatchTagPickerView: View {
                         VStack(spacing: 0) {
                             if displayedTags.isEmpty {
                                 VStack(spacing: 8) {
-                                    Text("无匹配标签")
+                                    Text("没有找到相关标签")
                                         .font(.subheadline)
                                         .foregroundStyle(Color(.secondaryLabel))
                                 }
@@ -961,7 +961,7 @@ struct BatchTagPickerView: View {
                 }
             }
             .background(Color(hex: 0xF2F2F6).ignoresSafeArea())
-            .navigationTitle("批量标签 (\(itemIds.count)项)")
+            .navigationTitle("标签 · \(itemIds.count) 条记录")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索标签")
             .toolbar {

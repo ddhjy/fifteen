@@ -296,7 +296,7 @@ class WorkflowManager {
             throw NSError(
                 domain: "WorkflowManager",
                 code: -2,
-                userInfo: [NSLocalizedDescriptionKey: "未找到对应的 Workflow"]
+                userInfo: [NSLocalizedDescriptionKey: "该 Workflow 已不存在"]
             )
         }
         
@@ -327,7 +327,7 @@ class WorkflowManager {
                 let port = node.config.httpPort ?? 9999
                 let urlString = "http://\(host):\(port)"
                 guard let url = URL(string: urlString) else {
-                    throw NSError(domain: "WorkflowManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "无效的 URL: \(urlString)"])
+                    throw NSError(domain: "WorkflowManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "目标地址格式有误，请检查主机和端口"])
                 }
                 var request = URLRequest(url: url)
                 request.httpMethod = "POST"
@@ -335,7 +335,7 @@ class WorkflowManager {
                 request.setValue("text/plain; charset=utf-8", forHTTPHeaderField: "Content-Type")
                 let (_, response) = try await URLSession.shared.data(for: request)
                 if let httpResponse = response as? HTTPURLResponse, !(200...299).contains(httpResponse.statusCode) {
-                    throw NSError(domain: "WorkflowManager", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "HTTP 请求失败，状态码: \(httpResponse.statusCode)"])
+                    throw NSError(domain: "WorkflowManager", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "发送失败，请检查目标地址是否正确"])
                 }
 
             case .copyToClipboard:

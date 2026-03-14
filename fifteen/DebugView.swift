@@ -7,7 +7,7 @@ struct DebugView: View {
         NavigationStack {
             List {
                 Section {
-                    Text("调试功能开关将在此处显示")
+                    Text("调试选项为空")
                         .foregroundStyle(.secondary)
                 }
             }

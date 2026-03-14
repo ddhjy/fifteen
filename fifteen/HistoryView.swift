@@ -173,7 +173,7 @@ struct HistoryView: View {
     }
 
     private var searchPrompt: String {
-        isSearchActive ? "支持多关键词，用空格分隔" : "搜索标签、文本"
+        isSearchActive ? "多个关键词用空格分隔" : "搜索内容或标签"
     }
     
     private func rebuildListCacheAsync() {
@@ -331,7 +331,7 @@ struct HistoryView: View {
         .onChange(of: historyManager.items) { _, _ in
             rebuildListCacheAsync()
         }
-        .alert("确定要删除选中的 \(selectedItems.count) 条记录吗？", isPresented: $showClearConfirmation) {
+        .alert("删除 \(selectedItems.count) 条记录？", isPresented: $showClearConfirmation) {
             Button("取消", role: .cancel) { }
             Button("删除", role: .destructive) {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -339,7 +339,7 @@ struct HistoryView: View {
                 }
             }
         } message: {
-            Text("此操作无法撤销")
+            Text("删除后无法恢复")
         }
         .sheet(item: $tagPickerItem) { item in
             TagPickerView(itemId: item.id)
@@ -504,7 +504,7 @@ struct HistoryView: View {
     private var loadingStateView: some View {
         VStack(spacing: 12) {
             ProgressView()
-            Text("正在加载记录…")
+            Text("加载中…")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -532,12 +532,12 @@ struct HistoryView: View {
             .scaleEffect(appearAnimation ? 1 : 0.8)
             
             VStack(spacing: 8) {
-                Text("暂无记录")
+                Text("还没有记录")
                     .font(.title3.bold())
                     .fontDesign(.rounded)
                     .foregroundStyle(Color(.label))
                 
-                Text("复制的文本会自动保存在这里")
+                Text("在主页写下内容，点击保存即可")
                     .font(.subheadline)
                     .foregroundStyle(Color(.secondaryLabel))
             }
@@ -553,7 +553,7 @@ struct HistoryView: View {
                 .font(.system(size: 40, weight: .light))
                 .foregroundStyle(Color(.tertiaryLabel))
             
-            Text("没有符合筛选条件的记录")
+            Text("当前筛选下没有记录")
                 .font(.callout)
                 .foregroundStyle(Color(.secondaryLabel))
         }
@@ -566,7 +566,7 @@ struct HistoryView: View {
                 .font(.system(size: 40, weight: .light))
                 .foregroundStyle(Color(.tertiaryLabel))
             
-            Text("没有找到 \"\(effectiveSearchText)\"")
+            Text("没有找到「\(effectiveSearchText)」，试试其他关键词")
                 .font(.callout)
                 .foregroundStyle(Color(.secondaryLabel))
         }
@@ -870,7 +870,7 @@ struct HistoryRowView: View {
                 Button {
                     onEdit()
                 } label: {
-                    Label("编辑", systemImage: "checkmark.circle")
+                    Label("选择", systemImage: "checkmark.circle")
                 }
                 
                 Divider()

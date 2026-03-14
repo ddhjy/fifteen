@@ -140,10 +140,10 @@ enum AIServiceError: LocalizedError {
     
     var errorDescription: String? {
         switch self {
-        case .missingToken: return "请先在设置中配置 AI API Token"
-        case .invalidURL: return "无效的 API 地址"
+        case .missingToken: return "请先在设置中填写 AI 密钥"
+        case .invalidURL: return "AI 服务地址异常，请联系管理员"
         case .requestFailed: return "AI 请求失败，请稍后重试"
-        case .emptyResponse: return "AI 返回结果为空"
+        case .emptyResponse: return "AI 未返回结果，请调整提示词后重试"
         }
     }
 }

@@ -75,10 +75,10 @@ struct ContentView: View {
             .sheet(isPresented: $showWorkflowConfig) {
                 WorkflowConfigView()
             }
-            .alert("处理失败", isPresented: $showWorkflowError) {
+            .alert("Workflow 执行出错", isPresented: $showWorkflowError) {
                 Button("确定") { workflowError = nil }
             } message: {
-                Text(workflowError?.localizedDescription ?? "未知错误")
+                Text(workflowError?.localizedDescription ?? "出了点问题，请稍后再试")
             }
 
         }
