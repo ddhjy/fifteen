@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 struct ContentView: View {
     @State private var showHistory: Bool = false
@@ -19,12 +18,12 @@ struct ContentView: View {
     
     @State private var isKeyboardAnimating: Bool = false
     
-    private static var keyboardWorkItem: DispatchWorkItem?
+    @State private var keyboardTask: Task<Void, Never>?
     
-    private static var isFirstLaunch: Bool = true
+    @State private var hasLaunched = false
     
-    private let primaryColor = Color(hex: 0x6366F1)
-    private let warningColor = Color.yellow
+    @State private var showWorkflowError = false
+    @State private var hapticTrigger = 0
     
     private var draftText: String {
         historyManager.currentDraft.text
@@ -46,19 +45,15 @@ struct ContentView: View {
         }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button(action: navigateToHistory) {
-                        Image(systemName: "rectangle.stack")
-                            .font(.system(size: 17, weight: .regular))
-                    }
-                    .tint(.primary)
+                    Button("记录", systemImage: "rectangle.stack", action: navigateToHistory)
+                        .labelStyle(.iconOnly)
+                        .tint(.primary)
                 }
                 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: { showSettings = true }) {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 17, weight: .regular))
-                    }
-                    .tint(.primary)
+                    Button("设置", systemImage: "ellipsis") { showSettings = true }
+                        .labelStyle(.iconOnly)
+                        .tint(.primary)
                 }
             }
 
@@ -80,20 +75,18 @@ struct ContentView: View {
             .sheet(isPresented: $showWorkflowConfig) {
                 WorkflowConfigView()
             }
-            .alert("处理失败", isPresented: Binding(
-                get: { workflowError != nil },
-                set: { if !$0 { workflowError = nil } }
-            )) {
+            .alert("处理失败", isPresented: $showWorkflowError) {
                 Button("确定") { workflowError = nil }
             } message: {
                 Text(workflowError?.localizedDescription ?? "未知错误")
             }
 
         }
+        .sensoryFeedback(.impact(weight: .light), trigger: hapticTrigger)
         .onAppear {
             historyManager.loadItemsIfNeeded()
-            if Self.isFirstLaunch {
-                Self.isFirstLaunch = false
+            if !hasLaunched {
+                hasLaunched = true
                 isTextEditorFocused = true
             } else {
                 scheduleKeyboardShow(delay: 0.5)
@@ -101,8 +94,8 @@ struct ContentView: View {
         }
         .onChange(of: showHistory) { _, isShowing in
             if isShowing {
-                Self.keyboardWorkItem?.cancel()
-                Self.keyboardWorkItem = nil
+                keyboardTask?.cancel()
+                keyboardTask = nil
                 isKeyboardAnimating = false
             } else {
                 scheduleKeyboardShow(delay: 0.5)
@@ -125,11 +118,9 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.leading, 16)
             
-            Button(action: clearText) {
-                Image(systemName: "trash")
-                    .font(.system(size: 20))
-            }
-            .tint(.primary)
+            Button("清除", systemImage: "trash", action: clearText)
+                .labelStyle(.iconOnly)
+                .tint(.primary)
             .padding(14)
             .glassEffect(.regular.interactive(), in: Circle())
             .disabled(processingWorkflowId != nil)
@@ -170,22 +161,22 @@ struct ContentView: View {
                     Image(systemName: "tag")
                         .font(.system(size: 18))
                     
-                    let fontSize: CGFloat = selectedTags.count == 1 ? 13 : 11
+                    let tagFont: Font = selectedTags.count == 1 ? .footnote : .caption
                     
                     VStack(alignment: .leading, spacing: 1) {
                         if let first = selectedTags.first {
                             Text(first)
-                                .font(.system(size: fontSize, weight: .medium))
+                                .font(tagFont)
                                 .lineLimit(1)
                         }
                         if selectedTags.count >= 2 {
                             HStack(spacing: 3) {
                                 Text(selectedTags[1])
-                                    .font(.system(size: fontSize, weight: .medium))
+                                    .font(tagFont)
                                     .lineLimit(1)
                                 if selectedTags.count > 2 {
                                     Text("+\(selectedTags.count - 2)")
-                                        .font(.system(size: fontSize - 1, weight: .regular))
+                                        .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
                             }
@@ -245,7 +236,7 @@ struct ContentView: View {
             ZStack(alignment: .topLeading) {
                 if draftText.isEmpty {
                     Text("开始输入...")
-                        .font(.system(size: 17))
+                        .font(.body)
                         .foregroundStyle(Color(.placeholderText))
                         .padding(.horizontal, 20)
                         .padding(.top, 8)
@@ -268,55 +259,49 @@ struct ContentView: View {
     }
     
     private func scheduleKeyboardShow(delay: Double) {
-        Self.keyboardWorkItem?.cancel()
+        keyboardTask?.cancel()
         
         isKeyboardAnimating = true
         
-        let workItem = DispatchWorkItem { [self] in
-            guard !showHistory else {
+        keyboardTask = Task {
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled, !showHistory else {
                 isKeyboardAnimating = false
                 return
             }
             isTextEditorFocused = true
             
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [self] in
-                guard !showHistory, !isTextEditorFocused else { return }
-                isTextEditorFocused = true
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [self] in
-                guard !showHistory, !isTextEditorFocused else { return }
-                isTextEditorFocused = true
-            }
+            try? await Task.sleep(for: .milliseconds(100))
+            guard !Task.isCancelled, !showHistory, !isTextEditorFocused else { return }
+            isTextEditorFocused = true
             
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [self] in
-                isKeyboardAnimating = false
-            }
+            try? await Task.sleep(for: .milliseconds(100))
+            guard !Task.isCancelled, !showHistory, !isTextEditorFocused else { return }
+            isTextEditorFocused = true
+            
+            try? await Task.sleep(for: .milliseconds(150))
+            isKeyboardAnimating = false
         }
-        Self.keyboardWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
     }
     
     private func navigateToHistory() {
         historyManager.loadItemsIfNeeded()
         isTextEditorFocused = false
         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-        DispatchQueue.main.async {
+        Task { @MainActor in
             showHistory = true
         }
     }
     
     private func clearText() {
-        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-        impactFeedback.impactOccurred()
-        
+        hapticTrigger += 1
         withAnimation(.easeOut(duration: 0.25)) {
             historyManager.clearDraft()
         }
     }
     
     private func handleWorkflowTap(_ workflow: Workflow) {
-        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-        impactFeedback.impactOccurred()
+        hapticTrigger += 1
         
         guard !draftText.isEmpty else { return }
         
@@ -339,8 +324,7 @@ struct ContentView: View {
             guard elapsed < minimumLoadingDuration else { return }
             let remaining = minimumLoadingDuration - elapsed
             guard remaining > 0 else { return }
-            let nanoseconds = UInt64((remaining * 1_000_000_000).rounded(.up))
-            try? await Task.sleep(nanoseconds: nanoseconds)
+            try? await Task.sleep(for: .seconds(remaining))
         }
 
         Task {
@@ -368,6 +352,7 @@ struct ContentView: View {
                 await MainActor.run {
                     processingWorkflowId = nil
                     workflowError = error
+                    showWorkflowError = true
                 }
             }
         }
@@ -375,10 +360,10 @@ struct ContentView: View {
     
     private func workflowTintColor(for workflow: Workflow) -> Color {
         if processingWorkflowId == workflow.id {
-            return primaryColor
+            return Design.primaryColor
         }
         
-        return workflowManager.areTerminalNodesAllDisabled(for: workflow) ? warningColor : .primary
+        return workflowManager.areTerminalNodesAllDisabled(for: workflow) ? Color.yellow : .primary
     }
     
     private func performSave(text: String) {
@@ -466,17 +451,6 @@ struct DraftTextView: UIViewRepresentable {
     }
 }
 
-extension Color {
-    init(hex: UInt, alpha: Double = 1.0) {
-        self.init(
-            .sRGB,
-            red: Double((hex >> 16) & 0xFF) / 255.0,
-            green: Double((hex >> 8) & 0xFF) / 255.0,
-            blue: Double(hex & 0xFF) / 255.0,
-            opacity: alpha
-        )
-    }
-}
 
 #Preview {
     ContentView()

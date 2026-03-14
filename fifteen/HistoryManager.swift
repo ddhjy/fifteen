@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-struct HistoryItem: Identifiable, Equatable {
+nonisolated struct HistoryItem: Identifiable, Equatable, Sendable {
     let id: UUID
     var fileName: String
     var text: String
@@ -10,7 +10,7 @@ struct HistoryItem: Identifiable, Equatable {
     var tags: [String]
     var isDraft: Bool
     
-    init(id: UUID = UUID(), fileName: String = "", text: String = "", createdAt: Date = Date(), description: String = "", tags: [String] = [], isDraft: Bool = false) {
+    init(id: UUID = UUID(), fileName: String = "", text: String = "", createdAt: Date = .now, description: String = "", tags: [String] = [], isDraft: Bool = false) {
         self.id = id
         self.fileName = fileName
         self.text = text
@@ -46,6 +46,7 @@ struct HistoryItem: Identifiable, Equatable {
     }
 }
 
+@MainActor
 @Observable
 class TagManager {
     static let shared = TagManager()
@@ -75,12 +76,12 @@ class TagManager {
         tags = saved
     }
     
-    struct Snapshot {
+    nonisolated struct Snapshot: Sendable {
         let tags: [String]
         let counts: [String: Int]
     }
 
-    static func snapshot(from items: [HistoryItem]) -> Snapshot {
+    nonisolated static func snapshot(from items: [HistoryItem]) -> Snapshot {
         var uniqueTags = Set<String>()
         var counts: [String: Int] = [:]
 
@@ -142,6 +143,7 @@ class TagManager {
     }
 }
 
+@MainActor
 @Observable
 class HistoryManager {
     static let shared = HistoryManager()
@@ -204,7 +206,7 @@ class HistoryManager {
         
         TagManager.shared.saveLastSelectedTags(draft.tags)
         
-        let now = Date()
+        let now = Date.now
         let fileName = generateFileName(for: now)
         let finalItem = HistoryItem(
             id: draft.id,
@@ -296,7 +298,7 @@ class HistoryManager {
         Self.resolveStorageURL(using: fileManager)
     }
 
-    private static func resolveStorageURL(using fileManager: FileManager) -> URL {
+    nonisolated private static func resolveStorageURL(using fileManager: FileManager) -> URL {
         if let containerURL = fileManager.url(forUbiquityContainerIdentifier: nil) {
             let documentsURL = containerURL.appendingPathComponent("Documents")
             
@@ -308,8 +310,7 @@ class HistoryManager {
             return documentsURL
         }
         
-        let localURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Records")
+        let localURL = URL.documentsDirectory.appending(path: "Records")
         
         if !fileManager.fileExists(atPath: localURL.path) {
             try? fileManager.createDirectory(at: localURL, withIntermediateDirectories: true)
@@ -324,7 +325,7 @@ class HistoryManager {
     }
     
     private func parseDate(from fileName: String) -> Date? {
-        let name = fileName.replacingOccurrences(of: ".md", with: "")
+        let name = fileName.replacing(".md", with: "")
         return dateFormatter.date(from: name)
     }
     
@@ -332,7 +333,7 @@ class HistoryManager {
         Self.parseMarkdownFile(content: content)
     }
 
-    private static func parseMarkdownFile(content: String) -> (description: String, tags: [String], body: String)? {
+    nonisolated private static func parseMarkdownFile(content: String) -> (description: String, tags: [String], body: String)? {
         let lines = content.components(separatedBy: "\n")
         
         guard lines.first == "---" else {
@@ -360,12 +361,12 @@ class HistoryManager {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             
             if trimmed.hasPrefix("description:") {
-                let value = trimmed.replacingOccurrences(of: "description:", with: "").trimmingCharacters(in: .whitespaces)
+                let value = trimmed.replacing("description:", with: "").trimmingCharacters(in: .whitespaces)
                 description = value.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
             } else if trimmed.hasPrefix("tags:") {
                 inTags = true
             } else if inTags && trimmed.hasPrefix("- ") {
-                let tagValue = trimmed.replacingOccurrences(of: "- ", with: "").trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+                let tagValue = trimmed.replacing("- ", with: "").trimmingCharacters(in: CharacterSet(charactersIn: "\""))
                 if !tagValue.isEmpty {
                     tags.append(tagValue)
                 }
@@ -384,14 +385,14 @@ class HistoryManager {
         return (description, tags, body)
     }
 
-    private struct DiskLoadResult {
+    nonisolated private struct DiskLoadResult: Sendable {
         let storageURL: URL
         let loadedItems: [HistoryItem]
         let draft: HistoryItem?
         let tagSnapshot: TagManager.Snapshot
     }
 
-    private static func loadItemsFromDisk(
+    nonisolated private static func loadItemsFromDisk(
         fileManager: FileManager,
         cachedStorageURL: URL?,
         draftFileName: String
@@ -413,7 +414,7 @@ class HistoryManager {
                 let fileName = fileURL.lastPathComponent
                 if fileName == draftFileName { continue }
 
-                let name = fileName.replacingOccurrences(of: ".md", with: "")
+                let name = fileName.replacing(".md", with: "")
                 guard let createdAt = dateFormatter.date(from: name) else { continue }
 
                 guard let content = try? String(contentsOf: fileURL, encoding: .utf8),
@@ -497,7 +498,7 @@ class HistoryManager {
             deleteRecord(existingItem)
         }
         
-        let now = Date()
+        let now = Date.now
         let fileName = generateFileName(for: now)
         let description = String(text.prefix(50))
         let content = generateMarkdownContent(text: text, description: description, tags: tags, createdAt: now)
@@ -702,14 +703,14 @@ class HistoryManager {
         let cachedStorageURL = self._cachedStorageURL
         let draftFileName = self.draftFileName
 
-        DispatchQueue.global(qos: .userInitiated).async {
+        Task.detached(priority: .userInitiated) {
             let result = Self.loadItemsFromDisk(
                 fileManager: fileManager,
                 cachedStorageURL: cachedStorageURL,
                 draftFileName: draftFileName
             )
 
-            DispatchQueue.main.async {
+            await MainActor.run {
                 self.mergeLoadedItems(result)
             }
         }
@@ -739,7 +740,7 @@ class HistoryManager {
         
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd_HHmmss"
-        let zipName = "Notes_\(dateFormatter.string(from: Date())).zip"
+        let zipName = "Notes_\(dateFormatter.string(from: Date.now)).zip"
         let zipURL = fileManager.temporaryDirectory.appendingPathComponent(zipName)
         
         try? fileManager.removeItem(at: zipURL)

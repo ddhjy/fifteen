@@ -10,8 +10,6 @@ struct WorkflowConfigView: View {
     @State private var renamingWorkflowId: UUID? = nil
     @State private var iconPickerWorkflowId: UUID? = nil
     
-    private let primaryColor = Color(hex: 0x6366F1)
-    
     var body: some View {
         NavigationStack {
             List {
@@ -119,18 +117,18 @@ struct WorkflowConfigView: View {
         
         HStack(spacing: 12) {
             Image(systemName: workflow.icon)
-                .foregroundStyle(isSelected ? primaryColor : Color(.tertiaryLabel))
+                .foregroundStyle(isSelected ? Design.primaryColor : Color(.tertiaryLabel))
                 .font(.system(size: 20))
                 .frame(width: 28)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(workflow.name)
-                    .font(.system(size: 16, weight: isSelected ? .semibold : .regular))
+                    .font(isSelected ? .callout.bold() : .callout)
                 
                 let enabledCount = workflow.nodes.filter { $0.isEnabled }.count
                 let totalCount = workflow.nodes.count
                 Text(workflow.isOpen ? "外部已显示 · \(enabledCount)/\(totalCount) 个节点启用" : "仅配置中 · \(enabledCount)/\(totalCount) 个节点启用")
-                    .font(.system(size: 12))
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
             
@@ -139,7 +137,7 @@ struct WorkflowConfigView: View {
             if isSelected {
                 Image(systemName: "checkmark")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(primaryColor)
+                    .foregroundStyle(Design.primaryColor)
             }
             
             Button {
@@ -147,7 +145,7 @@ struct WorkflowConfigView: View {
             } label: {
                 Image(systemName: workflow.isOpen ? "eye" : "eye.slash")
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(workflow.isOpen ? primaryColor : .secondary)
+                    .foregroundStyle(workflow.isOpen ? Design.primaryColor : .secondary)
                     .frame(width: 28, height: 28)
             }
             .buttonStyle(.plain)
@@ -157,6 +155,7 @@ struct WorkflowConfigView: View {
         .onTapGesture {
             workflowManager.selectWorkflow(workflow.id)
         }
+        .accessibilityAddTraits(.isButton)
         .contextMenu {
             Button {
                 workflowManager.toggleWorkflowOpen(workflow.id)
@@ -201,8 +200,6 @@ struct WorkflowListView: View {
     @State private var renamingWorkflowId: UUID? = nil
     @State private var iconPickerWorkflowId: UUID? = nil
     
-    private let primaryColor = Color(hex: 0x6366F1)
-    
     var body: some View {
         NavigationStack {
             List {
@@ -211,18 +208,18 @@ struct WorkflowListView: View {
                     
                     HStack(spacing: 12) {
                         Image(systemName: workflow.icon)
-                            .foregroundStyle(isSelected ? primaryColor : Color(.tertiaryLabel))
+                            .foregroundStyle(isSelected ? Design.primaryColor : Color(.tertiaryLabel))
                             .font(.system(size: 20))
                             .frame(width: 28)
                         
                         VStack(alignment: .leading, spacing: 2) {
                             Text(workflow.name)
-                                .font(.system(size: 16, weight: isSelected ? .semibold : .regular))
+                                .font(isSelected ? .callout.bold() : .callout)
                             
                             let enabledCount = workflow.nodes.filter { $0.isEnabled }.count
                             let totalCount = workflow.nodes.count
                             Text(workflow.isOpen ? "外部已显示 · \(enabledCount)/\(totalCount) 个节点启用" : "仅配置中 · \(enabledCount)/\(totalCount) 个节点启用")
-                                .font(.system(size: 12))
+                                .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                         
@@ -233,6 +230,7 @@ struct WorkflowListView: View {
                         workflowManager.selectWorkflow(workflow.id)
                         dismiss()
                     }
+                    .accessibilityAddTraits(.isButton)
                     .contextMenu {
                         Button {
                             workflowManager.toggleWorkflowOpen(workflow.id)
@@ -277,18 +275,18 @@ struct WorkflowListView: View {
                             
                             HStack(spacing: 12) {
                                 Image(systemName: workflow.icon)
-                                    .foregroundStyle(isSelected ? primaryColor : Color(.tertiaryLabel))
+                                    .foregroundStyle(isSelected ? Design.primaryColor : Color(.tertiaryLabel))
                                     .font(.system(size: 20))
                                     .frame(width: 28)
                                 
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(workflow.name)
-                                        .font(.system(size: 16, weight: isSelected ? .semibold : .regular))
+                                        .font(isSelected ? .callout.bold() : .callout)
                                     
                                     let enabledCount = workflow.nodes.filter { $0.isEnabled }.count
                                     let totalCount = workflow.nodes.count
                                     Text("仅配置中 · \(enabledCount)/\(totalCount) 个节点启用")
-                                        .font(.system(size: 12))
+                                        .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
                                 
@@ -299,6 +297,7 @@ struct WorkflowListView: View {
                                 workflowManager.selectWorkflow(workflow.id)
                                 dismiss()
                             }
+                            .accessibilityAddTraits(.isButton)
                             .contextMenu {
                                 Button {
                                     workflowManager.toggleWorkflowOpen(workflow.id)
@@ -367,8 +366,6 @@ struct NodeRowView: View {
     let onEdit: () -> Void
     @State private var workflowManager = WorkflowManager.shared
     
-    private let primaryColor = Color(hex: 0x6366F1)
-    
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: node.type.icon)
@@ -378,11 +375,11 @@ struct NodeRowView: View {
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(node.type.displayName)
-                    .font(.system(size: 16))
+                    .font(.callout)
                 
                 if node.type == .aiProcess, let prompt = node.config.aiPrompt {
                     Text(prompt)
-                        .font(.system(size: 12))
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -391,7 +388,7 @@ struct NodeRowView: View {
                     let host = node.config.httpHost ?? "localhost"
                     let port = node.config.httpPort ?? 9999
                     Text("\(host):\(port)")
-                        .font(.system(size: 12))
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -411,6 +408,7 @@ struct NodeRowView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { onEdit() }
+        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -418,8 +416,6 @@ struct NodeRowView: View {
 struct AddNodeSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var workflowManager = WorkflowManager.shared
-    
-    private let primaryColor = Color(hex: 0x6366F1)
     
     var body: some View {
         NavigationStack {
@@ -441,13 +437,13 @@ struct AddNodeSheet: View {
                 }
             }
             .listStyle(.insetGrouped)
-            .tint(primaryColor)
+            .tint(Design.primaryColor)
             .navigationTitle("添加节点")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("取消") { dismiss() }
-                        .tint(primaryColor)
+                        .tint(Design.primaryColor)
                 }
             }
         }
@@ -464,23 +460,21 @@ struct EditNodeSheet: View {
     @State private var httpHost: String = ""
     @State private var httpPort: String = ""
     
-    private let primaryColor = Color(hex: 0x6366F1)
-    
     var body: some View {
         NavigationStack {
             Form {
                 if node.type == .aiProcess {
                     Section("提示词") {
-                        TextEditor(text: $aiPrompt)
-                            .frame(minHeight: 120)
+                        TextField("请输入提示词", text: $aiPrompt, axis: .vertical)
+                            .lineLimit(5...)
                     }
                 }
                 
                 if node.type == .httpPost {
                     Section {
                         TextField("主机地址", text: $httpHost)
-                            .autocapitalization(.none)
-                            .disableAutocorrection(true)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
                             .keyboardType(.URL)
                         TextField("端口", text: $httpPort)
                             .keyboardType(.numberPad)
@@ -530,8 +524,6 @@ struct IconPickerView: View {
     
     @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
-    
-    private let primaryColor = Color(hex: 0x6366F1)
     
     private let icons: [(category: String, symbols: [String])] = [
         ("常用", [
@@ -633,7 +625,7 @@ struct IconPickerView: View {
                     ForEach(filteredIcons, id: \.category) { group in
                         VStack(alignment: .leading, spacing: 10) {
                             Text(group.category)
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.footnote.bold())
                                 .foregroundStyle(.secondary)
                                 .padding(.horizontal, 4)
                             
@@ -649,8 +641,8 @@ struct IconPickerView: View {
                                             .frame(width: 48, height: 48)
                                             .foregroundStyle(isSelected ? .white : .primary)
                                             .background(
-                                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                    .fill(isSelected ? primaryColor : Color(.tertiarySystemFill))
+                                                RoundedRectangle(cornerRadius: 10)
+                                                    .fill(isSelected ? Design.primaryColor : Color(.tertiarySystemFill))
                                             )
                                     }
                                     .buttonStyle(.plain)

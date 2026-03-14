@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 struct TagPickerView: View {
     let itemId: UUID
@@ -24,6 +23,8 @@ struct TagPickerView: View {
     
     @State private var hasStartedReselection: Bool = false
 
+    @State private var hapticTrigger = 0
+
     @State private var recommendedTags: [String] = []
     @State private var recommendationTask: Task<Void, Never>? = nil
     
@@ -44,7 +45,7 @@ struct TagPickerView: View {
         if trimmed.isEmpty {
             return sortedTags
         }
-        return sortedTags.filter { $0.localizedCaseInsensitiveContains(trimmed) }
+        return sortedTags.filter { $0.localizedStandardContains(trimmed) }
     }
     
     private func computeInitialSortedTags(recommendedTags: [String] = []) -> [String] {
@@ -122,7 +123,7 @@ struct TagPickerView: View {
                             if displayedTags.isEmpty {
                                 VStack(spacing: 8) {
                                     Text("无匹配标签")
-                                        .font(.system(size: 15))
+                                        .font(.subheadline)
                                         .foregroundStyle(Color(.secondaryLabel))
                                 }
                                 .frame(maxWidth: .infinity)
@@ -171,7 +172,7 @@ struct TagPickerView: View {
                     Button("完成") {
                         dismiss()
                     }
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.callout.bold())
                     .tint(.primary)
                 }
             }
@@ -192,6 +193,7 @@ struct TagPickerView: View {
                     pendingRenameOperation = (from: tagName, to: newName)
                 }
             }
+        .sensoryFeedback(.impact(weight: .light), trigger: hapticTrigger)
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
@@ -231,7 +233,7 @@ struct TagPickerView: View {
     private var emptyTagsView: some View {
         VStack(spacing: 8) {
             Text("暂无标签")
-                .font(.system(size: 15))
+                .font(.subheadline)
                 .foregroundStyle(Color(.secondaryLabel))
         }
         .frame(maxWidth: .infinity)
@@ -239,8 +241,7 @@ struct TagPickerView: View {
     }
     
     private func toggleTag(_ tagName: String) {
-        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-        impactFeedback.impactOccurred()
+        hapticTrigger += 1
         
         withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
             if reselectMode && !hasStartedReselection {
@@ -265,7 +266,7 @@ struct TagRowView: View {
     
     private var circleColor: Color {
         if isSelected {
-            return Color(hex: 0x6366F1)
+            return Design.primaryColor
         } else if isPreviousSelected {
             return Color(.systemGray3)
         } else {
@@ -292,7 +293,7 @@ struct TagRowView: View {
             }
             
             Text(tagName)
-                .font(.system(size: 16, weight: .regular))
+                .font(.callout)
                 .foregroundStyle(Color(.label))
             
             Spacer()
@@ -302,7 +303,7 @@ struct TagRowView: View {
                     Image(systemName: "pencil")
                         .font(.system(size: 14))
                         .foregroundStyle(Color(.secondaryLabel))
-                        .frame(width: 32, height: 32)
+                        .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -314,6 +315,7 @@ struct TagRowView: View {
         .onTapGesture {
             onToggle()
         }
+        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -326,16 +328,17 @@ struct TagEditSheet: View {
     var onSave: ((String) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var newTagName: String = ""
+    @State private var hapticTrigger = 0
     @FocusState private var isInputFocused: Bool
     
     var body: some View {
         NavigationStack {
             VStack(spacing: 24) {
                 TextField("标签名称", text: $newTagName)
-                    .font(.system(size: 17))
+                    .font(.body)
                     .padding(16)
                     .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: 12)
                             .fill(.regularMaterial)
                     )
                     .padding(.horizontal, 16)
@@ -362,7 +365,7 @@ struct TagEditSheet: View {
                     Button("保存") {
                         saveTag()
                     }
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.callout.bold())
                     .tint(.primary)
                     .disabled(newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
@@ -371,14 +374,14 @@ struct TagEditSheet: View {
                 newTagName = tagName
                 isInputFocused = true
             }
+        .sensoryFeedback(.impact(weight: .medium), trigger: hapticTrigger)
         }
         .presentationDetents([.height(200)])
         .presentationDragIndicator(.visible)
     }
     
     private func saveTag() {
-        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-        impactFeedback.impactOccurred()
+        hapticTrigger += 1
         
         let trimmedName = newTagName.trimmingCharacters(in: .whitespacesAndNewlines)
         if let onSave = onSave {
@@ -395,16 +398,17 @@ struct TagCreateSheet: View {
     @State private var historyManager = HistoryManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var tagName: String = ""
+    @State private var hapticTrigger = 0
     @FocusState private var isInputFocused: Bool
     
     var body: some View {
         NavigationStack {
             VStack(spacing: 24) {
                 TextField("标签名称", text: $tagName)
-                    .font(.system(size: 17))
+                    .font(.body)
                     .padding(16)
                     .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: 12)
                             .fill(.regularMaterial)
                     )
                     .padding(.horizontal, 16)
@@ -431,7 +435,7 @@ struct TagCreateSheet: View {
                     Button("添加") {
                         addTag()
                     }
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.callout.bold())
                     .tint(.primary)
                     .disabled(tagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
@@ -439,14 +443,14 @@ struct TagCreateSheet: View {
             .onAppear {
                 isInputFocused = true
             }
+        .sensoryFeedback(.impact(weight: .medium), trigger: hapticTrigger)
         }
         .presentationDetents([.height(200)])
         .presentationDragIndicator(.visible)
     }
     
     private func addTag() {
-        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-        impactFeedback.impactOccurred()
+        hapticTrigger += 1
         
         historyManager.addTag(to: itemId, tagName: tagName)
         dismiss()
@@ -458,7 +462,7 @@ struct TagBadgeView: View {
     
     var body: some View {
         Text(tagName)
-            .font(.system(size: 11, weight: .medium))
+            .font(.caption)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(
@@ -469,12 +473,12 @@ struct TagBadgeView: View {
     }
 }
 
-enum TagSelectionState: Equatable {
+nonisolated enum TagSelectionState: Equatable, Sendable {
     case positive
     case negative
 }
 
-struct TagSelection: Equatable {
+nonisolated struct TagSelection: Equatable, Sendable {
     var tag: String
     var state: TagSelectionState
     
@@ -528,7 +532,7 @@ struct TagFilterBar: View {
                     let availableTagsWithCounts = getAvailableTagsWithCounts(at: level, availableTagsFromItems: availableTagsFromItems)
                     
                     if !availableTagsWithCounts.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
+                        ScrollView(.horizontal) {
                             HStack(spacing: 8) {
                                 FilterChip(
                                     title: "全部",
@@ -573,6 +577,7 @@ struct TagFilterBar: View {
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
                         }
+                        .scrollIndicators(.hidden)
                     }
                 }
             }
@@ -719,30 +724,28 @@ struct FilterChip: View {
     var count: Int? = nil
     let action: () -> Void
     
+    @State private var hapticTrigger = 0
+    
     private var isSelected: Bool { selectionState != nil }
     private var isNegative: Bool { selectionState == .negative }
     
-    private var primaryColor: Color { Color(hex: 0x6366F1) }
-    private var negativeColor: Color { Color(hex: 0xEF4444) }
-    
     private var activeColor: Color {
-        isNegative ? negativeColor : primaryColor
+        isNegative ? Design.negativeColor : Design.primaryColor
     }
     
     var body: some View {
         Button(action: {
-            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-            impactFeedback.impactOccurred()
+            hapticTrigger += 1
             action()
         }) {
             HStack(spacing: 4) {
                 Text(title)
-                    .font(.system(size: 13, weight: .medium))
-                    .strikethrough(isNegative, color: negativeColor)
+                    .font(.footnote)
+                    .strikethrough(isNegative, color: Design.negativeColor)
                 
                 if let count = count {
                     Text("\(count)")
-                        .font(.system(size: 11, weight: .regular))
+                        .font(.caption)
                         .foregroundStyle(isSelected ? activeColor.opacity(0.7) : Color(.tertiaryLabel))
                 }
             }
@@ -755,6 +758,7 @@ struct FilterChip: View {
             .foregroundStyle(isSelected ? activeColor : Color(.secondaryLabel))
         }
         .buttonStyle(.plain)
+        .sensoryFeedback(.impact(weight: .light), trigger: hapticTrigger)
         .animation(.none, value: selectionState)
     }
 }
@@ -766,13 +770,14 @@ struct FilterIconChip: View {
     var usesDiceHaptics: Bool = false
     let action: () -> Void
 
+    @State private var hapticTrigger = 0
+
     var body: some View {
         Button(action: {
             if usesDiceHaptics {
                 playDiceHaptics()
             } else {
-                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                impactFeedback.impactOccurred()
+                hapticTrigger += 1
             }
             action()
         }) {
@@ -783,30 +788,34 @@ struct FilterIconChip: View {
                 .padding(.vertical, 8)
                 .background(
                     Capsule()
-                        .fill(isSelected ? Color(hex: 0x6366F1).opacity(0.15) : Color(.tertiarySystemFill))
+                        .fill(isSelected ? Design.primaryColor.opacity(0.15) : Color(.tertiarySystemFill))
                 )
-                .foregroundStyle(isSelected ? Color(hex: 0x6366F1) : Color(.secondaryLabel))
+                .foregroundStyle(isSelected ? Design.primaryColor : Color(.secondaryLabel))
         }
         .buttonStyle(.plain)
+        .sensoryFeedback(.impact(weight: .light), trigger: hapticTrigger)
         .accessibilityLabel(accessibilityLabel)
         .animation(.none, value: isSelected)
     }
     
     private func playDiceHaptics() {
-        let generator = UIImpactFeedbackGenerator(style: .rigid)
-        generator.prepare()
-        
-        let pattern: [(delay: Double, intensity: CGFloat)] = [
-            (0.00, 0.90),
-            (0.06, 0.55),
-            (0.12, 0.75),
-            (0.18, 0.50),
-            (0.24, 0.70),
-            (0.30, 0.45)
-        ]
-        
-        for step in pattern {
-            DispatchQueue.main.asyncAfter(deadline: .now() + step.delay) {
+        Task { @MainActor in
+            let generator = UIImpactFeedbackGenerator(style: .rigid)
+            generator.prepare()
+            
+            let steps: [(delay: Duration, intensity: CGFloat)] = [
+                (.zero, 0.90),
+                (.milliseconds(60), 0.55),
+                (.milliseconds(60), 0.75),
+                (.milliseconds(60), 0.50),
+                (.milliseconds(60), 0.70),
+                (.milliseconds(60), 0.45)
+            ]
+            
+            for step in steps {
+                if step.delay > .zero {
+                    try? await Task.sleep(for: step.delay)
+                }
                 generator.impactOccurred(intensity: step.intensity)
             }
         }
@@ -819,20 +828,18 @@ struct FilterIconChipWithState: View {
     let selectionState: TagSelectionState?
     let action: () -> Void
     
+    @State private var hapticTrigger = 0
+    
     private var isSelected: Bool { selectionState != nil }
     private var isNegative: Bool { selectionState == .negative }
     
-    private var primaryColor: Color { Color(hex: 0x6366F1) }
-    private var negativeColor: Color { Color(hex: 0xEF4444) }
-    
     private var activeColor: Color {
-        isNegative ? negativeColor : primaryColor
+        isNegative ? Design.negativeColor : Design.primaryColor
     }
 
     var body: some View {
         Button(action: {
-            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-            impactFeedback.impactOccurred()
+            hapticTrigger += 1
             action()
         }) {
             Image(systemName: systemImage)
@@ -848,11 +855,12 @@ struct FilterIconChipWithState: View {
                 .overlay(
                     isNegative ? 
                         Capsule()
-                            .stroke(negativeColor.opacity(0.3), lineWidth: 1)
+                            .stroke(Design.negativeColor.opacity(0.3), lineWidth: 1)
                         : nil
                 )
         }
         .buttonStyle(.plain)
+        .sensoryFeedback(.impact(weight: .light), trigger: hapticTrigger)
         .accessibilityLabel(accessibilityLabel)
         .animation(.none, value: selectionState)
     }
@@ -867,6 +875,7 @@ struct BatchTagPickerView: View {
     @State private var showCreateTag = false
     @State private var searchText: String = ""
     @State private var frozenSortedTags: [String] = []
+    @State private var hapticTrigger = 0
     
     @State private var tagStates: [String: Bool?] = [:]
     @State private var initialTagStates: [String: Bool?] = [:]
@@ -876,7 +885,7 @@ struct BatchTagPickerView: View {
     private var displayedTags: [String] {
         let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return sortedTags }
-        return sortedTags.filter { $0.localizedCaseInsensitiveContains(trimmed) }
+        return sortedTags.filter { $0.localizedStandardContains(trimmed) }
     }
     
     private func computeTagStates() -> [String: Bool?] {
@@ -912,7 +921,7 @@ struct BatchTagPickerView: View {
                 if tagManager.tags.isEmpty {
                     VStack(spacing: 8) {
                         Text("暂无标签")
-                            .font(.system(size: 15))
+                            .font(.subheadline)
                             .foregroundStyle(Color(.secondaryLabel))
                     }
                     .frame(maxWidth: .infinity)
@@ -924,7 +933,7 @@ struct BatchTagPickerView: View {
                             if displayedTags.isEmpty {
                                 VStack(spacing: 8) {
                                     Text("无匹配标签")
-                                        .font(.system(size: 15))
+                                        .font(.subheadline)
                                         .foregroundStyle(Color(.secondaryLabel))
                                 }
                                 .frame(maxWidth: .infinity)
@@ -964,7 +973,7 @@ struct BatchTagPickerView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("完成") { dismiss() }
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.callout.bold())
                         .tint(.primary)
                 }
             }
@@ -978,6 +987,7 @@ struct BatchTagPickerView: View {
             }) {
                 TagCreateSheet(itemId: itemIds.first ?? UUID())
             }
+        .sensoryFeedback(.impact(weight: .light), trigger: hapticTrigger)
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
@@ -992,8 +1002,7 @@ struct BatchTagPickerView: View {
     }
     
     private func toggleTag(_ tagName: String) {
-        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-        impactFeedback.impactOccurred()
+        hapticTrigger += 1
         
         withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
             let current = tagStates[tagName] ?? nil
@@ -1032,8 +1041,8 @@ struct BatchTagRowView: View {
     
     private var circleColor: Color {
         switch state {
-        case true: return Color(hex: 0x6366F1)
-        case nil: return Color(hex: 0x6366F1).opacity(0.5)
+        case true: return Design.primaryColor
+        case nil: return Design.primaryColor.opacity(0.5)
         default: return Color(.secondaryLabel)
         }
     }
@@ -1063,7 +1072,7 @@ struct BatchTagRowView: View {
             }
             
             Text(tagName)
-                .font(.system(size: 16, weight: .regular))
+                .font(.callout)
                 .foregroundStyle(Color(.label))
             
             Spacer()
@@ -1072,6 +1081,7 @@ struct BatchTagRowView: View {
         .padding(.vertical, 14)
         .contentShape(Rectangle())
         .onTapGesture { onToggle() }
+        .accessibilityAddTraits(.isButton)
     }
 }
 

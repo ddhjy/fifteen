@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 @Observable
 class SettingsManager {
     static let shared = SettingsManager()
@@ -12,9 +13,9 @@ class SettingsManager {
     var aiApiToken: String? {
         didSet {
             if let token = aiApiToken {
-                UserDefaults.standard.set(token, forKey: aiApiTokenKey)
+                KeychainHelper.saveString(token, forKey: aiApiTokenKey)
             } else {
-                UserDefaults.standard.removeObject(forKey: aiApiTokenKey)
+                KeychainHelper.delete(forKey: aiApiTokenKey)
             }
         }
     }
@@ -46,7 +47,11 @@ class SettingsManager {
     }
     
     private init() {
-        self.aiApiToken = UserDefaults.standard.string(forKey: aiApiTokenKey)
+        if let legacyToken = UserDefaults.standard.string(forKey: aiApiTokenKey) {
+            KeychainHelper.saveString(legacyToken, forKey: aiApiTokenKey)
+            UserDefaults.standard.removeObject(forKey: aiApiTokenKey)
+        }
+        self.aiApiToken = KeychainHelper.loadString(forKey: aiApiTokenKey)
         self.autoPasteSyncEnabled = UserDefaults.standard.bool(forKey: autoPasteSyncEnabledKey)
         self.autoPasteHost = UserDefaults.standard.string(forKey: autoPasteHostKey) ?? ""
 
@@ -69,7 +74,6 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var settingsManager = SettingsManager.shared
     
-    private let primaryColor = Color(red: 99/255, green: 102/255, blue: 241/255)
     
     var body: some View {
         NavigationStack {
@@ -89,34 +93,28 @@ struct SettingsView: View {
                     Toggle(isOn: $settingsManager.autoPasteSyncEnabled) {
                         HStack(spacing: 12) {
                             Image(systemName: "wave.3.right")
-                                .font(.system(size: 20))
+                                .font(.title3)
                                 .foregroundStyle(.primary)
                                 .frame(width: 28)
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("实时同步到 AutoPaste")
-                                    .font(.system(size: 16, weight: .regular))
+                                    .font(.callout)
 
                                 Text("把当前草稿实时镜像到同局域网 Mac")
-                                    .font(.system(size: 12))
+                                    .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
                         }
                     }
-                    .tint(primaryColor)
+                    .tint(Design.primaryColor)
 
                     TextField("AutoPaste 主机地址", text: $settingsManager.autoPasteHost)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
 
-                    TextField("AutoPaste 端口", text: Binding(
-                        get: { String(settingsManager.autoPastePort) },
-                        set: { newValue in
-                            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-                            settingsManager.autoPastePort = Int(trimmed) ?? 7788
-                        }
-                    ))
-                    .keyboardType(.numberPad)
+                    TextField("AutoPaste 端口", value: $settingsManager.autoPastePort, format: .number)
+                        .keyboardType(.numberPad)
                 } header: {
                     Text("AutoPaste Sync")
                 } footer: {
@@ -130,7 +128,7 @@ struct SettingsView: View {
                     Button("完成") {
                         dismiss()
                     }
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.callout.bold())
                     .tint(.primary)
                 }
             }

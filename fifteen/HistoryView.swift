@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 struct ShakeDetectorView: UIViewControllerRepresentable {
     let onShake: () -> Void
@@ -61,8 +60,10 @@ struct HistoryView: View {
     @State private var batchCopyToastWorkItem: DispatchWorkItem?
     @State private var isRebuildingCache = false
     @State private var rebuildToken = UUID()
+    @State private var lightHapticTrigger = 0
+    @State private var mediumHapticTrigger = 0
     
-    private struct HistoryListCache {
+    nonisolated private struct HistoryListCache: Sendable {
         var savedItems: [HistoryItem] = []
         var searchFilteredItems: [HistoryItem] = []
         var filteredItems: [HistoryItem] = []
@@ -114,8 +115,8 @@ struct HistoryView: View {
             } else {
                 searchFilteredItems = savedItems.filter { item in
                     tokens.allSatisfy { token in
-                        let textMatch = item.text.localizedCaseInsensitiveContains(token)
-                        let tagMatch = item.tags.contains { $0.localizedCaseInsensitiveContains(token) }
+                        let textMatch = item.text.localizedStandardContains(token)
+                        let tagMatch = item.tags.contains { $0.localizedStandardContains(token) }
                         return textMatch || tagMatch
                     }
                 }
@@ -185,7 +186,7 @@ struct HistoryView: View {
         let selectedTagsSnapshot = selectedTags
         let randomModeSnapshot = isRandomMode
 
-        DispatchQueue.global(qos: .userInitiated).async {
+        Task.detached(priority: .userInitiated) {
             let cache = HistoryListCache.build(
                 items: itemsSnapshot,
                 searchText: searchTextSnapshot,
@@ -193,7 +194,7 @@ struct HistoryView: View {
                 isRandomMode: randomModeSnapshot
             )
 
-            DispatchQueue.main.async {
+            await MainActor.run { [self] in
                 guard self.rebuildToken == token else { return }
                 self.listCache = cache
                 self.isRebuildingCache = false
@@ -214,10 +215,12 @@ struct HistoryView: View {
                 historyContent
             }
         }
+        .sensoryFeedback(.impact(weight: .light), trigger: lightHapticTrigger)
+        .sensoryFeedback(.impact(weight: .medium), trigger: mediumHapticTrigger)
         .overlay(alignment: .top) {
             if showBatchCopiedToast {
                 Text("已复制 \(batchCopiedCount) 条")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.footnote)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                     .background(.regularMaterial, in: Capsule())
@@ -289,9 +292,9 @@ struct HistoryView: View {
                         }
                     }) {
                         Text(selectedItems.count == listCache.filteredItems.count ? "取消全选" : "全选")
-                            .font(.system(size: 17))
+                            .font(.body)
                     }
-                    .tint(Color(hex: 0x6366F1))
+                    .tint(Design.primaryColor)
                     
                     Spacer()
                     
@@ -299,13 +302,13 @@ struct HistoryView: View {
                         Image(systemName: "doc.on.doc")
                             .font(.system(size: 20))
                     }
-                    .tint(Color(hex: 0x6366F1))
+                    .tint(Design.primaryColor)
                     
                     Button(action: { showBatchTagPicker = true }) {
                         Image(systemName: "tag")
                             .font(.system(size: 20))
                     }
-                    .tint(Color(hex: 0x6366F1))
+                    .tint(Design.primaryColor)
                     
                     Button(action: { showClearConfirmation = true }) {
                         Image(systemName: "trash")
@@ -375,18 +378,14 @@ struct HistoryView: View {
     private func exportNotes() {
         isExporting = true
         
-        DispatchQueue.global(qos: .userInitiated).async {
+        Task {
             do {
                 let url = try historyManager.exportAllNotes()
-                DispatchQueue.main.async {
-                    isExporting = false
-                    exportedFileURL = url
-                }
+                isExporting = false
+                exportedFileURL = url
             } catch {
-                DispatchQueue.main.async {
-                    isExporting = false
-                    print("Export failed: \(error)")
-                }
+                isExporting = false
+                print("Export failed: \(error)")
             }
         }
     }
@@ -435,20 +434,23 @@ struct HistoryView: View {
     }
     
     private func playDiceHaptics() {
-        let generator = UIImpactFeedbackGenerator(style: .rigid)
-        generator.prepare()
-        
-        let pattern: [(delay: Double, intensity: CGFloat)] = [
-            (0.00, 0.90),
-            (0.06, 0.55),
-            (0.12, 0.75),
-            (0.18, 0.50),
-            (0.24, 0.70),
-            (0.30, 0.45)
-        ]
-        
-        for step in pattern {
-            DispatchQueue.main.asyncAfter(deadline: .now() + step.delay) {
+        Task { @MainActor in
+            let generator = UIImpactFeedbackGenerator(style: .rigid)
+            generator.prepare()
+            
+            let steps: [(delay: Duration, intensity: CGFloat)] = [
+                (.zero, 0.90),
+                (.milliseconds(60), 0.55),
+                (.milliseconds(60), 0.75),
+                (.milliseconds(60), 0.50),
+                (.milliseconds(60), 0.70),
+                (.milliseconds(60), 0.45)
+            ]
+            
+            for step in steps {
+                if step.delay > .zero {
+                    try? await Task.sleep(for: step.delay)
+                }
                 generator.impactOccurred(intensity: step.intensity)
             }
         }
@@ -503,7 +505,7 @@ struct HistoryView: View {
         VStack(spacing: 12) {
             ProgressView()
             Text("正在加载记录…")
-                .font(.system(size: 13))
+                .font(.footnote)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -520,7 +522,7 @@ struct HistoryView: View {
                     .font(.system(size: 40, weight: .light))
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [Color(hex: 0x6366F1), Color(hex: 0x8B5CF6)],
+                            colors: [Design.primaryColor, Color(hex: 0x8B5CF6)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -531,11 +533,12 @@ struct HistoryView: View {
             
             VStack(spacing: 8) {
                 Text("暂无记录")
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .font(.title3.bold())
+                    .fontDesign(.rounded)
                     .foregroundStyle(Color(.label))
                 
                 Text("复制的文本会自动保存在这里")
-                    .font(.system(size: 15))
+                    .font(.subheadline)
                     .foregroundStyle(Color(.secondaryLabel))
             }
             .opacity(appearAnimation ? 1 : 0)
@@ -551,7 +554,7 @@ struct HistoryView: View {
                 .foregroundStyle(Color(.tertiaryLabel))
             
             Text("没有符合筛选条件的记录")
-                .font(.system(size: 16, weight: .medium))
+                .font(.callout)
                 .foregroundStyle(Color(.secondaryLabel))
         }
         .frame(maxHeight: .infinity)
@@ -564,7 +567,7 @@ struct HistoryView: View {
                 .foregroundStyle(Color(.tertiaryLabel))
             
             Text("没有找到 \"\(effectiveSearchText)\"")
-                .font(.system(size: 16, weight: .medium))
+                .font(.callout)
                 .foregroundStyle(Color(.secondaryLabel))
         }
         .frame(maxHeight: .infinity)
@@ -611,7 +614,7 @@ struct HistoryView: View {
             }
             .scrollIndicators(.hidden)
             .onChange(of: selectedTags) { _, _ in
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     proxy.scrollTo("ListTopAnchor", anchor: .top)
                 }
             }
@@ -626,8 +629,7 @@ struct HistoryView: View {
     }
     
     private func toggleSelection(_ item: HistoryItem) {
-        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-        impactFeedback.impactOccurred()
+        lightHapticTrigger += 1
         
         withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
             if selectedItems.contains(item.id) {
@@ -641,8 +643,7 @@ struct HistoryView: View {
     private func copySelectedItems() {
         guard !selectedItems.isEmpty else { return }
         
-        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-        impactFeedback.impactOccurred()
+        mediumHapticTrigger += 1
         
         let items = selectedHistoryItemsInCopyOrder()
         let text = buildBatchCopyText(items: items)
@@ -690,8 +691,7 @@ struct HistoryView: View {
     }
     
     private func copyItem(_ item: HistoryItem) {
-        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-        impactFeedback.impactOccurred()
+        mediumHapticTrigger += 1
         
         UIPasteboard.general.string = item.text
         
@@ -699,7 +699,8 @@ struct HistoryView: View {
             copiedItemId = item.id
         }
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+        Task {
+            try? await Task.sleep(for: .seconds(2))
             withAnimation(.easeOut(duration: 0.3)) {
                 if copiedItemId == item.id {
                     copiedItemId = nil
@@ -761,7 +762,7 @@ struct HistoryRowView: View {
                 ZStack {
                     Circle()
                         .stroke(
-                            isSelected ? Color(hex: 0x6366F1) : Color(.quaternaryLabel),
+                            isSelected ? Design.primaryColor : Color(.quaternaryLabel),
                             lineWidth: 1.5
                         )
                         .frame(width: 22, height: 22)
@@ -770,7 +771,7 @@ struct HistoryRowView: View {
                         Circle()
                             .fill(
                                 LinearGradient(
-                                    colors: [Color(hex: 0x6366F1), Color(hex: 0x818CF8)],
+                                    colors: [Design.primaryColor, Color(hex: 0x818CF8)],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 )
@@ -787,7 +788,7 @@ struct HistoryRowView: View {
             
             VStack(alignment: .leading, spacing: 8) {
                 highlightedText(item.preview, searchText: searchText)
-                    .font(.system(size: 17, weight: .regular))
+                    .font(.body)
                     .foregroundStyle(Color(.label))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     
@@ -797,7 +798,7 @@ struct HistoryRowView: View {
                     
                     HStack(spacing: 8) {
                         Text(item.formattedDate)
-                            .font(.system(size: 11, weight: .regular))
+                            .font(.caption)
                             .foregroundStyle(Color(.secondaryLabel))
                         
                         let displayTags = item.tags.filter { !filteredTags.contains($0) }
@@ -805,19 +806,19 @@ struct HistoryRowView: View {
                             ForEach(displayTags.prefix(4), id: \.self) { tagName in
                                 let isTagHighlighted = isTagMatchingSearch(tagName: tagName, searchText: searchText)
                                 Text(tagName)
-                                    .font(.system(size: 10, weight: isTagHighlighted ? .bold : .medium))
-                                    .foregroundStyle(isTagHighlighted ? .white : Color(hex: 0x6366F1))
+                                    .font(isTagHighlighted ? .caption.bold() : .caption)
+                                    .foregroundStyle(isTagHighlighted ? .white : Design.primaryColor)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
                                     .background(
                                         Capsule()
-                                            .fill(isTagHighlighted ? Color(hex: 0x6366F1) : Color(hex: 0x6366F1).opacity(0.08))
+                                            .fill(isTagHighlighted ? Design.primaryColor : Design.primaryColor.opacity(0.08))
                                     )
                             }
                             
                             if displayTags.count > 4 {
                                 Text("+\(displayTags.count - 4)")
-                                    .font(.system(size: 10, weight: .medium))
+                                    .font(.caption)
                                     .foregroundStyle(Color(.tertiaryLabel))
                             }
                         }
@@ -837,6 +838,7 @@ struct HistoryRowView: View {
                 .onTapGesture {
                     onTagTap()
                 }
+                .accessibilityAddTraits(.isButton)
             }
         }
         .padding(.horizontal, 16)
@@ -850,6 +852,7 @@ struct HistoryRowView: View {
                 onToggleSelection()
             }
         }
+        .accessibilityAddTraits(.isButton)
         .contextMenu {
             if !isEditMode {
                 Button {
@@ -921,8 +924,8 @@ struct HistoryRowView: View {
             var searchStartIndex = lowercasedText.startIndex
             while let range = lowercasedText.range(of: token, range: searchStartIndex..<lowercasedText.endIndex) {
                 if let attributedRange = Range(NSRange(range, in: text), in: attributedString) {
-                    attributedString[attributedRange].backgroundColor = Color(hex: 0x6366F1).opacity(0.25)
-                    attributedString[attributedRange].foregroundColor = Color(hex: 0x6366F1)
+                    attributedString[attributedRange].backgroundColor = Design.primaryColor.opacity(0.25)
+                    attributedString[attributedRange].foregroundColor = Design.primaryColor
                 }
                 searchStartIndex = range.upperBound
             }
@@ -934,14 +937,14 @@ struct HistoryRowView: View {
     @ViewBuilder
     private var rowBackground: some View {
         if isSelected {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(hex: 0x6366F1).opacity(0.06))
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Design.primaryColor.opacity(0.06))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color(hex: 0x6366F1).opacity(0.25), lineWidth: 1.5)
+                    RoundedRectangle(cornerRadius: 16)
+                        .strokeBorder(Design.primaryColor.opacity(0.25), lineWidth: 1.5)
                 )
         } else {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 16)
                 .fill(Color(.systemBackground))
                 .shadow(color: Color.black.opacity(0.03), radius: 10, x: 0, y: 2)
         }
@@ -1035,7 +1038,7 @@ struct StatisticsView: View {
                                     selectedDate = nil
                                 }
                             }
-                            .font(.system(size: 12))
+                            .font(.caption)
                             .textCase(nil)
                         }
                     }
@@ -1144,13 +1147,13 @@ struct CalendarGridView: View {
                 } label: {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color(hex: 0x6366F1))
+                        .foregroundStyle(Design.primaryColor)
                 }
                 
                 Spacer()
                 
                 Text(monthYearString)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.callout.bold())
                 
                 Spacer()
                 
@@ -1161,7 +1164,7 @@ struct CalendarGridView: View {
                 } label: {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color(hex: 0x6366F1))
+                        .foregroundStyle(Design.primaryColor)
                 }
             }
             .padding(.horizontal, 8)
@@ -1169,15 +1172,15 @@ struct CalendarGridView: View {
             LazyVGrid(columns: columns, spacing: 4) {
                 ForEach(weekdaySymbols, id: \.self) { symbol in
                     Text(symbol)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                         .frame(height: 24)
                 }
             }
             
             LazyVGrid(columns: columns, spacing: 4) {
-                ForEach(Array(daysInMonth.enumerated()), id: \.offset) { _, date in
-                    if let date = date {
+                ForEach(daysInMonth.enumerated(), id: \.offset) { _, date in
+                    if let date {
                         let dateOnly = calendar.startOfDay(for: date)
                         let count = recordsByDate[dateOnly] ?? 0
                         let isToday = calendar.isDateInToday(date)
@@ -1186,7 +1189,7 @@ struct CalendarGridView: View {
                         VStack(spacing: 2) {
                             Text("\(calendar.component(.day, from: date))")
                                 .font(.system(size: 14, weight: isToday || isSelected ? .bold : .regular))
-                                .foregroundStyle(isSelected ? .white : (isToday ? Color(hex: 0x6366F1) : .primary))
+                                .foregroundStyle(isSelected ? .white : (isToday ? Design.primaryColor : .primary))
                             
                             if count > 0 && !isSelected {
                                 Circle()
@@ -1198,10 +1201,10 @@ struct CalendarGridView: View {
                                     .frame(width: 6, height: 6)
                             }
                         }
-                        .frame(width: 36, height: 36)
+                        .frame(width: 44, height: 44)
                         .background(
                             Circle()
-                                .fill(isSelected ? Color(hex: 0x6366F1) : Color.clear)
+                                .fill(isSelected ? Design.primaryColor : Color.clear)
                         )
                         .contentShape(Rectangle())
                         .onTapGesture {
@@ -1215,6 +1218,7 @@ struct CalendarGridView: View {
                                 }
                             }
                         }
+                        .accessibilityAddTraits(.isButton)
                     } else {
                         Color.clear
                             .frame(height: 36)

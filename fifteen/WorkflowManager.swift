@@ -1,6 +1,5 @@
 import Foundation
 import SwiftUI
-import UIKit
 
 
 enum WorkflowNodeType: String, Codable, CaseIterable {
@@ -11,19 +10,19 @@ enum WorkflowNodeType: String, Codable, CaseIterable {
     
     var displayName: String {
         switch self {
-        case .aiProcess: return "AI 处理"
-        case .copyToClipboard: return "复制"
-        case .save: return "保存记录"
-        case .httpPost: return "HTTP 发送"
+        case .aiProcess: "AI 处理"
+        case .copyToClipboard: "复制"
+        case .save: "保存记录"
+        case .httpPost: "HTTP 发送"
         }
     }
     
     var icon: String {
         switch self {
-        case .aiProcess: return "sparkles"
-        case .copyToClipboard: return "doc.on.doc"
-        case .save: return "square.and.arrow.down"
-        case .httpPost: return "paperplane.circle"
+        case .aiProcess: "sparkles"
+        case .copyToClipboard: "doc.on.doc"
+        case .save: "square.and.arrow.down"
+        case .httpPost: "paperplane.circle"
         }
     }
 }

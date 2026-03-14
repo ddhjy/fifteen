@@ -31,7 +31,7 @@ final class AutoPasteSyncManager {
     private let debounceInterval: TimeInterval = 0.3
     private let controlServer = FifteenControlServer()
 
-    private var pendingSyncWorkItem: DispatchWorkItem?
+    private var pendingSyncTask: Task<Void, Never>?
     private var isSceneActive = false
 
     private init() {
@@ -53,8 +53,8 @@ final class AutoPasteSyncManager {
         }
 
         isSceneActive = isActive
-        pendingSyncWorkItem?.cancel()
-        pendingSyncWorkItem = nil
+        pendingSyncTask?.cancel()
+        pendingSyncTask = nil
 
         guard isActive else {
             controlServer.stop()
@@ -67,8 +67,8 @@ final class AutoPasteSyncManager {
     }
 
     func settingsDidChange() {
-        pendingSyncWorkItem?.cancel()
-        pendingSyncWorkItem = nil
+        pendingSyncTask?.cancel()
+        pendingSyncTask = nil
 
         guard isSceneActive else { return }
 
@@ -85,8 +85,8 @@ final class AutoPasteSyncManager {
     }
 
     func scheduleDraftSync(text: String, immediate: Bool = false) {
-        pendingSyncWorkItem?.cancel()
-        pendingSyncWorkItem = nil
+        pendingSyncTask?.cancel()
+        pendingSyncTask = nil
 
         guard isSceneActive, isSyncEnabled else { return }
 
@@ -95,11 +95,11 @@ final class AutoPasteSyncManager {
             return
         }
 
-        let workItem = DispatchWorkItem { [weak self] in
-            self?.sendDraft(text: text)
+        pendingSyncTask = Task {
+            try? await Task.sleep(for: .seconds(debounceInterval))
+            guard !Task.isCancelled else { return }
+            sendDraft(text: text)
         }
-        pendingSyncWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + debounceInterval, execute: workItem)
     }
 
     private var hasSyncTarget: Bool {
@@ -131,17 +131,17 @@ final class AutoPasteSyncManager {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONEncoder().encode(DraftPayload(text: text, callbackPort: callbackPort))
 
-        URLSession.shared.dataTask(with: request) { _, response, error in
-            if let error {
+        Task {
+            do {
+                let (_, response) = try await URLSession.shared.data(for: request)
+                if let httpResponse = response as? HTTPURLResponse,
+                   !(200...299).contains(httpResponse.statusCode) {
+                    print("AutoPaste sync failed with status: \(httpResponse.statusCode)")
+                }
+            } catch {
                 print("AutoPaste sync failed: \(error.localizedDescription)")
-                return
             }
-
-            guard let httpResponse = response as? HTTPURLResponse else { return }
-            if !(200...299).contains(httpResponse.statusCode) {
-                print("AutoPaste sync failed with status: \(httpResponse.statusCode)")
-            }
-        }.resume()
+        }
     }
 
     private func targetURL(path: String) -> URL? {
@@ -234,7 +234,7 @@ private final class FifteenControlServer {
             return Self.httpResponse(status: 404, body: "{\"error\":\"not found\"}")
         }
 
-        DispatchQueue.main.async { [weak self] in
+        Task { @MainActor [weak self] in
             self?.onClearDraft?()
         }
         return Self.httpResponse(status: 200, body: "{\"ok\":true}")

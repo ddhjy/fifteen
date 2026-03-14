@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 @Observable
 class AIService {
     static let shared = AIService()
@@ -108,8 +109,8 @@ class AIService {
         }
 
         let cleaned = raw
-            .replacingOccurrences(of: "```json", with: "")
-            .replacingOccurrences(of: "```", with: "")
+            .replacing("```json", with: "")
+            .replacing("```", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         if let data = cleaned.data(using: .utf8),
