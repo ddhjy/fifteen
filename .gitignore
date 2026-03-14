@@ -1,2 +1,9 @@
 *.xcuserstate
 xcuserdata/
+
+# Xcode / Swift build artifacts
+.build/
+DerivedData/
+
+# Local Codex environment state
+.codex/environments/

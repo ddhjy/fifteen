@@ -9,7 +9,6 @@ struct ContentView: View {
     @State private var tagManager = TagManager.shared
     
     @State private var showSettings: Bool = false
-    @State private var settingsManager = SettingsManager.shared
 
     @State private var isTextEditorFocused: Bool = false
     
@@ -116,55 +115,29 @@ struct ContentView: View {
     
     private var bottomToolbar: some View {
         HStack {
-            if settingsManager.isRightHandMode {
-                Button(action: clearText) {
-                    Image(systemName: "trash")
-                        .font(.system(size: 20))
-                }
-                .tint(.primary)
-                .padding(14)
-                .glassEffect(.regular.interactive(), in: Circle())
-                
-                Spacer()
-                
-                if !tagManager.tags.isEmpty {
-                    tagButton
-                }
-
-                workflowButton
-                
-                Button(action: copyAndClear) {
-                    Image(systemName: "paperplane.fill")
-                        .font(.system(size: 20))
-                }
-                .tint(primaryColor)
-                .padding(14)
-                .glassEffect(.regular.interactive(), in: Circle())
-            } else {
-                Button(action: copyAndClear) {
-                    Image(systemName: "paperplane.fill")
-                        .font(.system(size: 20))
-                }
-                .tint(primaryColor)
-                .padding(14)
-                .glassEffect(.regular.interactive(), in: Circle())
-                
-                workflowButton
-
-                if !tagManager.tags.isEmpty {
-                    tagButton
-                }
-                
-                Spacer()
-                
-                Button(action: clearText) {
-                    Image(systemName: "trash")
-                        .font(.system(size: 20))
-                }
-                .tint(.primary)
-                .padding(14)
-                .glassEffect(.regular.interactive(), in: Circle())
+            Button(action: copyAndClear) {
+                Image(systemName: "paperplane.fill")
+                    .font(.system(size: 20))
             }
+            .tint(primaryColor)
+            .padding(14)
+            .glassEffect(.regular.interactive(), in: Circle())
+
+            workflowButton
+
+            if !tagManager.tags.isEmpty {
+                tagButton
+            }
+
+            Spacer()
+
+            Button(action: clearText) {
+                Image(systemName: "trash")
+                    .font(.system(size: 20))
+            }
+            .tint(.primary)
+            .padding(14)
+            .glassEffect(.regular.interactive(), in: Circle())
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 8)

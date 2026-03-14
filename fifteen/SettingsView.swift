@@ -4,17 +4,10 @@ import SwiftUI
 class SettingsManager {
     static let shared = SettingsManager()
     
-    private let rightHandModeKey = "rightHandMode"
     private let aiApiTokenKey = "aiApiToken"
     private let autoPasteSyncEnabledKey = "autoPasteSyncEnabled"
     private let autoPasteHostKey = "autoPasteHost"
     private let autoPastePortKey = "autoPastePort"
-    
-    var isRightHandMode: Bool {
-        didSet {
-            UserDefaults.standard.set(isRightHandMode, forKey: rightHandModeKey)
-        }
-    }
     
     var aiApiToken: String? {
         didSet {
@@ -53,7 +46,6 @@ class SettingsManager {
     }
     
     private init() {
-        self.isRightHandMode = UserDefaults.standard.bool(forKey: rightHandModeKey)
         self.aiApiToken = UserDefaults.standard.string(forKey: aiApiTokenKey)
         self.autoPasteSyncEnabled = UserDefaults.standard.bool(forKey: autoPasteSyncEnabledKey)
         self.autoPasteHost = UserDefaults.standard.string(forKey: autoPasteHostKey) ?? ""
@@ -82,31 +74,6 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    Toggle(isOn: $settingsManager.isRightHandMode) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "hand.point.right")
-                                .font(.system(size: 20))
-                                .foregroundStyle(.primary)
-                                .frame(width: 28)
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("右手模式")
-                                    .font(.system(size: 16, weight: .regular))
-                                
-                                Text("将发送按钮移至右侧")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .tint(primaryColor)
-                } header: {
-                    Text("布局")
-                } footer: {
-                    Text("开启后，底部工具栏的按钮排列将左右反转，方便右手操作。")
-                }
-                
                 Section {
                     SecureField("API Token", text: Binding(
                         get: { settingsManager.aiApiToken ?? "" },
