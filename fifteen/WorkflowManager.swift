@@ -215,6 +215,13 @@ class WorkflowManager {
         if !shouldOpen && !canCloseWorkflow(id) {
             return
         }
+
+        if shouldOpen && workflows[idx].kind == .autoPasteSync {
+            for i in workflows.indices where workflows[i].kind == .autoPasteSync {
+                workflows[i].isOpen = false
+            }
+        }
+
         workflows[idx].isOpen = shouldOpen
         saveWorkflows()
     }
@@ -278,7 +285,7 @@ class WorkflowManager {
                 name: source.name + " 副本",
                 icon: source.icon,
                 kind: .autoPasteSync,
-                isOpen: source.isOpen,
+                isOpen: false,
                 isActive: false,
                 syncConfig: source.syncConfig,
                 nodes: []
@@ -335,7 +342,15 @@ class WorkflowManager {
     func toggleWorkflowActive(_ id: UUID) {
         guard let idx = workflows.firstIndex(where: { $0.id == id }),
               workflows[idx].kind == .autoPasteSync else { return }
-        workflows[idx].isActive.toggle()
+
+        let shouldActivate = !workflows[idx].isActive
+        if shouldActivate {
+            for i in workflows.indices where workflows[i].kind == .autoPasteSync {
+                workflows[i].isActive = false
+            }
+        }
+        workflows[idx].isActive = shouldActivate
+
         saveWorkflows()
         notifyAutoPasteSyncWorkflowChanged()
     }
@@ -401,11 +416,13 @@ class WorkflowManager {
         for i in workflows.indices {
             normalizeNodes(&workflows[i].nodes)
         }
+        normalizeAutoPasteSyncState()
         ensureOpenWorkflowExists()
         saveWorkflows()
     }
     
     func saveWorkflows() {
+        normalizeAutoPasteSyncState()
         for i in workflows.indices {
             if workflows[i].kind == .autoPasteSync {
                 workflows[i].nodes = []
@@ -512,6 +529,31 @@ class WorkflowManager {
         guard workflows.contains(where: { $0.kind == .autoPasteSync }) else {
             workflows.append(.autoPasteSync())
             return
+        }
+    }
+
+    private func normalizeAutoPasteSyncState() {
+        var activeAutoPasteFound = false
+        var openAutoPasteFound = false
+
+        for i in workflows.indices where workflows[i].kind == .autoPasteSync {
+            workflows[i].nodes = []
+
+            if workflows[i].isActive {
+                if activeAutoPasteFound {
+                    workflows[i].isActive = false
+                } else {
+                    activeAutoPasteFound = true
+                }
+            }
+
+            if workflows[i].isOpen {
+                if openAutoPasteFound {
+                    workflows[i].isOpen = false
+                } else {
+                    openAutoPasteFound = true
+                }
+            }
         }
     }
 
