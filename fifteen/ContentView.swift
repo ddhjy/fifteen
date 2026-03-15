@@ -242,7 +242,7 @@ struct ContentView: View {
         .tint(workflowTintColor(for: workflow))
         .frame(width: 44, height: 44)
         .contentShape(Circle())
-        .accessibilityLabel(workflow.name)
+        .accessibilityLabel(workflowAccessibilityLabel(for: workflow))
     }
     
     private var fullScreenEditor: some View {
@@ -327,15 +327,20 @@ struct ContentView: View {
     
     private func handleWorkflowTap(_ workflow: Workflow) {
         hapticTrigger += 1
-        
+
+        if workflow.kind == .autoPasteSync {
+            toggleAutoPasteWorkflow(workflow)
+            return
+        }
+
         guard !draftText.isEmpty else { return }
-        
+
         if draftText.hasPrefix("打开调试模式") {
             historyManager.clearDraft()
             showDebugView = true
             return
         }
-        
+
         executeWorkflow(workflow)
     }
     
@@ -387,8 +392,34 @@ struct ContentView: View {
         if processingWorkflowId == workflow.id {
             return Design.primaryColor
         }
-        
+
+        if workflow.kind == .autoPasteSync {
+            return workflow.isActive ? Design.primaryColor : .secondary
+        }
+
         return workflowManager.areTerminalNodesAllDisabled(for: workflow) ? Color.yellow : .primary
+    }
+
+    private func workflowAccessibilityLabel(for workflow: Workflow) -> String {
+        if workflow.kind == .autoPasteSync {
+            return workflow.isActive ? "\(workflow.name)，已开启" : "\(workflow.name)，已关闭"
+        }
+        return workflow.name
+    }
+
+    private func toggleAutoPasteWorkflow(_ workflow: Workflow) {
+        let host = workflow.syncConfig.host.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !workflow.isActive && host.isEmpty {
+            workflowError = NSError(
+                domain: "ContentView",
+                code: -10,
+                userInfo: [NSLocalizedDescriptionKey: "请先在 Workflow 配置里填写 Auto Paste 主机地址"]
+            )
+            showWorkflowError = true
+            return
+        }
+
+        workflowManager.toggleWorkflowActive(workflow.id)
     }
     
     private func performSave(text: String) {

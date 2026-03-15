@@ -41,7 +41,7 @@ struct WorkflowConfigView: View {
                     
                     Button {
                         let count = workflowManager.workflows.count + 1
-                        let newWf = Workflow(name: "Workflow \(count)")
+                        let newWf = Workflow(name: "Workflow \(count)", kind: .manual)
                         workflowManager.addWorkflow(newWf)
                         workflowManager.selectWorkflow(newWf.id)
                     } label: {
@@ -51,27 +51,31 @@ struct WorkflowConfigView: View {
                 } header: {
                     Text("管理")
                 } footer: {
-                    Text("点选 Workflow 可编辑其节点")
+                    Text("点选 Workflow 可编辑配置，特殊 Workflow 会显示专属设置")
                 }
-                
-                Section {
-                    ForEach(workflowManager.nodes) { node in
-                        NodeRowView(node: node, onEdit: { editingNode = node })
+
+                if workflowManager.selectedWorkflow.kind == .autoPasteSync {
+                    autoPasteSyncSection(for: workflowManager.selectedWorkflow)
+                } else {
+                    Section {
+                        ForEach(workflowManager.nodes) { node in
+                            NodeRowView(node: node, onEdit: { editingNode = node })
+                        }
+                        .onMove { workflowManager.moveNode(from: $0, to: $1) }
+                        .onDelete { workflowManager.deleteNodes(at: $0) }
+                    } header: {
+                        Text("处理节点")
+                    } footer: {
+                        Text("拖动排序，执行时按从上到下顺序运行")
                     }
-                    .onMove { workflowManager.moveNode(from: $0, to: $1) }
-                    .onDelete { workflowManager.deleteNodes(at: $0) }
-                } header: {
-                    Text("处理节点")
-                } footer: {
-                    Text("拖动排序，执行时按从上到下顺序运行")
-                }
-                
-                Section {
-                    Button {
-                        showAddNode = true
-                    } label: {
-                        Label("添加节点", systemImage: "plus.circle")
-                            .foregroundStyle(.primary)
+                    
+                    Section {
+                        Button {
+                            showAddNode = true
+                        } label: {
+                            Label("添加节点", systemImage: "plus.circle")
+                                .foregroundStyle(.primary)
+                        }
                     }
                 }
             }
@@ -117,7 +121,7 @@ struct WorkflowConfigView: View {
         
         HStack(spacing: 12) {
             Image(systemName: workflow.icon)
-                .foregroundStyle(isSelected ? Design.primaryColor : Color(.tertiaryLabel))
+                .foregroundStyle(workflowRowIconColor(for: workflow, isSelected: isSelected))
                 .font(.system(size: 20))
                 .frame(width: 28)
             
@@ -125,9 +129,7 @@ struct WorkflowConfigView: View {
                 Text(workflow.name)
                     .font(isSelected ? .callout.bold() : .callout)
                 
-                let enabledCount = workflow.nodes.filter { $0.isEnabled }.count
-                let totalCount = workflow.nodes.count
-                Text(workflow.isOpen ? "主页显示 · \(enabledCount)/\(totalCount) 节点启用" : "未在主页显示 · \(enabledCount)/\(totalCount) 节点启用")
+                Text(workflowSummary(for: workflow))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -174,12 +176,14 @@ struct WorkflowConfigView: View {
             } label: {
                 Label("重命名", systemImage: "pencil")
             }
-            Button {
-                workflowManager.duplicateWorkflow(workflow.id)
-            } label: {
-                Label("创建副本", systemImage: "doc.on.doc")
+            if workflowManager.canDuplicateWorkflow(workflow.id) {
+                Button {
+                    workflowManager.duplicateWorkflow(workflow.id)
+                } label: {
+                    Label("创建副本", systemImage: "doc.on.doc")
+                }
             }
-            if workflowManager.workflows.count > 1 {
+            if workflowManager.canDeleteWorkflow(workflow.id) {
                 Divider()
                 Button(role: .destructive) {
                     withAnimation { workflowManager.deleteWorkflow(workflow.id) }
@@ -188,6 +192,58 @@ struct WorkflowConfigView: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func autoPasteSyncSection(for workflow: Workflow) -> some View {
+        Section {
+            Toggle("主页按钮控制同步状态", isOn: Binding(
+                get: { workflowManager.workflows.first(where: { $0.id == workflow.id })?.isActive ?? false },
+                set: { _ in
+                    workflowManager.toggleWorkflowActive(workflow.id)
+                }
+            ))
+            .tint(Design.primaryColor)
+
+            TextField("AutoPaste 主机地址", text: Binding(
+                get: { workflowManager.workflows.first(where: { $0.id == workflow.id })?.syncConfig.host ?? "" },
+                set: { workflowManager.updateAutoPasteSyncConfig(workflowID: workflow.id, host: $0) }
+            ))
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+
+            TextField("AutoPaste 端口", value: Binding(
+                get: { workflowManager.workflows.first(where: { $0.id == workflow.id })?.syncConfig.port ?? 7788 },
+                set: { workflowManager.updateAutoPasteSyncConfig(workflowID: workflow.id, port: $0) }
+            ), format: .number)
+            .keyboardType(.numberPad)
+        } header: {
+            Text("同步配置")
+        } footer: {
+            Text("这是一个开关型 Workflow。主页点亮后会实时同步当前草稿，并接收远端清空指令。")
+        }
+    }
+
+    private func workflowSummary(for workflow: Workflow) -> String {
+        let visibility = workflow.isOpen ? "主页显示" : "未在主页显示"
+
+        if workflow.kind == .autoPasteSync {
+            let state = workflow.isActive ? "同步已开启" : "同步已关闭"
+            let host = workflow.syncConfig.host.trimmingCharacters(in: .whitespacesAndNewlines)
+            let target = host.isEmpty ? "未配置目标" : "\(host):\(workflow.syncConfig.port)"
+            return "\(visibility) · \(state) · \(target)"
+        }
+
+        let enabledCount = workflow.nodes.filter { $0.isEnabled }.count
+        let totalCount = workflow.nodes.count
+        return "\(visibility) · \(enabledCount)/\(totalCount) 节点启用"
+    }
+
+    private func workflowRowIconColor(for workflow: Workflow, isSelected: Bool) -> Color {
+        if isSelected || (workflow.kind == .autoPasteSync && workflow.isActive) {
+            return Design.primaryColor
+        }
+        return Color(.tertiaryLabel)
     }
 }
 
@@ -208,7 +264,7 @@ struct WorkflowListView: View {
                     
                     HStack(spacing: 12) {
                         Image(systemName: workflow.icon)
-                            .foregroundStyle(isSelected ? Design.primaryColor : Color(.tertiaryLabel))
+                            .foregroundStyle(workflowRowIconColor(for: workflow, isSelected: isSelected))
                             .font(.system(size: 20))
                             .frame(width: 28)
                         
@@ -216,9 +272,7 @@ struct WorkflowListView: View {
                             Text(workflow.name)
                                 .font(isSelected ? .callout.bold() : .callout)
                             
-                            let enabledCount = workflow.nodes.filter { $0.isEnabled }.count
-                            let totalCount = workflow.nodes.count
-                            Text(workflow.isOpen ? "主页显示 · \(enabledCount)/\(totalCount) 节点启用" : "未在主页显示 · \(enabledCount)/\(totalCount) 节点启用")
+                            Text(workflowSummary(for: workflow))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -251,13 +305,15 @@ struct WorkflowListView: View {
                             Label("重命名", systemImage: "pencil")
                         }
                         
-                        Button {
-                            workflowManager.duplicateWorkflow(workflow.id)
-                        } label: {
-                            Label("创建副本", systemImage: "doc.on.doc")
+                        if workflowManager.canDuplicateWorkflow(workflow.id) {
+                            Button {
+                                workflowManager.duplicateWorkflow(workflow.id)
+                            } label: {
+                                Label("创建副本", systemImage: "doc.on.doc")
+                            }
                         }
                         
-                        if workflowManager.workflows.count > 1 {
+                        if workflowManager.canDeleteWorkflow(workflow.id) {
                             Divider()
                             Button(role: .destructive) {
                                 withAnimation { workflowManager.deleteWorkflow(workflow.id) }
@@ -275,7 +331,7 @@ struct WorkflowListView: View {
                             
                             HStack(spacing: 12) {
                                 Image(systemName: workflow.icon)
-                                    .foregroundStyle(isSelected ? Design.primaryColor : Color(.tertiaryLabel))
+                                    .foregroundStyle(workflowRowIconColor(for: workflow, isSelected: isSelected))
                                     .font(.system(size: 20))
                                     .frame(width: 28)
                                 
@@ -283,9 +339,7 @@ struct WorkflowListView: View {
                                     Text(workflow.name)
                                         .font(isSelected ? .callout.bold() : .callout)
                                     
-                                    let enabledCount = workflow.nodes.filter { $0.isEnabled }.count
-                                    let totalCount = workflow.nodes.count
-                                    Text("未在主页显示 · \(enabledCount)/\(totalCount) 节点启用")
+                                    Text(workflowSummary(for: workflow))
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
@@ -311,7 +365,7 @@ struct WorkflowListView: View {
                 
                 Button {
                     let count = workflowManager.workflows.count + 1
-                    let newWf = Workflow(name: "Workflow \(count)")
+                    let newWf = Workflow(name: "Workflow \(count)", kind: .manual)
                     workflowManager.addWorkflow(newWf)
                     workflowManager.selectWorkflow(newWf.id)
                     dismiss()
@@ -353,6 +407,28 @@ struct WorkflowListView: View {
     
     private func currentIcon(for id: UUID) -> String {
         workflowManager.workflows.first(where: { $0.id == id })?.icon ?? "arrow.triangle.branch"
+    }
+
+    private func workflowSummary(for workflow: Workflow) -> String {
+        let visibility = workflow.isOpen ? "主页显示" : "未在主页显示"
+
+        if workflow.kind == .autoPasteSync {
+            let state = workflow.isActive ? "同步已开启" : "同步已关闭"
+            let host = workflow.syncConfig.host.trimmingCharacters(in: .whitespacesAndNewlines)
+            let target = host.isEmpty ? "未配置目标" : "\(host):\(workflow.syncConfig.port)"
+            return "\(visibility) · \(state) · \(target)"
+        }
+
+        let enabledCount = workflow.nodes.filter { $0.isEnabled }.count
+        let totalCount = workflow.nodes.count
+        return "\(visibility) · \(enabledCount)/\(totalCount) 节点启用"
+    }
+
+    private func workflowRowIconColor(for workflow: Workflow, isSelected: Bool) -> Color {
+        if isSelected || (workflow.kind == .autoPasteSync && workflow.isActive) {
+            return Design.primaryColor
+        }
+        return Color(.tertiaryLabel)
     }
 }
 

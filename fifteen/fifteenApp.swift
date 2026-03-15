@@ -103,11 +103,11 @@ final class AutoPasteSyncManager {
     }
 
     private var hasSyncTarget: Bool {
-        !SettingsManager.shared.autoPasteHost.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !syncHost.isEmpty
     }
 
     private var isSyncEnabled: Bool {
-        SettingsManager.shared.autoPasteSyncEnabled && hasSyncTarget
+        (autoPasteSyncWorkflow?.isActive ?? false) && hasSyncTarget
     }
 
     private func scheduleCurrentDraftSync(immediate: Bool) {
@@ -145,16 +145,25 @@ final class AutoPasteSyncManager {
     }
 
     private func targetURL(path: String) -> URL? {
-        let settings = SettingsManager.shared
-        let host = settings.autoPasteHost.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let workflow = autoPasteSyncWorkflow else { return nil }
+
+        let host = workflow.syncConfig.host.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !host.isEmpty else { return nil }
 
         var components = URLComponents()
         components.scheme = "http"
         components.host = host
-        components.port = settings.autoPastePort
+        components.port = workflow.syncConfig.port
         components.path = path
         return components.url
+    }
+
+    private var autoPasteSyncWorkflow: Workflow? {
+        WorkflowManager.shared.autoPasteSyncWorkflow
+    }
+
+    private var syncHost: String {
+        autoPasteSyncWorkflow?.syncConfig.host.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 }
 
