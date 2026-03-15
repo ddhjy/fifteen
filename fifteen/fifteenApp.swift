@@ -28,10 +28,8 @@ final class AutoPasteSyncManager {
     static let shared = AutoPasteSyncManager()
 
     private let callbackPort: UInt16 = 7789
-    private let debounceInterval: TimeInterval = 0.3
     private let controlServer = FifteenControlServer()
 
-    private var pendingSyncTask: Task<Void, Never>?
     private var isSceneActive = false
     private var lastActiveTargets: Set<SyncTarget> = []
 
@@ -50,14 +48,12 @@ final class AutoPasteSyncManager {
             if isActive && !currentTargets.isEmpty {
                 lastActiveTargets = currentTargets
                 startControlServerIfNeeded()
-                scheduleCurrentDraftSync(immediate: true)
+                syncCurrentDraft()
             }
             return
         }
 
         isSceneActive = isActive
-        pendingSyncTask?.cancel()
-        pendingSyncTask = nil
 
         guard isActive else {
             controlServer.stop()
@@ -71,14 +67,12 @@ final class AutoPasteSyncManager {
         }
         lastActiveTargets = currentTargets
         startControlServerIfNeeded()
-        scheduleCurrentDraftSync(immediate: true)
+        syncCurrentDraft()
     }
 
     func settingsDidChange() {
         let currentTargets = Set(activeSyncTargets)
         let removedTargets = Array(lastActiveTargets.subtracting(currentTargets))
-        pendingSyncTask?.cancel()
-        pendingSyncTask = nil
 
         guard isSceneActive else {
             lastActiveTargets = currentTargets
@@ -87,7 +81,7 @@ final class AutoPasteSyncManager {
 
         if !currentTargets.isEmpty {
             startControlServerIfNeeded()
-            scheduleCurrentDraftSync(immediate: true)
+            syncCurrentDraft()
         } else {
             controlServer.stop()
         }
@@ -99,33 +93,18 @@ final class AutoPasteSyncManager {
         lastActiveTargets = currentTargets
     }
 
-    func scheduleDraftSync(text: String, immediate: Bool = false) {
-        pendingSyncTask?.cancel()
-        pendingSyncTask = nil
-
+    func scheduleDraftSync(text: String) {
         guard isSceneActive else { return }
 
         let targets = activeSyncTargets
         guard !targets.isEmpty else { return }
 
-        if immediate {
-            lastActiveTargets = Set(targets)
-            sendDraft(text: text, to: targets)
-            return
-        }
-
-        pendingSyncTask = Task {
-            try? await Task.sleep(for: .seconds(debounceInterval))
-            guard !Task.isCancelled else { return }
-            let latestTargets = self.activeSyncTargets
-            guard !latestTargets.isEmpty else { return }
-            self.lastActiveTargets = Set(latestTargets)
-            self.sendDraft(text: text, to: latestTargets)
-        }
+        lastActiveTargets = Set(targets)
+        sendDraft(text: text, to: targets)
     }
 
-    private func scheduleCurrentDraftSync(immediate: Bool) {
-        scheduleDraftSync(text: HistoryManager.shared.currentDraft.text, immediate: immediate)
+    private func syncCurrentDraft() {
+        scheduleDraftSync(text: HistoryManager.shared.currentDraft.text)
     }
 
     private func startControlServerIfNeeded() {
