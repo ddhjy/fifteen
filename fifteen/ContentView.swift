@@ -419,9 +419,8 @@ struct DraftTextView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: UITextView, context: Context) {
-        if uiView.text != text {
-            uiView.text = text
-        }
+        context.coordinator.parent = self
+        context.coordinator.syncTextIfNeeded(on: uiView)
         uiView.font = font
         uiView.isScrollEnabled = isScrollEnabled
         uiView.isUserInteractionEnabled = isUserInteractionEnabled
@@ -457,8 +456,20 @@ struct DraftTextView: UIViewRepresentable {
             self.parent = parent
             self.lastText = parent.text
         }
+
+        func syncTextIfNeeded(on textView: UITextView) {
+            guard textView.text != parent.text else { return }
+
+            if textView.isFirstResponder,
+               let fullRange = textView.textRange(from: textView.beginningOfDocument, to: textView.endOfDocument) {
+                textView.replace(fullRange, withText: parent.text)
+            } else {
+                textView.text = parent.text
+            }
+        }
         
         func textViewDidChange(_ textView: UITextView) {
+            lastText = textView.text
             parent.text = textView.text
         }
         
