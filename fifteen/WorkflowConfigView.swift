@@ -220,7 +220,7 @@ struct WorkflowConfigView: View {
         } header: {
             Text("同步配置")
         } footer: {
-            Text("这是一个开关型 Workflow。主页点亮后会实时同步当前草稿，并接收远端清空指令。")
+            Text("这是一个开关型 Workflow。主页点亮后会实时同步当前草稿，并接收远端清空指令。可通过创建副本配置多个同步目标。")
         }
     }
 

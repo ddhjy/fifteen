@@ -187,8 +187,8 @@ class WorkflowManager {
         }
     }
 
-    var autoPasteSyncWorkflow: Workflow? {
-        workflows.first(where: { $0.kind == .autoPasteSync })
+    var autoPasteSyncWorkflows: [Workflow] {
+        workflows.filter { $0.kind == .autoPasteSync }
     }
 
     func areTerminalNodesAllDisabled(for workflow: Workflow) -> Bool {
@@ -231,8 +231,15 @@ class WorkflowManager {
     }
     
     func deleteWorkflow(_ id: UUID) {
-        guard let workflow = workflows.first(where: { $0.id == id }), workflow.kind == .manual else { return }
-        guard workflows.filter({ $0.kind == .manual }).count > 1 else { return }
+        guard let workflow = workflows.first(where: { $0.id == id }) else { return }
+
+        switch workflow.kind {
+        case .manual:
+            guard workflows.filter({ $0.kind == .manual }).count > 1 else { return }
+        case .autoPasteSync:
+            guard workflows.filter({ $0.kind == .autoPasteSync }).count > 1 else { return }
+        }
+
         workflows.removeAll { $0.id == id }
         if selectedWorkflowId == id, let firstWorkflowId = workflows.first?.id {
             selectWorkflow(firstWorkflowId)
@@ -255,8 +262,29 @@ class WorkflowManager {
 
     func duplicateWorkflow(_ id: UUID) {
         guard let source = workflows.first(where: { $0.id == id }) else { return }
-        guard source.kind == .manual else { return }
-        let copy = Workflow(name: source.name + " 副本", icon: source.icon, kind: .manual, isOpen: source.isOpen, nodes: source.nodes)
+
+        let copy: Workflow
+        switch source.kind {
+        case .manual:
+            copy = Workflow(
+                name: source.name + " 副本",
+                icon: source.icon,
+                kind: .manual,
+                isOpen: source.isOpen,
+                nodes: source.nodes
+            )
+        case .autoPasteSync:
+            copy = Workflow(
+                name: source.name + " 副本",
+                icon: source.icon,
+                kind: .autoPasteSync,
+                isOpen: source.isOpen,
+                isActive: false,
+                syncConfig: source.syncConfig,
+                nodes: []
+            )
+        }
+
         workflows.append(copy)
         saveWorkflows()
     }
@@ -291,12 +319,17 @@ class WorkflowManager {
     }
 
     func canDuplicateWorkflow(_ id: UUID) -> Bool {
-        workflows.first(where: { $0.id == id })?.kind == .manual
+        workflows.contains(where: { $0.id == id })
     }
 
     func canDeleteWorkflow(_ id: UUID) -> Bool {
         guard let workflow = workflows.first(where: { $0.id == id }) else { return false }
-        return workflow.kind == .manual && workflows.filter { $0.kind == .manual }.count > 1
+        switch workflow.kind {
+        case .manual:
+            return workflows.filter { $0.kind == .manual }.count > 1
+        case .autoPasteSync:
+            return workflows.filter { $0.kind == .autoPasteSync }.count > 1
+        }
     }
 
     func toggleWorkflowActive(_ id: UUID) {
@@ -476,15 +509,9 @@ class WorkflowManager {
     }
 
     private func ensureAutoPasteSyncWorkflowExists() {
-        let autoPasteSyncWorkflows = workflows.filter { $0.kind == .autoPasteSync }
-        guard !autoPasteSyncWorkflows.isEmpty else {
+        guard workflows.contains(where: { $0.kind == .autoPasteSync }) else {
             workflows.append(.autoPasteSync())
             return
-        }
-
-        if autoPasteSyncWorkflows.count > 1,
-           let keeper = autoPasteSyncWorkflows.first {
-            workflows.removeAll { $0.kind == .autoPasteSync && $0.id != keeper.id }
         }
     }
 

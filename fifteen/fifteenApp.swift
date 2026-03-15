@@ -33,6 +33,7 @@ final class AutoPasteSyncManager {
 
     private var pendingSyncTask: Task<Void, Never>?
     private var isSceneActive = false
+    private var lastActiveTargets: Set<SyncTarget> = []
 
     private init() {
         controlServer.onClearDraft = { [weak self] in
@@ -43,9 +44,11 @@ final class AutoPasteSyncManager {
     }
 
     func handleScenePhaseChange(_ phase: ScenePhase) {
+        let currentTargets = Set(activeSyncTargets)
         let isActive = phase == .active
         if isSceneActive == isActive {
-            if isActive && isSyncEnabled {
+            if isActive && !currentTargets.isEmpty {
+                lastActiveTargets = currentTargets
                 startControlServerIfNeeded()
                 scheduleCurrentDraftSync(immediate: true)
             }
@@ -58,56 +61,67 @@ final class AutoPasteSyncManager {
 
         guard isActive else {
             controlServer.stop()
+            lastActiveTargets = currentTargets
             return
         }
 
-        guard isSyncEnabled else { return }
+        guard !currentTargets.isEmpty else {
+            lastActiveTargets = currentTargets
+            return
+        }
+        lastActiveTargets = currentTargets
         startControlServerIfNeeded()
         scheduleCurrentDraftSync(immediate: true)
     }
 
     func settingsDidChange() {
+        let currentTargets = Set(activeSyncTargets)
+        let removedTargets = Array(lastActiveTargets.subtracting(currentTargets))
         pendingSyncTask?.cancel()
         pendingSyncTask = nil
 
-        guard isSceneActive else { return }
-
-        if isSyncEnabled {
-            startControlServerIfNeeded()
-            scheduleCurrentDraftSync(immediate: true)
+        guard isSceneActive else {
+            lastActiveTargets = currentTargets
             return
         }
 
-        controlServer.stop()
-        if hasSyncTarget {
-            sendDraft(text: "")
+        if !currentTargets.isEmpty {
+            startControlServerIfNeeded()
+            scheduleCurrentDraftSync(immediate: true)
+        } else {
+            controlServer.stop()
         }
+
+        if !removedTargets.isEmpty {
+            sendDraft(text: "", to: removedTargets)
+        }
+
+        lastActiveTargets = currentTargets
     }
 
     func scheduleDraftSync(text: String, immediate: Bool = false) {
         pendingSyncTask?.cancel()
         pendingSyncTask = nil
 
-        guard isSceneActive, isSyncEnabled else { return }
+        guard isSceneActive else { return }
+
+        let targets = activeSyncTargets
+        guard !targets.isEmpty else { return }
 
         if immediate {
-            sendDraft(text: text)
+            lastActiveTargets = Set(targets)
+            sendDraft(text: text, to: targets)
             return
         }
 
         pendingSyncTask = Task {
             try? await Task.sleep(for: .seconds(debounceInterval))
             guard !Task.isCancelled else { return }
-            sendDraft(text: text)
+            let latestTargets = self.activeSyncTargets
+            guard !latestTargets.isEmpty else { return }
+            self.lastActiveTargets = Set(latestTargets)
+            self.sendDraft(text: text, to: latestTargets)
         }
-    }
-
-    private var hasSyncTarget: Bool {
-        !syncHost.isEmpty
-    }
-
-    private var isSyncEnabled: Bool {
-        (autoPasteSyncWorkflow?.isActive ?? false) && hasSyncTarget
     }
 
     private func scheduleCurrentDraftSync(immediate: Bool) {
@@ -122,49 +136,52 @@ final class AutoPasteSyncManager {
         HistoryManager.shared.clearDraft()
     }
 
-    private func sendDraft(text: String) {
-        guard let url = targetURL(path: "/draft") else { return }
+    private func sendDraft(text: String, to targets: [SyncTarget]) {
+        for target in targets {
+            guard let url = targetURL(path: "/draft", target: target) else { continue }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.timeoutInterval = 2
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONEncoder().encode(DraftPayload(text: text, callbackPort: callbackPort))
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.timeoutInterval = 2
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try? JSONEncoder().encode(DraftPayload(text: text, callbackPort: callbackPort))
 
-        Task {
-            do {
-                let (_, response) = try await URLSession.shared.data(for: request)
-                if let httpResponse = response as? HTTPURLResponse,
-                   !(200...299).contains(httpResponse.statusCode) {
-                    print("AutoPaste sync failed with status: \(httpResponse.statusCode)")
+            Task {
+                do {
+                    let (_, response) = try await URLSession.shared.data(for: request)
+                    if let httpResponse = response as? HTTPURLResponse,
+                       !(200...299).contains(httpResponse.statusCode) {
+                        print("AutoPaste sync failed for \(target.host):\(target.port) with status: \(httpResponse.statusCode)")
+                    }
+                } catch {
+                    print("AutoPaste sync failed for \(target.host):\(target.port): \(error.localizedDescription)")
                 }
-            } catch {
-                print("AutoPaste sync failed: \(error.localizedDescription)")
             }
         }
     }
 
-    private func targetURL(path: String) -> URL? {
-        guard let workflow = autoPasteSyncWorkflow else { return nil }
-
-        let host = workflow.syncConfig.host.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !host.isEmpty else { return nil }
-
+    private func targetURL(path: String, target: SyncTarget) -> URL? {
         var components = URLComponents()
         components.scheme = "http"
-        components.host = host
-        components.port = workflow.syncConfig.port
+        components.host = target.host
+        components.port = target.port
         components.path = path
         return components.url
     }
 
-    private var autoPasteSyncWorkflow: Workflow? {
-        WorkflowManager.shared.autoPasteSyncWorkflow
+    private var activeSyncTargets: [SyncTarget] {
+        WorkflowManager.shared.autoPasteSyncWorkflows.compactMap { workflow in
+            guard workflow.isActive else { return nil }
+            let host = workflow.syncConfig.host.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !host.isEmpty else { return nil }
+            return SyncTarget(host: host, port: workflow.syncConfig.port)
+        }
     }
+}
 
-    private var syncHost: String {
-        autoPasteSyncWorkflow?.syncConfig.host.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-    }
+private struct SyncTarget: Hashable {
+    let host: String
+    let port: Int
 }
 
 private struct DraftPayload: Encodable {
