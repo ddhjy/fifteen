@@ -32,6 +32,10 @@ final class AutoPasteSyncManager {
 
     private var isSceneActive = false
     private var lastActiveTargets: Set<SyncTarget> = []
+    private var pendingDraftSync: DraftSyncState?
+    private var syncTask: Task<Void, Never>?
+    private var lastDeliveredDraftSync: DraftSyncState?
+    private var consecutiveSyncFailures = 0
 
     private init() {
         controlServer.onClearDraft = { [weak self] in
@@ -58,6 +62,8 @@ final class AutoPasteSyncManager {
         guard isActive else {
             controlServer.stop()
             lastActiveTargets = currentTargets
+            pendingDraftSync = nil
+            consecutiveSyncFailures = 0
             return
         }
 
@@ -67,7 +73,7 @@ final class AutoPasteSyncManager {
         }
         lastActiveTargets = currentTargets
         startControlServerIfNeeded()
-        syncCurrentDraft()
+        syncCurrentDraft(force: true)
     }
 
     func settingsDidChange() {
@@ -81,30 +87,42 @@ final class AutoPasteSyncManager {
 
         if !currentTargets.isEmpty {
             startControlServerIfNeeded()
-            syncCurrentDraft()
+            syncCurrentDraft(force: true)
         } else {
             controlServer.stop()
+            pendingDraftSync = nil
         }
 
         if !removedTargets.isEmpty {
-            sendDraft(text: "", to: removedTargets)
+            Task {
+                _ = await sendDraft(text: "", to: removedTargets)
+            }
         }
 
+        lastDeliveredDraftSync = nil
         lastActiveTargets = currentTargets
     }
 
-    func scheduleDraftSync(text: String) {
+    func scheduleDraftSync(text: String, force: Bool = false) {
         guard isSceneActive else { return }
 
         let targets = activeSyncTargets
         guard !targets.isEmpty else { return }
 
         lastActiveTargets = Set(targets)
-        sendDraft(text: text, to: targets)
+        let syncState = DraftSyncState(text: text, targets: Set(targets))
+        if !force,
+           syncState == lastDeliveredDraftSync,
+           pendingDraftSync == nil {
+            return
+        }
+
+        pendingDraftSync = syncState
+        startSyncTaskIfNeeded()
     }
 
-    private func syncCurrentDraft() {
-        scheduleDraftSync(text: HistoryManager.shared.currentDraft.text)
+    private func syncCurrentDraft(force: Bool = false) {
+        scheduleDraftSync(text: HistoryManager.shared.currentDraft.text, force: force)
     }
 
     private func startControlServerIfNeeded() {
@@ -115,27 +133,93 @@ final class AutoPasteSyncManager {
         HistoryManager.shared.clearDraft()
     }
 
-    private func sendDraft(text: String, to targets: [SyncTarget]) {
-        for target in targets {
-            guard let url = targetURL(path: "/draft", target: target) else { continue }
+    private func startSyncTaskIfNeeded() {
+        guard syncTask == nil else { return }
 
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.timeoutInterval = 2
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = try? JSONEncoder().encode(DraftPayload(text: text, callbackPort: callbackPort))
+        syncTask = Task { [weak self] in
+            await self?.drainPendingDraftSyncs()
+        }
+    }
 
-            Task {
-                do {
-                    let (_, response) = try await URLSession.shared.data(for: request)
-                    if let httpResponse = response as? HTTPURLResponse,
-                       !(200...299).contains(httpResponse.statusCode) {
-                        print("AutoPaste sync failed for \(target.host):\(target.port) with status: \(httpResponse.statusCode)")
+    private func drainPendingDraftSyncs() async {
+        defer {
+            syncTask = nil
+
+            if isSceneActive, pendingDraftSync != nil {
+                startSyncTaskIfNeeded()
+            }
+        }
+
+        while !Task.isCancelled {
+            guard isSceneActive else { return }
+            guard let syncState = pendingDraftSync else { return }
+
+            if syncState == lastDeliveredDraftSync {
+                pendingDraftSync = nil
+                continue
+            }
+
+            let didSucceed = await sendDraft(text: syncState.text, to: Array(syncState.targets))
+            guard !Task.isCancelled else { return }
+
+            if didSucceed {
+                if pendingDraftSync == syncState {
+                    pendingDraftSync = nil
+                }
+                lastDeliveredDraftSync = syncState
+                consecutiveSyncFailures = 0
+                continue
+            }
+
+            consecutiveSyncFailures += 1
+            let retryDelayNanoseconds = UInt64(
+                min(
+                    pow(2.0, Double(consecutiveSyncFailures - 1)) * 350_000_000,
+                    5_000_000_000
+                )
+            )
+            try? await Task.sleep(nanoseconds: retryDelayNanoseconds)
+        }
+    }
+
+    private func sendDraft(text: String, to targets: [SyncTarget]) async -> Bool {
+        guard !targets.isEmpty else { return true }
+
+        let payload = DraftPayload(text: text, callbackPort: callbackPort)
+
+        return await withTaskGroup(of: Bool.self, returning: Bool.self) { group in
+            for target in targets {
+                guard let url = targetURL(path: "/draft", target: target) else { continue }
+
+                group.addTask {
+                    var request = URLRequest(url: url)
+                    request.httpMethod = "POST"
+                    request.timeoutInterval = 2
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    request.httpBody = try? JSONEncoder().encode(payload)
+
+                    do {
+                        let (_, response) = try await URLSession.shared.data(for: request)
+                        if let httpResponse = response as? HTTPURLResponse,
+                           !(200...299).contains(httpResponse.statusCode) {
+                            print("AutoPaste sync failed for \(target.host):\(target.port) with status: \(httpResponse.statusCode)")
+                            return false
+                        }
+                        return true
+                    } catch {
+                        print("AutoPaste sync failed for \(target.host):\(target.port): \(error.localizedDescription)")
+                        return false
                     }
-                } catch {
-                    print("AutoPaste sync failed for \(target.host):\(target.port): \(error.localizedDescription)")
                 }
             }
+
+            var allSucceeded = true
+            for await didSucceed in group {
+                if !didSucceed {
+                    allSucceeded = false
+                }
+            }
+            return allSucceeded
         }
     }
 
@@ -158,12 +242,17 @@ final class AutoPasteSyncManager {
     }
 }
 
-private struct SyncTarget: Hashable {
+nonisolated private struct SyncTarget: Hashable, Sendable {
     let host: String
     let port: Int
 }
 
-private struct DraftPayload: Encodable {
+nonisolated private struct DraftSyncState: Equatable, Sendable {
+    let text: String
+    let targets: Set<SyncTarget>
+}
+
+nonisolated private struct DraftPayload: Encodable, Sendable {
     let text: String
     let callbackPort: UInt16
 }
