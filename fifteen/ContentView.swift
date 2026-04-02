@@ -494,7 +494,7 @@ struct DraftTextView: UIViewRepresentable {
         var parent: DraftTextView
         var lastText: String
         var lastInputSessionResetToken: Int
-        var shouldForceDirectTextSync = false
+        var shouldPreferLegacyTextSync = false
         
         init(_ parent: DraftTextView) {
             self.parent = parent
@@ -506,13 +506,15 @@ struct DraftTextView: UIViewRepresentable {
             guard lastInputSessionResetToken != parent.inputSessionResetToken else { return }
 
             lastInputSessionResetToken = parent.inputSessionResetToken
-            shouldForceDirectTextSync = true
+            shouldPreferLegacyTextSync = true
         }
 
         func syncTextIfNeeded(on textView: UITextView) {
-            if shouldForceDirectTextSync {
-                shouldForceDirectTextSync = false
+            if shouldPreferLegacyTextSync {
                 textView.text = parent.text
+                if parent.text.isEmpty {
+                    shouldPreferLegacyTextSync = false
+                }
                 return
             }
 
