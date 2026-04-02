@@ -25,6 +25,7 @@ struct ContentView: View {
     
     @State private var showWorkflowError = false
     @State private var hapticTrigger = 0
+    @State private var inputSessionResetToken = 0
     
     private var draftText: String {
         historyManager.currentDraft.text
@@ -262,6 +263,7 @@ struct ContentView: View {
                         set: { historyManager.updateDraftText($0) }
                     ),
                     isFocused: $isTextEditorFocused,
+                    inputSessionResetToken: inputSessionResetToken,
                     isScrollEnabled: !draftText.isEmpty,
                     isUserInteractionEnabled: !isKeyboardAnimating,
                     font: UIFont.systemFont(ofSize: 17, weight: .regular)
@@ -320,6 +322,7 @@ struct ContentView: View {
             if draftText.isEmpty {
                 historyManager.clearDraftTags()
             } else {
+                interruptDraftInputSession()
                 historyManager.clearDraft()
             }
         }
@@ -334,6 +337,8 @@ struct ContentView: View {
         }
 
         guard !draftText.isEmpty else { return }
+
+        interruptDraftInputSession()
 
         if draftText.hasPrefix("打开调试模式") {
             historyManager.clearDraft()
@@ -426,11 +431,16 @@ struct ContentView: View {
         historyManager.updateDraftText(text)
         historyManager.finalizeDraft()
     }
+
+    private func interruptDraftInputSession() {
+        inputSessionResetToken &+= 1
+    }
 }
 
 struct DraftTextView: UIViewRepresentable {
     @Binding var text: String
     @Binding var isFocused: Bool
+    let inputSessionResetToken: Int
     let isScrollEnabled: Bool
     let isUserInteractionEnabled: Bool
     let font: UIFont
@@ -451,12 +461,15 @@ struct DraftTextView: UIViewRepresentable {
     
     func updateUIView(_ uiView: UITextView, context: Context) {
         context.coordinator.parent = self
+        context.coordinator.resetInputSessionIfNeeded(on: uiView)
         context.coordinator.syncTextIfNeeded(on: uiView)
         uiView.font = font
         uiView.isScrollEnabled = isScrollEnabled
         uiView.isUserInteractionEnabled = isUserInteractionEnabled
-        
-        if isFocused && !uiView.isFirstResponder {
+
+        if context.coordinator.restoreFocusIfNeeded(on: uiView) {
+            // Keep the editor ready after a local clear/send while ending dictation.
+        } else if isFocused && !uiView.isFirstResponder {
             uiView.becomeFirstResponder()
         } else if !isFocused && uiView.isFirstResponder {
             uiView.resignFirstResponder()
@@ -482,10 +495,32 @@ struct DraftTextView: UIViewRepresentable {
     final class Coordinator: NSObject, UITextViewDelegate {
         var parent: DraftTextView
         var lastText: String
+        var lastInputSessionResetToken: Int
+        var shouldRestoreFocusAfterReset = false
         
         init(_ parent: DraftTextView) {
             self.parent = parent
             self.lastText = parent.text
+            self.lastInputSessionResetToken = parent.inputSessionResetToken
+        }
+
+        func resetInputSessionIfNeeded(on textView: UITextView) {
+            guard lastInputSessionResetToken != parent.inputSessionResetToken else { return }
+
+            lastInputSessionResetToken = parent.inputSessionResetToken
+            shouldRestoreFocusAfterReset = parent.isFocused || textView.isFirstResponder
+
+            if textView.isFirstResponder {
+                textView.resignFirstResponder()
+            }
+        }
+
+        func restoreFocusIfNeeded(on textView: UITextView) -> Bool {
+            guard shouldRestoreFocusAfterReset else { return false }
+
+            shouldRestoreFocusAfterReset = false
+            textView.becomeFirstResponder()
+            return true
         }
 
         func syncTextIfNeeded(on textView: UITextView) {
