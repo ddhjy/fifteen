@@ -467,9 +467,7 @@ struct DraftTextView: UIViewRepresentable {
         uiView.isScrollEnabled = isScrollEnabled
         uiView.isUserInteractionEnabled = isUserInteractionEnabled
 
-        if context.coordinator.restoreFocusIfNeeded(on: uiView) {
-            // Keep the editor ready after a local clear/send while ending dictation.
-        } else if isFocused && !uiView.isFirstResponder {
+        if isFocused && !uiView.isFirstResponder {
             uiView.becomeFirstResponder()
         } else if !isFocused && uiView.isFirstResponder {
             uiView.resignFirstResponder()
@@ -496,7 +494,7 @@ struct DraftTextView: UIViewRepresentable {
         var parent: DraftTextView
         var lastText: String
         var lastInputSessionResetToken: Int
-        var shouldRestoreFocusAfterReset = false
+        var shouldForceDirectTextSync = false
         
         init(_ parent: DraftTextView) {
             self.parent = parent
@@ -508,22 +506,16 @@ struct DraftTextView: UIViewRepresentable {
             guard lastInputSessionResetToken != parent.inputSessionResetToken else { return }
 
             lastInputSessionResetToken = parent.inputSessionResetToken
-            shouldRestoreFocusAfterReset = parent.isFocused || textView.isFirstResponder
-
-            if textView.isFirstResponder {
-                textView.resignFirstResponder()
-            }
-        }
-
-        func restoreFocusIfNeeded(on textView: UITextView) -> Bool {
-            guard shouldRestoreFocusAfterReset else { return false }
-
-            shouldRestoreFocusAfterReset = false
-            textView.becomeFirstResponder()
-            return true
+            shouldForceDirectTextSync = true
         }
 
         func syncTextIfNeeded(on textView: UITextView) {
+            if shouldForceDirectTextSync {
+                shouldForceDirectTextSync = false
+                textView.text = parent.text
+                return
+            }
+
             guard textView.text != parent.text else { return }
 
             if textView.isFirstResponder,
