@@ -149,6 +149,7 @@ class HistoryManager {
     static let shared = HistoryManager()
     
     var items: [HistoryItem] = []
+    private(set) var lastClearedText: String = ""
     var isLoading = false
     private(set) var hasLoadedHistory = false
     
@@ -175,6 +176,10 @@ class HistoryManager {
         items.insert(newDraft, at: 0)
         return newDraft
     }
+
+    var hasLastClearedText: Bool {
+        !lastClearedText.isEmpty
+    }
     
     private func ensureDraftExists() {
         if !items.contains(where: { $0.isDraft }) {
@@ -189,13 +194,31 @@ class HistoryManager {
     
     func updateDraftText(_ text: String) {
         guard let index = items.firstIndex(where: { $0.isDraft }) else { return }
+        if !text.isEmpty {
+            lastClearedText = ""
+        }
         items[index].text = text
         saveDraft()
         notifyDraftDidChange(text)
     }
 
     func clearDraft() {
-        updateDraftText("")
+        guard let index = items.firstIndex(where: { $0.isDraft }) else { return }
+        let currentText = items[index].text
+        if !currentText.isEmpty {
+            lastClearedText = currentText
+        }
+        items[index].text = ""
+        saveDraft()
+        notifyDraftDidChange("")
+    }
+
+    func restoreLastClearedDraft() {
+        guard let index = items.firstIndex(where: { $0.isDraft }), !lastClearedText.isEmpty else { return }
+        items[index].text = lastClearedText
+        lastClearedText = ""
+        saveDraft()
+        notifyDraftDidChange(items[index].text)
     }
 
     func clearDraftTags() {
@@ -211,6 +234,9 @@ class HistoryManager {
               !items[draftIndex].text.isEmpty else { return }
         
         let draft = items[draftIndex]
+        if !draft.text.isEmpty {
+            lastClearedText = draft.text
+        }
         
         TagManager.shared.saveLastSelectedTags(draft.tags)
         

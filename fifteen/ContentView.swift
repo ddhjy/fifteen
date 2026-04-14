@@ -320,7 +320,12 @@ struct ContentView: View {
         hapticTrigger += 1
         withAnimation(.easeOut(duration: 0.25)) {
             if draftText.isEmpty {
-                historyManager.clearDraftTags()
+                if historyManager.hasLastClearedText {
+                    interruptDraftInputSession()
+                    historyManager.restoreLastClearedDraft()
+                } else {
+                    historyManager.clearDraftTags()
+                }
             } else {
                 interruptDraftInputSession()
                 historyManager.clearDraft()
