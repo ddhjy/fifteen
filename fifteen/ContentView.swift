@@ -131,7 +131,7 @@ struct ContentView: View {
                 .tint(.primary)
                 .padding(14)
                 .glassEffect(.regular.interactive(), in: Circle())
-                .disabled(processingWorkflowId != nil || trimmedDraftText.isEmpty)
+                .disabled(processingWorkflowId != nil)
 
             Button("清除", systemImage: "trash", action: clearText)
                 .labelStyle(.iconOnly)
@@ -311,9 +311,12 @@ struct ContentView: View {
     }
 
     private func searchDraftInHistory() {
-        guard !trimmedDraftText.isEmpty else { return }
         hapticTrigger += 1
-        navigateToHistory(searchText: trimmedDraftText)
+        if trimmedDraftText.isEmpty {
+            navigateToHistory()
+        } else {
+            navigateToHistory(searchText: trimmedDraftText)
+        }
     }
     
     private func clearText() {
