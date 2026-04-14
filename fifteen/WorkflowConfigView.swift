@@ -87,6 +87,7 @@ struct WorkflowConfigView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("完成") { dismiss() }
+                        .fontWeight(.semibold)
                 }
             }
             .sheet(isPresented: $showAddNode) { AddNodeSheet() }
@@ -379,6 +380,7 @@ struct WorkflowListView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("完成") { dismiss() }
+                        .fontWeight(.semibold)
                 }
             }
             .alert("重命名", isPresented: $showRenameAlert) {
@@ -481,6 +483,7 @@ struct NodeRowView: View {
                 }
             ))
             .labelsHidden()
+            .tint(Design.primaryColor)
         }
         .contentShape(Rectangle())
         .onTapGesture { onEdit() }
@@ -519,7 +522,6 @@ struct AddNodeSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("取消") { dismiss() }
-                        .tint(Design.primaryColor)
                 }
             }
         }
@@ -571,7 +573,6 @@ struct EditNodeSheet: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("保存") { saveChanges() }
                         .fontWeight(.semibold)
-                        .tint(.primary)
                 }
             }
             .onAppear {
@@ -735,6 +736,7 @@ struct IconPickerView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("完成") { dismiss() }
+                        .fontWeight(.semibold)
                 }
             }
         }

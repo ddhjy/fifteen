@@ -2,7 +2,7 @@ import SwiftUI
 
 enum Design {
     static let primaryColor = Color(hex: 0x6366F1)
-    static let negativeColor = Color(hex: 0xEF4444)
+    static let negativeColor = Color(.systemRed)
 }
 
 extension Color {

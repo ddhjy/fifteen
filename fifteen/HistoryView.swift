@@ -298,7 +298,6 @@ struct HistoryView: View {
                             Image(systemName: "checkmark")
                                 .font(.system(size: 17, weight: .regular))
                         }
-                        .tint(.primary)
                     } else {
                         Menu {
                             Button(action: {
@@ -326,7 +325,6 @@ struct HistoryView: View {
                                     .font(.system(size: 17, weight: .regular))
                             }
                         }
-                        .tint(.primary)
                     }
                 }
             }
@@ -363,7 +361,7 @@ struct HistoryView: View {
                         Image(systemName: "trash")
                             .font(.system(size: 20))
                     }
-                    .tint(Color(hex: 0xFF3B30))
+                    .tint(Color(.systemRed))
                 }
             }
         }
@@ -569,13 +567,7 @@ struct HistoryView: View {
                 
                 Image(systemName: "rectangle.stack")
                     .font(.system(size: 40, weight: .light))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [Design.primaryColor, Color(hex: 0x8B5CF6)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .foregroundStyle(Color(.secondaryLabel))
             }
             .opacity(appearAnimation ? 1 : 0)
             .scaleEffect(appearAnimation ? 1 : 0.8)
@@ -583,7 +575,6 @@ struct HistoryView: View {
             VStack(spacing: 8) {
                 Text("还没有记录")
                     .font(.title3.bold())
-                    .fontDesign(.rounded)
                     .foregroundStyle(Color(.label))
                 
                 Text("在主页写下内容，点击保存即可")
@@ -661,7 +652,7 @@ struct HistoryView: View {
                     .padding(.vertical, 12)
                 }
             }
-            .scrollIndicators(.hidden)
+            .scrollIndicators(.automatic)
             .onChange(of: selectedTags) { _, _ in
                 Task { @MainActor in
                     proxy.scrollTo("ListTopAnchor", anchor: .top)
@@ -814,18 +805,12 @@ struct HistoryRowView: View {
                             isSelected ? Design.primaryColor : Color(.quaternaryLabel),
                             lineWidth: 1.5
                         )
-                        .frame(width: 22, height: 22)
+                        .frame(width: 24, height: 24)
                     
-                    if isSelected {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [Design.primaryColor, Color(hex: 0x818CF8)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 22, height: 22)
+                                    if isSelected {
+                                        Circle()
+                                            .fill(Design.primaryColor)
+                                            .frame(width: 24, height: 24)
                         
                         Image(systemName: "checkmark")
                             .font(.system(size: 11, weight: .bold))
@@ -841,9 +826,7 @@ struct HistoryRowView: View {
                     .foregroundStyle(Color(.label))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     
-                    Rectangle()
-                        .fill(Color(.separator).opacity(0.5))
-                        .frame(height: 1)
+                    Divider()
                     
                     HStack(spacing: 8) {
                         Text(item.formattedDate)
@@ -876,7 +859,7 @@ struct HistoryRowView: View {
                         
                         if !isEditMode {
                             Image(systemName: "ellipsis")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.system(size: 14, weight: .regular))
                                 .foregroundStyle(Color(.tertiaryLabel))
                                 .frame(width: 32, height: 16, alignment: .trailing)
                         }
@@ -951,14 +934,6 @@ struct HistoryRowView: View {
     
     private func createHighlightedAttributedString(text: String, searchText: String) -> AttributedString {
         var attributedString = AttributedString(text)
-        
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.alignment = .justified
-        paragraphStyle.lineBreakMode = .byWordWrapping
-        
-        var container = AttributeContainer()
-        container.paragraphStyle = paragraphStyle
-        attributedString.mergeAttributes(container)
         
         let lowercasedText = text.lowercased()
         let tokens = searchText
@@ -1146,6 +1121,7 @@ struct StatisticsView: View {
                     Button("完成") {
                         dismiss()
                     }
+                    .fontWeight(.semibold)
                 }
             }
         }
@@ -1242,7 +1218,7 @@ struct CalendarGridView: View {
                             
                             if count > 0 && !isSelected {
                                 Circle()
-                                    .fill(Color.green.opacity(min(Double(count) / 5.0, 1.0) * 0.7 + 0.3))
+                                    .fill(Design.primaryColor.opacity(min(Double(count) / 5.0, 1.0) * 0.7 + 0.3))
                                     .frame(width: 6, height: 6)
                             } else {
                                 Circle()

@@ -179,7 +179,7 @@ struct TagPickerView: View {
                 }
             }
             .background(
-                Color(hex: 0xF2F2F6)
+                Color(.systemGroupedBackground)
                     .ignoresSafeArea()
             )
             .navigationTitle(selectedTagCount > 0 ? "标签 (\(selectedTagCount))" : "标签")
@@ -190,15 +190,13 @@ struct TagPickerView: View {
                     Button(action: { showCreateTag = true }) {
                         Image(systemName: "plus")
                     }
-                    .tint(.primary)
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("完成") {
                         dismiss()
                     }
-                    .font(.callout.bold())
-                    .tint(.primary)
+                    .fontWeight(.semibold)
                 }
             }
             .sheet(isPresented: $showCreateTag, onDismiss: {
@@ -370,15 +368,15 @@ struct TagRowView: View {
             ZStack {
                 Circle()
                     .stroke(circleColor, lineWidth: 2)
-                    .frame(width: 22, height: 22)
+                    .frame(width: 24, height: 24)
                 
                 if isSelected || isPreviousSelected {
                     Circle()
                         .fill(circleColor)
-                        .frame(width: 22, height: 22)
+                        .frame(width: 24, height: 24)
                     
                     Image(systemName: "checkmark")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(.white)
                 }
             }
@@ -465,7 +463,7 @@ struct TagEditSheet: View {
             }
             .padding(.top, 20)
             .background(
-                Color(hex: 0xF2F2F6)
+                Color(.systemGroupedBackground)
                     .ignoresSafeArea()
             )
             .navigationTitle("编辑标签")
@@ -475,15 +473,13 @@ struct TagEditSheet: View {
                     Button("取消") {
                         dismiss()
                     }
-                    .foregroundStyle(Color(.secondaryLabel))
                 }
                 
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("保存") {
                         saveTag()
                     }
-                    .font(.callout.bold())
-                    .tint(.primary)
+                    .fontWeight(.semibold)
                     .disabled(newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
@@ -535,7 +531,7 @@ struct TagCreateSheet: View {
             }
             .padding(.top, 20)
             .background(
-                Color(hex: 0xF2F2F6)
+                Color(.systemGroupedBackground)
                     .ignoresSafeArea()
             )
             .navigationTitle("新建标签")
@@ -545,15 +541,13 @@ struct TagCreateSheet: View {
                     Button("取消") {
                         dismiss()
                     }
-                    .foregroundStyle(Color(.secondaryLabel))
                 }
                 
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("添加") {
                         addTag()
                     }
-                    .font(.callout.bold())
-                    .tint(.primary)
+                    .fontWeight(.semibold)
                     .disabled(tagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
@@ -1107,7 +1101,7 @@ struct BatchTagPickerView: View {
                     Spacer()
                 }
             }
-            .background(Color(hex: 0xF2F2F6).ignoresSafeArea())
+            .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .navigationTitle("标签 · \(itemIds.count) 条记录")
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索标签")
@@ -1116,12 +1110,10 @@ struct BatchTagPickerView: View {
                     Button(action: { showCreateTag = true }) {
                         Image(systemName: "plus")
                     }
-                    .tint(.primary)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("完成") { dismiss() }
-                        .font(.callout.bold())
-                        .tint(.primary)
+                        .fontWeight(.semibold)
                 }
             }
             .sheet(isPresented: $showCreateTag, onDismiss: {
@@ -1213,21 +1205,21 @@ struct BatchTagRowView: View {
             ZStack {
                 Circle()
                     .stroke(circleColor, lineWidth: 2)
-                    .frame(width: 22, height: 22)
+                    .frame(width: 24, height: 24)
                 
                 if state == true {
                     Circle()
                         .fill(circleColor)
-                        .frame(width: 22, height: 22)
+                        .frame(width: 24, height: 24)
                     Image(systemName: "checkmark")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(.white)
                 } else if state == nil {
                     Circle()
                         .fill(circleColor)
-                        .frame(width: 22, height: 22)
+                        .frame(width: 24, height: 24)
                     Image(systemName: "minus")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(.white)
                 }
             }

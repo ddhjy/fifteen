@@ -15,9 +15,10 @@ struct DebugView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("关闭") {
+                    Button("完成") {
                         dismiss()
                     }
+                    .fontWeight(.semibold)
                 }
             }
         }

@@ -55,13 +55,11 @@ struct ContentView: View {
                         navigateToHistory()
                     }
                         .labelStyle(.iconOnly)
-                        .tint(.primary)
                 }
                 
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("设置", systemImage: "ellipsis") { showSettings = true }
                         .labelStyle(.iconOnly)
-                        .tint(.primary)
                 }
             }
 
@@ -128,14 +126,12 @@ struct ContentView: View {
             
             Button("搜索", systemImage: "magnifyingglass", action: searchDraftInHistory)
                 .labelStyle(.iconOnly)
-                .tint(.primary)
                 .padding(14)
                 .glassEffect(.regular.interactive(), in: Circle())
                 .disabled(processingWorkflowId != nil)
 
-            Button("清除", systemImage: "trash", action: clearText)
+            Button("清除", systemImage: "xmark", action: clearText)
                 .labelStyle(.iconOnly)
-                .tint(.primary)
                 .padding(14)
                 .glassEffect(.regular.interactive(), in: Circle())
                 .disabled(processingWorkflowId != nil)
@@ -165,11 +161,10 @@ struct ContentView: View {
                     .font(.system(size: 18))
                     .frame(width: 20, height: 20)
             }
-            .tint(.primary)
-            .padding(14)
-            .glassEffect(.regular.interactive(), in: Circle())
-            .accessibilityLabel("标签")
-            .disabled(processingWorkflowId != nil)
+        .padding(14)
+        .glassEffect(.regular.interactive(), in: Circle())
+        .accessibilityLabel("标签")
+        .disabled(processingWorkflowId != nil)
         } else {
             Button(action: { showTagSelector = true }) {
                 HStack(spacing: 6) {
@@ -200,7 +195,6 @@ struct ContentView: View {
                 }
                 .frame(height: 20)
             }
-            .tint(.primary)
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
             .glassEffect(.regular.interactive(), in: Capsule())
@@ -217,7 +211,6 @@ struct ContentView: View {
                 .font(.system(size: 18, weight: .medium))
                 .frame(width: 20, height: 20)
         }
-        .tint(.primary)
         .frame(width: 44, height: 44)
         .contentShape(Circle())
         .accessibilityLabel("工作流设置")

@@ -52,8 +52,7 @@ struct SettingsView: View {
                     Button("完成") {
                         dismiss()
                     }
-                    .font(.callout.bold())
-                    .tint(.primary)
+                    .fontWeight(.semibold)
                 }
             }
         }
