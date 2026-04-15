@@ -309,7 +309,6 @@ struct ContentView: View {
     }
 
     private func searchDraftInHistory() {
-        hapticTrigger += 1
         if trimmedDraftText.isEmpty {
             navigateToHistory()
         } else {
@@ -318,19 +317,16 @@ struct ContentView: View {
     }
     
     private func clearText() {
-        hapticTrigger += 1
-        withAnimation(.easeOut(duration: 0.25)) {
-            if draftText.isEmpty {
-                if historyManager.hasLastClearedText {
-                    interruptDraftInputSession()
-                    historyManager.restoreLastClearedDraft()
-                } else {
-                    historyManager.clearDraftTags()
-                }
-            } else {
+        if draftText.isEmpty {
+            if historyManager.hasLastClearedText {
                 interruptDraftInputSession()
-                historyManager.clearDraft()
+                historyManager.restoreLastClearedDraft()
+            } else {
+                historyManager.clearDraftTags()
             }
+        } else {
+            interruptDraftInputSession()
+            historyManager.clearDraft()
         }
     }
     
