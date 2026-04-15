@@ -24,7 +24,6 @@ struct ContentView: View {
     @State private var hasLaunched = false
     
     @State private var showWorkflowError = false
-    @State private var hapticTrigger = 0
     @State private var inputSessionResetToken = 0
     
     private var draftText: String {
@@ -88,7 +87,6 @@ struct ContentView: View {
             }
 
         }
-        .sensoryFeedback(.impact(weight: .light), trigger: hapticTrigger)
         .onAppear {
             historyManager.loadItemsIfNeeded()
             if !hasLaunched {
@@ -331,8 +329,6 @@ struct ContentView: View {
     }
     
     private func handleWorkflowTap(_ workflow: Workflow) {
-        hapticTrigger += 1
-
         if workflow.kind == .autoPasteSync {
             toggleAutoPasteWorkflow(workflow)
             return

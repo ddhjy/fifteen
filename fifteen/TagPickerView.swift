@@ -312,9 +312,7 @@ struct TagPickerView: View {
     private func markers(for tagName: String, isSelected: Bool, isPreviousSelected: Bool) -> [TagRowMarker] {
         var markers: [TagRowMarker] = []
 
-        if isSelected {
-            markers.append(.selected)
-        } else if isPreviousSelected {
+        if !isSelected && isPreviousSelected {
             markers.append(.recent)
         }
 
@@ -381,7 +379,7 @@ struct TagRowView: View {
                 }
             }
             
-            VStack(alignment: .leading, spacing: markers.isEmpty ? 0 : 6) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text(tagName)
                     .font(.callout)
                     .foregroundStyle(Color(.label))
@@ -392,6 +390,7 @@ struct TagRowView: View {
                             TagRowMarkerBadge(marker: marker)
                         }
                     }
+                    .padding(.top, 6)
                 }
             }
             
