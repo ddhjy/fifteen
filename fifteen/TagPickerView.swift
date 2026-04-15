@@ -23,7 +23,6 @@ struct TagPickerView: View {
     
     @State private var hasStartedReselection: Bool = false
 
-    @State private var hapticTrigger = 0
     @State private var locallyCreatedTags: Set<String> = []
 
     @State private var recommendedTags: [String] = []
@@ -216,7 +215,6 @@ struct TagPickerView: View {
                     pendingRenameOperation = (from: tagName, to: newName)
                 }
             }
-        .sensoryFeedback(.impact(weight: .light), trigger: hapticTrigger)
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
@@ -275,8 +273,6 @@ struct TagPickerView: View {
     }
     
     private func toggleTag(_ tagName: String) {
-        hapticTrigger += 1
-        
         withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
             if localSelectedTags.contains(tagName) {
                 localSelectedTags.remove(tagName)
@@ -289,8 +285,6 @@ struct TagPickerView: View {
     private func createTagFromSearch() {
         let newTag = trimmedSearchText
         guard !newTag.isEmpty else { return }
-
-        hapticTrigger += 1
 
         withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
             locallyCreatedTags.insert(newTag)
@@ -834,8 +828,6 @@ struct FilterChip: View {
     var count: Int? = nil
     let action: () -> Void
     
-    @State private var hapticTrigger = 0
-    
     private var isSelected: Bool { selectionState != nil }
     private var isNegative: Bool { selectionState == .negative }
     
@@ -844,10 +836,7 @@ struct FilterChip: View {
     }
     
     var body: some View {
-        Button(action: {
-            hapticTrigger += 1
-            action()
-        }) {
+        Button(action: action) {
             HStack(spacing: 4) {
                 Text(title)
                     .font(.footnote)
@@ -868,7 +857,6 @@ struct FilterChip: View {
             .foregroundStyle(isSelected ? activeColor : Color(.secondaryLabel))
         }
         .buttonStyle(.plain)
-        .sensoryFeedback(.impact(weight: .light), trigger: hapticTrigger)
         .animation(.none, value: selectionState)
     }
 }
@@ -880,14 +868,10 @@ struct FilterIconChip: View {
     var usesDiceHaptics: Bool = false
     let action: () -> Void
 
-    @State private var hapticTrigger = 0
-
     var body: some View {
         Button(action: {
             if usesDiceHaptics {
                 playDiceHaptics()
-            } else {
-                hapticTrigger += 1
             }
             action()
         }) {
@@ -903,7 +887,6 @@ struct FilterIconChip: View {
                 .foregroundStyle(isSelected ? Design.primaryColor : Color(.secondaryLabel))
         }
         .buttonStyle(.plain)
-        .sensoryFeedback(.impact(weight: .light), trigger: hapticTrigger)
         .accessibilityLabel(accessibilityLabel)
         .animation(.none, value: isSelected)
     }
@@ -938,8 +921,6 @@ struct FilterIconChipWithState: View {
     let selectionState: TagSelectionState?
     let action: () -> Void
     
-    @State private var hapticTrigger = 0
-    
     private var isSelected: Bool { selectionState != nil }
     private var isNegative: Bool { selectionState == .negative }
     
@@ -948,10 +929,7 @@ struct FilterIconChipWithState: View {
     }
 
     var body: some View {
-        Button(action: {
-            hapticTrigger += 1
-            action()
-        }) {
+        Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 13, weight: .medium))
                 .frame(height: 16)
@@ -970,7 +948,6 @@ struct FilterIconChipWithState: View {
                 )
         }
         .buttonStyle(.plain)
-        .sensoryFeedback(.impact(weight: .light), trigger: hapticTrigger)
         .accessibilityLabel(accessibilityLabel)
         .animation(.none, value: selectionState)
     }
@@ -985,7 +962,6 @@ struct BatchTagPickerView: View {
     @State private var showCreateTag = false
     @State private var searchText: String = ""
     @State private var frozenSortedTags: [String] = []
-    @State private var hapticTrigger = 0
     @State private var locallyCreatedTags: Set<String> = []
     
     @State private var tagStates: [String: Bool?] = [:]
@@ -1125,7 +1101,6 @@ struct BatchTagPickerView: View {
             }) {
                 TagCreateSheet(itemId: itemIds.first ?? UUID())
             }
-        .sensoryFeedback(.impact(weight: .light), trigger: hapticTrigger)
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
@@ -1140,8 +1115,6 @@ struct BatchTagPickerView: View {
     }
     
     private func toggleTag(_ tagName: String) {
-        hapticTrigger += 1
-        
         withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
             let current = tagStates[tagName] ?? nil
             switch current {
@@ -1158,8 +1131,6 @@ struct BatchTagPickerView: View {
     private func createTagFromSearch() {
         let newTag = trimmedSearchText
         guard !newTag.isEmpty else { return }
-
-        hapticTrigger += 1
 
         withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
             locallyCreatedTags.insert(newTag)

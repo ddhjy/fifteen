@@ -60,7 +60,6 @@ struct HistoryView: View {
     @State private var batchCopyToastWorkItem: DispatchWorkItem?
     @State private var isRebuildingCache = false
     @State private var rebuildToken = UUID()
-    @State private var lightHapticTrigger = 0
     @State private var mediumHapticTrigger = 0
     
     nonisolated private struct HistoryListCache: Sendable {
@@ -264,7 +263,6 @@ struct HistoryView: View {
                 historyContent
             }
         }
-        .sensoryFeedback(.impact(weight: .light), trigger: lightHapticTrigger)
         .sensoryFeedback(.impact(weight: .medium), trigger: mediumHapticTrigger)
         .overlay(alignment: .top) {
             if showBatchCopiedToast {
@@ -669,8 +667,6 @@ struct HistoryView: View {
     }
     
     private func toggleSelection(_ item: HistoryItem) {
-        lightHapticTrigger += 1
-        
         withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
             if selectedItems.contains(item.id) {
                 selectedItems.remove(item.id)
