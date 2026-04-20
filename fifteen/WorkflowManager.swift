@@ -52,10 +52,7 @@ struct WorkflowNode: Identifiable, Codable, Equatable {
     }
     
     static func defaultNodes() -> [WorkflowNode] {
-        [
-            WorkflowNode(type: .copyToClipboard, isEnabled: false),
-            WorkflowNode(type: .save, isEnabled: true)
-        ]
+        []
     }
 }
 
@@ -193,8 +190,9 @@ class WorkflowManager {
 
     func areTerminalNodesAllDisabled(for workflow: Workflow) -> Bool {
         guard workflow.kind == .manual else { return false }
-        let saveEnabled = workflow.nodes.first(where: { $0.type == .save })?.isEnabled ?? false
-        return !saveEnabled
+        let saveEnabled = workflow.nodes.contains { $0.type == .save && $0.isEnabled }
+        let copyEnabled = workflow.nodes.contains { $0.type == .copyToClipboard && $0.isEnabled }
+        return !saveEnabled && !copyEnabled
     }
     
     func selectWorkflow(_ id: UUID) {
