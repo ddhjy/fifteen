@@ -15,11 +15,13 @@ struct ContentView: View {
     @State private var showWorkflowConfig = false
     @State private var workflowManager = WorkflowManager.shared
     @State private var processingWorkflowId: UUID? = nil
+    @State private var visibleLoadingWorkflowId: UUID? = nil
     @State private var workflowError: Error? = nil
     
     @State private var isKeyboardAnimating: Bool = false
     
     @State private var keyboardTask: Task<Void, Never>?
+    @State private var workflowLoadingTask: Task<Void, Never>?
     
     @State private var hasLaunched = false
     
@@ -225,7 +227,7 @@ struct ContentView: View {
             handleWorkflowTap(workflow)
         } label: {
             Group {
-                if processingWorkflowId == workflow.id {
+                if visibleLoadingWorkflowId == workflow.id {
                     ProgressView()
                         .scaleEffect(0.8)
                 } else {
@@ -349,15 +351,15 @@ struct ContentView: View {
     
     private func executeWorkflow(_ workflow: Workflow) {
         processingWorkflowId = workflow.id
-        let startTime = Date()
-        let minimumLoadingDuration: TimeInterval = 0.2
-
-        let waitMinimumDurationIfNeeded: () async -> Void = {
-            let elapsed = Date().timeIntervalSince(startTime)
-            guard elapsed < minimumLoadingDuration else { return }
-            let remaining = minimumLoadingDuration - elapsed
-            guard remaining > 0 else { return }
-            try? await Task.sleep(for: .seconds(remaining))
+        visibleLoadingWorkflowId = nil
+        workflowLoadingTask?.cancel()
+        workflowLoadingTask = Task {
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard processingWorkflowId == workflow.id else { return }
+                visibleLoadingWorkflowId = workflow.id
+            }
         }
 
         Task {
@@ -368,9 +370,10 @@ struct ContentView: View {
                     tags: selectedTags
                 )
 
-                await waitMinimumDurationIfNeeded()
-
                 await MainActor.run {
+                    workflowLoadingTask?.cancel()
+                    workflowLoadingTask = nil
+                    visibleLoadingWorkflowId = nil
                     processingWorkflowId = nil
                     
                     if result.shouldSave {
@@ -380,9 +383,10 @@ struct ContentView: View {
                     }
                 }
             } catch {
-                await waitMinimumDurationIfNeeded()
-
                 await MainActor.run {
+                    workflowLoadingTask?.cancel()
+                    workflowLoadingTask = nil
+                    visibleLoadingWorkflowId = nil
                     processingWorkflowId = nil
                     workflowError = error
                     showWorkflowError = true
