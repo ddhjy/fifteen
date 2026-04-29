@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import zlib
 
 nonisolated struct HistoryItem: Identifiable, Equatable, Sendable {
     let id: UUID
@@ -43,6 +44,43 @@ nonisolated struct HistoryItem: Identifiable, Equatable, Sendable {
         }
         
         return Self.relativeDateFormatter.localizedString(for: createdAt, relativeTo: now)
+    }
+}
+
+nonisolated struct NotesImportResult: Sendable {
+    let importedCount: Int
+    let skippedCount: Int
+}
+
+enum NotesImportError: LocalizedError {
+    case noFilesSelected
+    case noImportableNotes
+    case invalidZipArchive
+    case unsupportedZipArchive
+    case unsupportedCompressionMethod(Int)
+    case corruptZipEntry(String)
+    case decompressionFailed
+    case fileTooLarge(String)
+    
+    var errorDescription: String? {
+        switch self {
+        case .noFilesSelected:
+            return "没有选择文件"
+        case .noImportableNotes:
+            return "没有找到可导入的 Markdown 记录"
+        case .invalidZipArchive:
+            return "压缩包格式不正确"
+        case .unsupportedZipArchive:
+            return "暂不支持这个压缩包格式"
+        case .unsupportedCompressionMethod(let method):
+            return "暂不支持压缩方式 \(method)"
+        case .corruptZipEntry(let name):
+            return "\(name) 读取失败"
+        case .decompressionFailed:
+            return "压缩包解压失败"
+        case .fileTooLarge(let name):
+            return "\(name) 太大，已停止导入"
+        }
     }
 }
 
@@ -161,6 +199,8 @@ class HistoryManager {
         formatter.dateFormat = "yyyy-MM-dd-HHmm-ss"
         return formatter
     }()
+    
+    private let maxImportEntrySize = 50 * 1024 * 1024
     
     private init() {
         ensureDraftExists()
@@ -417,6 +457,27 @@ class HistoryManager {
         let body = lines[bodyStartIndex...].joined(separator: "\n")
         
         return (description, tags, body)
+    }
+    
+    private func parseCreatedDate(from content: String) -> Date? {
+        let lines = content.components(separatedBy: "\n")
+        guard lines.first == "---" else { return nil }
+        
+        for line in lines.dropFirst() {
+            if line == "---" { break }
+            
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix("created:") else { continue }
+            
+            let value = trimmed
+                .replacing("created:", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+            
+            return dateFormatter.date(from: value)
+        }
+        
+        return nil
     }
 
     nonisolated private struct DiskLoadResult: Sendable {
@@ -794,10 +855,357 @@ class HistoryManager {
         
         return zipURL
     }
+    
+    func importNotes(from urls: [URL]) throws -> NotesImportResult {
+        guard !urls.isEmpty else { throw NotesImportError.noFilesSelected }
+        
+        var candidates: [ImportCandidate] = []
+        for url in urls {
+            let didAccess = url.startAccessingSecurityScopedResource()
+            defer {
+                if didAccess {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+            
+            candidates.append(contentsOf: try importCandidates(from: url))
+        }
+        
+        guard !candidates.isEmpty else { throw NotesImportError.noImportableNotes }
+        
+        let documentsURL = storageURL
+        var existingTexts = Set(savedItems.map(\.text))
+        var reservedFileNames = Set(savedItems.map(\.fileName))
+        reservedFileNames.insert(draftFileName)
+        
+        var importedItems: [HistoryItem] = []
+        var skippedCount = 0
+        
+        for candidate in candidates {
+            guard let parsed = parseMarkdownFile(content: candidate.content) else {
+                skippedCount += 1
+                continue
+            }
+            
+            guard !parsed.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                skippedCount += 1
+                continue
+            }
+            
+            guard !existingTexts.contains(parsed.body) else {
+                skippedCount += 1
+                continue
+            }
+            
+            let preferredDate = parseDate(from: candidate.fileName) ?? parseCreatedDate(from: candidate.content) ?? Date.now
+            let createdAt = uniqueImportDate(startingAt: preferredDate, reservedFileNames: &reservedFileNames)
+            let fileName = generateFileName(for: createdAt)
+            let description = parsed.description.isEmpty ? String(parsed.body.prefix(50)) : parsed.description
+            let item = HistoryItem(
+                fileName: fileName,
+                text: parsed.body,
+                createdAt: createdAt,
+                description: description,
+                tags: parsed.tags
+            )
+            let content = generateMarkdownContent(
+                text: item.text,
+                description: item.description,
+                tags: item.tags,
+                createdAt: item.createdAt
+            )
+            let fileURL = documentsURL.appendingPathComponent(fileName)
+            
+            try content.write(to: fileURL, atomically: true, encoding: .utf8)
+            
+            importedItems.append(item)
+            existingTexts.insert(parsed.body)
+        }
+        
+        guard !importedItems.isEmpty else {
+            return NotesImportResult(importedCount: 0, skippedCount: skippedCount)
+        }
+        
+        let draft = currentDraft
+        let mergedSavedItems = (importedItems + savedItems).sorted { $0.createdAt > $1.createdAt }
+        items = [draft] + mergedSavedItems
+        TagManager.shared.refreshTags(from: savedItems)
+        
+        return NotesImportResult(importedCount: importedItems.count, skippedCount: skippedCount)
+    }
 
     private func notifyDraftDidChange(_ text: String) {
         Task { @MainActor in
             AutoPasteSyncManager.shared.scheduleDraftSync(text: text)
         }
+    }
+}
+
+private struct ImportCandidate {
+    let fileName: String
+    let content: String
+}
+
+private extension HistoryManager {
+    func uniqueImportDate(startingAt preferredDate: Date, reservedFileNames: inout Set<String>) -> Date {
+        var candidateDate = preferredDate
+        
+        while reservedFileNames.contains(generateFileName(for: candidateDate)) {
+            candidateDate = candidateDate.addingTimeInterval(1)
+        }
+        
+        reservedFileNames.insert(generateFileName(for: candidateDate))
+        return candidateDate
+    }
+    
+    func importCandidates(from url: URL) throws -> [ImportCandidate] {
+        if url.hasDirectoryPath {
+            return try importCandidatesFromDirectory(url)
+        }
+        
+        switch url.pathExtension.lowercased() {
+        case "zip":
+            return try Self.importCandidatesFromZip(url: url, maxEntrySize: maxImportEntrySize)
+        case "md", "markdown":
+            return [try importCandidateFromMarkdownFile(url)]
+        default:
+            return []
+        }
+    }
+    
+    func importCandidatesFromDirectory(_ url: URL) throws -> [ImportCandidate] {
+        guard let enumerator = fileManager.enumerator(
+            at: url,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else {
+            return []
+        }
+        
+        var candidates: [ImportCandidate] = []
+        for case let fileURL as URL in enumerator {
+            guard Self.isImportableMarkdownFileName(fileURL.lastPathComponent) else { continue }
+            candidates.append(try importCandidateFromMarkdownFile(fileURL))
+        }
+        return candidates
+    }
+    
+    func importCandidateFromMarkdownFile(_ url: URL) throws -> ImportCandidate {
+        let content = try String(contentsOf: url, encoding: .utf8)
+        return ImportCandidate(fileName: url.lastPathComponent, content: content)
+    }
+    
+    static func importCandidatesFromZip(url: URL, maxEntrySize: Int) throws -> [ImportCandidate] {
+        let data = try Data(contentsOf: url)
+        let entries = try zipEntries(in: data)
+        var candidates: [ImportCandidate] = []
+        
+        for entry in entries {
+            guard isImportableMarkdownFileName(entry.fileName) else { continue }
+            guard entry.uncompressedSize <= maxEntrySize else {
+                throw NotesImportError.fileTooLarge(entry.fileName)
+            }
+            
+            let fileData = try zipEntryData(entry, in: data)
+            guard let content = String(data: fileData, encoding: .utf8) else {
+                throw NotesImportError.corruptZipEntry(entry.fileName)
+            }
+            
+            candidates.append(ImportCandidate(fileName: entry.fileName, content: content))
+        }
+        
+        return candidates
+    }
+    
+    static func isImportableMarkdownFileName(_ fileName: String) -> Bool {
+        let lowercased = fileName.lowercased()
+        guard lowercased.hasSuffix(".md") || lowercased.hasSuffix(".markdown") else { return false }
+        guard !fileName.hasPrefix(".") else { return false }
+        guard lowercased != "_draft.md" else { return false }
+        return true
+    }
+}
+
+private struct ZipEntry {
+    let path: String
+    let compressionMethod: Int
+    let compressedSize: Int
+    let uncompressedSize: Int
+    let localHeaderOffset: Int
+    
+    var fileName: String {
+        URL(fileURLWithPath: path).lastPathComponent
+    }
+}
+
+private extension HistoryManager {
+    static func zipEntries(in data: Data) throws -> [ZipEntry] {
+        let endOffset = try endOfCentralDirectoryOffset(in: data)
+        let entryCount = try intFromUInt16(data, at: endOffset + 10)
+        let centralDirectoryOffset = try intFromUInt32(data, at: endOffset + 16)
+        
+        guard centralDirectoryOffset < data.count else {
+            throw NotesImportError.invalidZipArchive
+        }
+        
+        var offset = centralDirectoryOffset
+        var entries: [ZipEntry] = []
+        
+        for _ in 0..<entryCount {
+            guard offset + 46 <= data.count else {
+                throw NotesImportError.invalidZipArchive
+            }
+            guard try uint32(data, at: offset) == 0x02014b50 else {
+                throw NotesImportError.invalidZipArchive
+            }
+            
+            let compressionMethod = try intFromUInt16(data, at: offset + 10)
+            let compressedSize = try intFromUInt32(data, at: offset + 20)
+            let uncompressedSize = try intFromUInt32(data, at: offset + 24)
+            let fileNameLength = try intFromUInt16(data, at: offset + 28)
+            let extraFieldLength = try intFromUInt16(data, at: offset + 30)
+            let fileCommentLength = try intFromUInt16(data, at: offset + 32)
+            let localHeaderOffset = try intFromUInt32(data, at: offset + 42)
+            let nameStart = offset + 46
+            let nameEnd = nameStart + fileNameLength
+            
+            guard nameEnd <= data.count else {
+                throw NotesImportError.invalidZipArchive
+            }
+            
+            let nameData = data.subdata(in: nameStart..<nameEnd)
+            let path = String(data: nameData, encoding: .utf8) ?? String(data: nameData, encoding: .ascii) ?? ""
+            
+            if !path.isEmpty && !path.hasSuffix("/") && !pathComponents(path).contains("__MACOSX") {
+                entries.append(ZipEntry(
+                    path: path,
+                    compressionMethod: compressionMethod,
+                    compressedSize: compressedSize,
+                    uncompressedSize: uncompressedSize,
+                    localHeaderOffset: localHeaderOffset
+                ))
+            }
+            
+            offset = nameEnd + extraFieldLength + fileCommentLength
+        }
+        
+        return entries
+    }
+    
+    static func zipEntryData(_ entry: ZipEntry, in archiveData: Data) throws -> Data {
+        let localHeaderOffset = entry.localHeaderOffset
+        guard localHeaderOffset + 30 <= archiveData.count else {
+            throw NotesImportError.invalidZipArchive
+        }
+        guard try uint32(archiveData, at: localHeaderOffset) == 0x04034b50 else {
+            throw NotesImportError.invalidZipArchive
+        }
+        
+        let localFileNameLength = try intFromUInt16(archiveData, at: localHeaderOffset + 26)
+        let localExtraFieldLength = try intFromUInt16(archiveData, at: localHeaderOffset + 28)
+        let dataStart = localHeaderOffset + 30 + localFileNameLength + localExtraFieldLength
+        let dataEnd = dataStart + entry.compressedSize
+        
+        guard dataStart <= archiveData.count, dataEnd <= archiveData.count else {
+            throw NotesImportError.invalidZipArchive
+        }
+        
+        let compressedData = archiveData.subdata(in: dataStart..<dataEnd)
+        switch entry.compressionMethod {
+        case 0:
+            return compressedData
+        case 8:
+            return try inflateRawDeflate(compressedData, uncompressedSize: entry.uncompressedSize)
+        default:
+            throw NotesImportError.unsupportedCompressionMethod(entry.compressionMethod)
+        }
+    }
+    
+    static func endOfCentralDirectoryOffset(in data: Data) throws -> Int {
+        guard data.count >= 22 else {
+            throw NotesImportError.invalidZipArchive
+        }
+        
+        let minimumOffset = max(0, data.count - 65_557)
+        var offset = data.count - 22
+        
+        while offset >= minimumOffset {
+            if try uint32(data, at: offset) == 0x06054b50 {
+                return offset
+            }
+            offset -= 1
+        }
+        
+        throw NotesImportError.invalidZipArchive
+    }
+    
+    static func inflateRawDeflate(_ data: Data, uncompressedSize: Int) throws -> Data {
+        guard uncompressedSize > 0 else { return Data() }
+        
+        var output = Data(count: uncompressedSize)
+        let outputCount = output.count
+        var stream = z_stream()
+        let initStatus = inflateInit2_(&stream, -MAX_WBITS, ZLIB_VERSION, Int32(MemoryLayout<z_stream>.size))
+        guard initStatus == Z_OK else {
+            throw NotesImportError.decompressionFailed
+        }
+        defer { inflateEnd(&stream) }
+        
+        let status = data.withUnsafeBytes { inputBuffer in
+            output.withUnsafeMutableBytes { outputBuffer in
+                guard let inputBase = inputBuffer.bindMemory(to: Bytef.self).baseAddress,
+                      let outputBase = outputBuffer.bindMemory(to: Bytef.self).baseAddress else {
+                    return Z_STREAM_ERROR
+                }
+                
+                stream.next_in = UnsafeMutablePointer<Bytef>(mutating: inputBase)
+                stream.avail_in = uInt(data.count)
+                stream.next_out = outputBase
+                stream.avail_out = uInt(outputCount)
+                
+                return inflate(&stream, Z_FINISH)
+            }
+        }
+        
+        guard status == Z_STREAM_END else {
+            throw NotesImportError.decompressionFailed
+        }
+        
+        return output
+    }
+    
+    static func pathComponents(_ path: String) -> [String] {
+        path.split(separator: "/").map(String.init)
+    }
+    
+    static func intFromUInt16(_ data: Data, at offset: Int) throws -> Int {
+        Int(try uint16(data, at: offset))
+    }
+    
+    static func intFromUInt32(_ data: Data, at offset: Int) throws -> Int {
+        let value = try uint32(data, at: offset)
+        guard value < UInt32.max else {
+            throw NotesImportError.unsupportedZipArchive
+        }
+        return Int(value)
+    }
+    
+    static func uint16(_ data: Data, at offset: Int) throws -> UInt16 {
+        guard offset >= 0, offset + 2 <= data.count else {
+            throw NotesImportError.invalidZipArchive
+        }
+        
+        return UInt16(data[offset]) | (UInt16(data[offset + 1]) << 8)
+    }
+    
+    static func uint32(_ data: Data, at offset: Int) throws -> UInt32 {
+        guard offset >= 0, offset + 4 <= data.count else {
+            throw NotesImportError.invalidZipArchive
+        }
+        
+        return UInt32(data[offset])
+            | (UInt32(data[offset + 1]) << 8)
+            | (UInt32(data[offset + 2]) << 16)
+            | (UInt32(data[offset + 3]) << 24)
     }
 }

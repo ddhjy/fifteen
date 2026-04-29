@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ShakeDetectorView: UIViewControllerRepresentable {
     let onShake: () -> Void
@@ -44,6 +45,9 @@ struct HistoryView: View {
     @State private var selectedTags: [TagSelection] = []
     @State private var tagPickerItem: HistoryItem? = nil
     @State private var isExporting = false
+    @State private var isImporting = false
+    @State private var showImportPicker = false
+    @State private var importAlert: ImportAlert? = nil
     @State private var exportedFileURL: URL? = nil
     @State private var searchText = ""
     @State private var committedSearchText = ""
@@ -61,6 +65,19 @@ struct HistoryView: View {
     @State private var isRebuildingCache = false
     @State private var rebuildToken = UUID()
     @State private var mediumHapticTrigger = 0
+    
+    private static let importableContentTypes: [UTType] = [
+        .zip,
+        .folder,
+        UTType(filenameExtension: "md") ?? .plainText,
+        UTType(filenameExtension: "markdown") ?? .plainText
+    ]
+    
+    private struct ImportAlert: Identifiable {
+        let id = UUID()
+        let title: String
+        let message: String
+    }
     
     nonisolated private struct HistoryListCache: Sendable {
         var savedItems: [HistoryItem] = []
@@ -285,19 +302,26 @@ struct HistoryView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
-                if !listCache.savedItems.isEmpty {
-                    if isEditMode {
-                        Button(action: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                isEditMode = false
-                                selectedItems.removeAll()
-                            }
-                        }) {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 17, weight: .regular))
+                if isEditMode && !listCache.savedItems.isEmpty {
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            isEditMode = false
+                            selectedItems.removeAll()
                         }
-                    } else {
-                        Menu {
+                    }) {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 17, weight: .regular))
+                    }
+                } else {
+                    Menu {
+                        Button(action: { showImportPicker = true }) {
+                            Label("导入", systemImage: "square.and.arrow.down")
+                        }
+                        .disabled(isImporting || historyManager.isLoading)
+                        
+                        if !listCache.savedItems.isEmpty {
+                            Divider()
+                            
                             Button(action: {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                     isEditMode = true
@@ -314,14 +338,14 @@ struct HistoryView: View {
                                 Label("导出", systemImage: "square.and.arrow.up")
                             }
                             .disabled(isExporting)
-                        } label: {
-                            if isExporting {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                            } else {
-                                Image(systemName: "ellipsis")
-                                    .font(.system(size: 17, weight: .regular))
-                            }
+                        }
+                    } label: {
+                        if isExporting || isImporting {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 17, weight: .regular))
                         }
                     }
                 }
@@ -403,6 +427,20 @@ struct HistoryView: View {
         .sheet(isPresented: $showStatistics) {
             StatisticsView(items: listCache.savedItems)
         }
+        .fileImporter(
+            isPresented: $showImportPicker,
+            allowedContentTypes: Self.importableContentTypes,
+            allowsMultipleSelection: true
+        ) { result in
+            handleImportSelection(result)
+        }
+        .alert(item: $importAlert) { alert in
+            Alert(
+                title: Text(alert.title),
+                message: Text(alert.message),
+                dismissButton: .default(Text("好"))
+            )
+        }
         .onAppear {
             historyManager.loadItemsIfNeeded()
             rebuildListCacheAsync()
@@ -432,6 +470,48 @@ struct HistoryView: View {
                 isExporting = false
                 print("Export failed: \(error)")
             }
+        }
+    }
+    
+    private func handleImportSelection(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            importNotes(from: urls)
+        case .failure(let error):
+            importAlert = ImportAlert(title: "导入失败", message: error.localizedDescription)
+        }
+    }
+    
+    private func importNotes(from urls: [URL]) {
+        isImporting = true
+        
+        Task {
+            do {
+                let result = try historyManager.importNotes(from: urls)
+                isImporting = false
+                rebuildListCacheAsync()
+                showImportResult(result)
+            } catch {
+                isImporting = false
+                importAlert = ImportAlert(title: "导入失败", message: error.localizedDescription)
+                print("Import failed: \(error)")
+            }
+        }
+    }
+    
+    private func showImportResult(_ result: NotesImportResult) {
+        let skippedText = result.skippedCount > 0 ? "，跳过 \(result.skippedCount) 条重复或空记录" : ""
+        
+        if result.importedCount > 0 {
+            importAlert = ImportAlert(
+                title: "导入完成",
+                message: "已导入 \(result.importedCount) 条记录\(skippedText)"
+            )
+        } else {
+            importAlert = ImportAlert(
+                title: "没有新记录",
+                message: result.skippedCount > 0 ? "已跳过 \(result.skippedCount) 条重复或空记录" : "没有找到可导入的内容"
+            )
         }
     }
     
@@ -581,6 +661,17 @@ struct HistoryView: View {
             }
             .opacity(appearAnimation ? 1 : 0)
             .offset(y: appearAnimation ? 0 : 10)
+            
+            Button(action: { showImportPicker = true }) {
+                Label("导入记录", systemImage: "square.and.arrow.down")
+                    .font(.callout.weight(.semibold))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Design.primaryColor)
+            .disabled(isImporting || historyManager.isLoading)
+            .opacity(appearAnimation ? 1 : 0)
         }
         .padding(.horizontal, 40)
     }
