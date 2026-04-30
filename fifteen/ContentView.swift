@@ -18,8 +18,6 @@ struct ContentView: View {
     @State private var visibleLoadingWorkflowId: UUID? = nil
     @State private var workflowError: Error? = nil
     
-    @State private var isKeyboardAnimating: Bool = false
-    
     @State private var keyboardTask: Task<Void, Never>?
     @State private var workflowLoadingTask: Task<Void, Never>?
     
@@ -102,7 +100,6 @@ struct ContentView: View {
             if isShowing {
                 keyboardTask?.cancel()
                 keyboardTask = nil
-                isKeyboardAnimating = false
             } else {
                 scheduleKeyboardShow(delay: 0.5)
             }
@@ -263,7 +260,6 @@ struct ContentView: View {
                     isFocused: $isTextEditorFocused,
                     inputSessionResetToken: inputSessionResetToken,
                     isScrollEnabled: !draftText.isEmpty,
-                    isUserInteractionEnabled: !isKeyboardAnimating,
                     font: UIFont.systemFont(ofSize: 17, weight: .regular)
                 )
                 .padding(.horizontal, 16)
@@ -275,26 +271,22 @@ struct ContentView: View {
     private func scheduleKeyboardShow(delay: Double) {
         keyboardTask?.cancel()
         
-        isKeyboardAnimating = true
-        
-        keyboardTask = Task {
+        keyboardTask = Task { @MainActor in
             try? await Task.sleep(for: .seconds(delay))
-            guard !Task.isCancelled, !showHistory else {
-                isKeyboardAnimating = false
-                return
+            guard !Task.isCancelled, !showHistory else { return }
+            isTextEditorFocused = true
+            
+            try? await Task.sleep(for: .milliseconds(100))
+            guard !Task.isCancelled, !showHistory else { return }
+            if !isTextEditorFocused {
+                isTextEditorFocused = true
             }
-            isTextEditorFocused = true
             
             try? await Task.sleep(for: .milliseconds(100))
-            guard !Task.isCancelled, !showHistory, !isTextEditorFocused else { return }
-            isTextEditorFocused = true
-            
-            try? await Task.sleep(for: .milliseconds(100))
-            guard !Task.isCancelled, !showHistory, !isTextEditorFocused else { return }
-            isTextEditorFocused = true
-            
-            try? await Task.sleep(for: .milliseconds(150))
-            isKeyboardAnimating = false
+            guard !Task.isCancelled, !showHistory else { return }
+            if !isTextEditorFocused {
+                isTextEditorFocused = true
+            }
         }
     }
     
@@ -444,7 +436,6 @@ struct DraftTextView: UIViewRepresentable {
     @Binding var isFocused: Bool
     let inputSessionResetToken: Int
     let isScrollEnabled: Bool
-    let isUserInteractionEnabled: Bool
     let font: UIFont
     
     func makeUIView(context: Context) -> UITextView {
@@ -467,7 +458,6 @@ struct DraftTextView: UIViewRepresentable {
         context.coordinator.syncTextIfNeeded(on: uiView)
         uiView.font = font
         uiView.isScrollEnabled = isScrollEnabled
-        uiView.isUserInteractionEnabled = isUserInteractionEnabled
 
         if isFocused && !uiView.isFirstResponder {
             uiView.becomeFirstResponder()
