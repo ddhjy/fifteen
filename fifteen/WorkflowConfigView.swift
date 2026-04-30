@@ -1,227 +1,447 @@
 import SwiftUI
 
+private enum WorkflowConfigPresentation: Identifiable {
+    case addNode
+    case editNode(UUID)
+    case iconPicker(UUID)
+
+    var id: String {
+        switch self {
+        case .addNode:
+            "add-node"
+        case .editNode(let id):
+            "edit-node-\(id.uuidString)"
+        case .iconPicker(let id):
+            "icon-picker-\(id.uuidString)"
+        }
+    }
+}
+
 struct WorkflowConfigView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var workflowManager = WorkflowManager.shared
-    @State private var showAddNode = false
-    @State private var editingNode: WorkflowNode? = nil
-    @State private var showRenameAlert = false
-    @State private var renameText = ""
-    @State private var renamingWorkflowId: UUID? = nil
-    @State private var iconPickerWorkflowId: UUID? = nil
-    
-    var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    ForEach(workflowManager.openWorkflows) { workflow in
-                        workflowRow(for: workflow)
-                    }
-                    .onMove { workflowManager.moveWorkflows(inOpenState: true, from: $0, to: $1) }
-                } header: {
-                    Text("显示中")
-                } footer: {
-                    Text("这些 Workflow 显示在主页工具栏，可拖动排序")
-                }
-                
-                if !workflowManager.closedWorkflows.isEmpty {
-                    Section {
-                        ForEach(workflowManager.closedWorkflows) { workflow in
-                            workflowRow(for: workflow)
-                        }
-                        .onMove { workflowManager.moveWorkflows(inOpenState: false, from: $0, to: $1) }
-                    } header: {
-                        Text("已隐藏")
-                    } footer: {
-                        Text("未显示在主页，仅在此处管理")
-                    }
-                }
-                
-                Section {
-                    
-                    Button {
-                        let count = workflowManager.workflows.count + 1
-                        let newWf = Workflow(name: "Workflow \(count)", kind: .manual)
-                        workflowManager.addWorkflow(newWf)
-                        workflowManager.selectWorkflow(newWf.id)
-                    } label: {
-                        Label("新建 Workflow", systemImage: "plus.circle")
-                            .foregroundStyle(.primary)
-                    }
-                } header: {
-                    Text("管理")
-                } footer: {
-                    Text("点选 Workflow 可编辑配置，特殊 Workflow 会显示专属设置")
-                }
+    @State private var preferredCompactColumn = NavigationSplitViewColumn.sidebar
+    @State private var compactPath: [UUID] = []
+    @State private var detailWorkflowId: UUID?
+    @State private var presentation: WorkflowConfigPresentation?
+    @State private var syncWarningWorkflowId: UUID?
 
-                if workflowManager.selectedWorkflow.kind == .autoPasteSync {
-                    autoPasteSyncSection(for: workflowManager.selectedWorkflow)
-                } else {
-                    Section {
-                        ForEach(workflowManager.nodes) { node in
-                            NodeRowView(node: node, onEdit: { editingNode = node })
-                        }
-                        .onMove { workflowManager.moveNode(from: $0, to: $1) }
-                        .onDelete { workflowManager.deleteNodes(at: $0) }
-                    } header: {
-                        Text("处理节点")
-                    } footer: {
-                        Text("拖动排序，执行时按从上到下顺序运行")
+    var body: some View {
+        Group {
+            if horizontalSizeClass == .compact {
+                compactWorkflowNavigation
+            } else {
+                regularWorkflowSplitView
+            }
+        }
+        .tint(Design.primaryColor)
+        .sheet(item: $presentation) { item in
+            presentationView(for: item)
+        }
+        .onAppear {
+            ensureSelection()
+            resetNavigationForCurrentSizeClass()
+        }
+        .onChange(of: horizontalSizeClass) { _, _ in
+            resetNavigationForCurrentSizeClass()
+        }
+        .onChange(of: workflowManager.selectedWorkflowId) { oldValue, _ in
+            if let oldValue {
+                normalizeWorkflowName(oldValue)
+            }
+        }
+        .onDisappear {
+            normalizeWorkflowNames()
+        }
+    }
+
+    private var regularWorkflowSplitView: some View {
+        NavigationSplitView(preferredCompactColumn: $preferredCompactColumn) {
+            workflowSidebar
+        } detail: {
+            if let workflow = detailWorkflow {
+                workflowDetail(for: workflow)
+            } else {
+                ContentUnavailableView("未选择 Workflow", systemImage: "arrow.triangle.branch")
+            }
+        }
+        .navigationSplitViewStyle(.balanced)
+    }
+
+    private var compactWorkflowNavigation: some View {
+        NavigationStack(path: $compactPath) {
+            compactWorkflowList
+                .navigationDestination(for: UUID.self) { workflowID in
+                    if let workflow = workflowManager.workflows.first(where: { $0.id == workflowID }) {
+                        workflowDetail(for: workflow)
+                            .onAppear {
+                                activateWorkflowDetail(workflow.id)
+                            }
+                    } else {
+                        ContentUnavailableView("Workflow 已不存在", systemImage: "exclamationmark.triangle")
                     }
-                    
-                    Section {
-                        Button {
-                            showAddNode = true
-                        } label: {
-                            Label("添加节点", systemImage: "plus.circle")
-                                .foregroundStyle(.primary)
-                        }
+                }
+        }
+    }
+
+    private var compactWorkflowList: some View {
+        List {
+            Section {
+                ForEach(workflowManager.openWorkflows) { workflow in
+                    NavigationLink(value: workflow.id) {
+                        WorkflowSidebarRow(
+                            workflow: workflow,
+                            summary: workflowSummary(for: workflow)
+                        )
                     }
+                    .contextMenu { workflowContextMenu(for: workflow) }
+                }
+                .onMove { workflowManager.moveWorkflows(inOpenState: true, from: $0, to: $1) }
+            } header: {
+                Text("主页显示")
+            } footer: {
+                Text("这些 Workflow 会出现在主页底部工具栏。")
+            }
+
+            if !workflowManager.closedWorkflows.isEmpty {
+                Section {
+                    ForEach(workflowManager.closedWorkflows) { workflow in
+                        NavigationLink(value: workflow.id) {
+                            WorkflowSidebarRow(
+                                workflow: workflow,
+                                summary: workflowSummary(for: workflow)
+                            )
+                        }
+                        .contextMenu { workflowContextMenu(for: workflow) }
+                    }
+                    .onMove { workflowManager.moveWorkflows(inOpenState: false, from: $0, to: $1) }
+                } header: {
+                    Text("已隐藏")
+                } footer: {
+                    Text("隐藏后不会出现在主页，但仍可在这里编辑。")
                 }
             }
-            .navigationTitle("Workflow 配置")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    EditButton()
+
+            Section {
+                Button {
+                    addWorkflow()
+                } label: {
+                    Label("新建 Workflow", systemImage: "plus.circle.fill")
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+            }
+        }
+        .listStyle(.sidebar)
+        .navigationTitle("Workflow")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                EditButton()
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("完成") { dismiss() }
+                    .fontWeight(.semibold)
+            }
+        }
+    }
+
+    private var detailWorkflow: Workflow? {
+        guard let detailWorkflowId else { return nil }
+        return workflowManager.workflows.first { $0.id == detailWorkflowId }
+    }
+
+    private var workflowSelection: Binding<UUID?> {
+        Binding {
+            detailWorkflowId
+        } set: { newValue in
+            guard let newValue else { return }
+            selectWorkflowForEditing(newValue)
+        }
+    }
+
+    private var workflowSidebar: some View {
+        List(selection: workflowSelection) {
+            Section {
+                ForEach(workflowManager.openWorkflows) { workflow in
+                    NavigationLink(value: workflow.id) {
+                        WorkflowSidebarRow(
+                            workflow: workflow,
+                            summary: workflowSummary(for: workflow)
+                        )
+                    }
+                    .tag(workflow.id)
+                    .contextMenu { workflowContextMenu(for: workflow) }
+                }
+                .onMove { workflowManager.moveWorkflows(inOpenState: true, from: $0, to: $1) }
+            } header: {
+                Text("主页显示")
+            } footer: {
+                Text("这些 Workflow 会出现在主页底部工具栏。")
+            }
+
+            if !workflowManager.closedWorkflows.isEmpty {
+                Section {
+                    ForEach(workflowManager.closedWorkflows) { workflow in
+                        NavigationLink(value: workflow.id) {
+                            WorkflowSidebarRow(
+                                workflow: workflow,
+                                summary: workflowSummary(for: workflow)
+                            )
+                        }
+                        .tag(workflow.id)
+                        .contextMenu { workflowContextMenu(for: workflow) }
+                    }
+                    .onMove { workflowManager.moveWorkflows(inOpenState: false, from: $0, to: $1) }
+                } header: {
+                    Text("已隐藏")
+                } footer: {
+                    Text("隐藏后不会出现在主页，但仍可在这里编辑。")
+                }
+            }
+
+            Section {
+                Button {
+                    addWorkflow()
+                } label: {
+                    Label("新建 Workflow", systemImage: "plus.circle.fill")
+                }
+            }
+        }
+        .listStyle(.sidebar)
+        .navigationTitle("Workflow")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                EditButton()
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                if horizontalSizeClass == .compact {
                     Button("完成") { dismiss() }
                         .fontWeight(.semibold)
                 }
             }
-            .sheet(isPresented: $showAddNode) { AddNodeSheet() }
-            .sheet(item: $editingNode) { node in EditNodeSheet(node: node) }
-            .alert("重命名", isPresented: $showRenameAlert) {
-                TextField("名称", text: $renameText)
-                Button("取消", role: .cancel) {}
-                Button("确定") {
-                    guard let id = renamingWorkflowId,
-                          var wf = workflowManager.workflows.first(where: { $0.id == id }) else { return }
-                    let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !trimmed.isEmpty else { return }
-                    wf.name = trimmed
-                    workflowManager.updateWorkflow(wf)
+        }
+    }
+
+    private func workflowDetail(for workflow: Workflow) -> some View {
+        List {
+            Section {
+                workflowHeader(for: workflow)
+            }
+
+            if workflow.kind == .autoPasteSync {
+                autoPasteSyncEditor(for: workflow)
+            } else {
+                manualWorkflowEditor(for: workflow)
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle(displayName(for: workflow))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                if workflow.kind == .manual {
+                    EditButton()
                 }
             }
-            .sheet(item: $iconPickerWorkflowId) { workflowId in
-                IconPickerView(
-                    selectedIcon: workflowManager.workflows.first(where: { $0.id == workflowId })?.icon ?? "arrow.triangle.branch"
-                ) { newIcon in
-                    guard var wf = workflowManager.workflows.first(where: { $0.id == workflowId }) else { return }
-                    wf.icon = newIcon
-                    workflowManager.updateWorkflow(wf)
-                }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("完成") { dismiss() }
+                    .fontWeight(.semibold)
             }
         }
     }
-    
+
     @ViewBuilder
-    private func workflowRow(for workflow: Workflow) -> some View {
-        let isSelected = workflow.id == workflowManager.selectedWorkflowId
-        
-        HStack(spacing: 12) {
-            Image(systemName: workflow.icon)
-                .foregroundStyle(workflowRowIconColor(for: workflow, isSelected: isSelected))
-                .font(.system(size: 20))
-                .frame(width: 28)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(workflow.name)
-                    .font(isSelected ? .callout.bold() : .callout)
-                
-                Text(workflowSummary(for: workflow))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            
-            Spacer()
-            
-            if isSelected {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Design.primaryColor)
-            }
-            
-            Button {
-                workflowManager.toggleWorkflowOpen(workflow.id)
-            } label: {
-                Image(systemName: workflow.isOpen ? "eye" : "eye.slash")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(workflow.isOpen ? Design.primaryColor : .secondary)
-                    .frame(width: 28, height: 28)
-            }
-            .buttonStyle(.plain)
-            .disabled(!workflowManager.canCloseWorkflow(workflow.id))
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            workflowManager.selectWorkflow(workflow.id)
-        }
-        .accessibilityAddTraits(.isButton)
-        .contextMenu {
-            Button {
-                workflowManager.toggleWorkflowOpen(workflow.id)
-            } label: {
-                Label(workflow.isOpen ? "从主页隐藏" : "显示到主页", systemImage: workflow.isOpen ? "eye.slash" : "eye")
-            }
-            Button {
-                iconPickerWorkflowId = workflow.id
-            } label: {
-                Label("更换图标", systemImage: "square.grid.2x2")
-            }
-            Button {
-                renamingWorkflowId = workflow.id
-                renameText = workflow.name
-                showRenameAlert = true
-            } label: {
-                Label("重命名", systemImage: "pencil")
-            }
-            if workflowManager.canDuplicateWorkflow(workflow.id) {
+    private func workflowHeader(for workflow: Workflow) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top, spacing: 14) {
                 Button {
-                    workflowManager.duplicateWorkflow(workflow.id)
+                    presentation = .iconPicker(workflow.id)
                 } label: {
-                    Label("创建副本", systemImage: "doc.on.doc")
+                    Image(systemName: workflow.icon)
+                        .font(.system(size: 28, weight: .medium))
+                        .foregroundStyle(Design.primaryColor)
+                        .frame(width: 58, height: 58)
+                        .background(Circle().fill(Color(.tertiarySystemFill)))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("更换图标")
+
+                VStack(alignment: .leading, spacing: 6) {
+                    TextField("Workflow 名称", text: workflowNameBinding(for: workflow.id))
+                        .font(.title3.weight(.semibold))
+                        .textFieldStyle(.plain)
+                        .submitLabel(.done)
+                        .onSubmit { normalizeWorkflowName(workflow.id) }
+
+                    Text(workflowSummary(for: workflow))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
                 }
             }
-            if workflowManager.canDeleteWorkflow(workflow.id) {
-                Divider()
-                Button(role: .destructive) {
-                    withAnimation { workflowManager.deleteWorkflow(workflow.id) }
+
+            HStack(spacing: 10) {
+                Button {
+                    workflowManager.toggleWorkflowOpen(workflow.id)
                 } label: {
-                    Label("删除", systemImage: "trash")
+                    Label(workflow.isOpen ? "从主页隐藏" : "显示到主页", systemImage: workflow.isOpen ? "eye.slash" : "eye")
                 }
+                .buttonStyle(.bordered)
+                .disabled(!workflowManager.canCloseWorkflow(workflow.id))
+
+                Menu {
+                    workflowContextMenu(for: workflow)
+                } label: {
+                    Label("更多", systemImage: "ellipsis.circle")
+                }
+                .buttonStyle(.bordered)
+            }
+            .labelStyle(.titleAndIcon)
+        }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private func manualWorkflowEditor(for workflow: Workflow) -> some View {
+        Section {
+            if workflow.nodes.isEmpty {
+                EmptyWorkflowNodesView {
+                    presentation = .addNode
+                }
+            } else {
+                ForEach(Array(workflowManager.nodes.enumerated()), id: \.element.id) { index, node in
+                    NodeRowView(
+                        node: node,
+                        position: index + 1,
+                        onEdit: { presentation = .editNode(node.id) }
+                    )
+                }
+                .onMove { workflowManager.moveNode(from: $0, to: $1) }
+                .onDelete { workflowManager.deleteNodes(at: $0) }
+            }
+        } header: {
+            Text("节点流水线")
+        } footer: {
+            Text("执行时按从上到下顺序运行，可进入编辑模式拖动排序或删除。")
+        }
+
+        Section {
+            Button {
+                presentation = .addNode
+            } label: {
+                Label("添加节点", systemImage: "plus.circle.fill")
             }
         }
     }
 
     @ViewBuilder
-    private func autoPasteSyncSection(for workflow: Workflow) -> some View {
+    private func autoPasteSyncEditor(for workflow: Workflow) -> some View {
+        let host = workflow.syncConfig.host.trimmingCharacters(in: .whitespacesAndNewlines)
+        let needsHost = host.isEmpty
+
         Section {
-            Toggle("主页按钮控制同步状态", isOn: Binding(
-                get: { workflowManager.workflows.first(where: { $0.id == workflow.id })?.isActive ?? false },
-                set: { _ in
-                    workflowManager.toggleWorkflowActive(workflow.id)
-                }
-            ))
-            .tint(Design.primaryColor)
+            Toggle("开启同步", isOn: autoPasteActiveBinding(for: workflow.id))
+                .tint(Design.primaryColor)
 
-            TextField("AutoPaste 主机地址", text: Binding(
-                get: { workflowManager.workflows.first(where: { $0.id == workflow.id })?.syncConfig.host ?? "" },
-                set: { workflowManager.updateAutoPasteSyncConfig(workflowID: workflow.id, host: $0) }
-            ))
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
+            TextField("AutoPaste 主机地址", text: autoPasteHostBinding(for: workflow.id))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.URL)
 
-            TextField("AutoPaste 端口", value: Binding(
-                get: { workflowManager.workflows.first(where: { $0.id == workflow.id })?.syncConfig.port ?? 7788 },
-                set: { workflowManager.updateAutoPasteSyncConfig(workflowID: workflow.id, port: $0) }
-            ), format: .number)
-            .keyboardType(.numberPad)
+            TextField("AutoPaste 端口", value: autoPastePortBinding(for: workflow.id), format: .number)
+                .keyboardType(.numberPad)
         } header: {
             Text("同步配置")
         } footer: {
-            Text("这是一个开关型 Workflow。主页点亮后会实时同步当前草稿，并接收远端清空指令。可通过创建副本配置多个目标，但同一时间只允许一个开启同步、一个显示在主页。")
+            Text("主页点亮后会实时同步当前草稿，并接收远端清空指令。同一时间只允许一个 Auto Paste 开启同步、一个显示在主页。")
+        }
+
+        Section {
+            HStack(spacing: 10) {
+                Image(systemName: needsHost ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                    .foregroundStyle(needsHost ? .orange : Design.primaryColor)
+                    .frame(width: 24)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(needsHost ? "未配置目标" : "\(host):\(workflow.syncConfig.port)")
+                        .font(.callout.weight(.medium))
+                        .lineLimit(1)
+
+                    Text(needsHost ? "填写主机地址后才能开启同步" : "当前同步目标")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("目标预览")
+        }
+
+        if syncWarningWorkflowId == workflow.id && needsHost {
+            Section {
+                Label("请先填写 AutoPaste 主机地址", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func workflowContextMenu(for workflow: Workflow) -> some View {
+        Button {
+            workflowManager.toggleWorkflowOpen(workflow.id)
+        } label: {
+            Label(workflow.isOpen ? "从主页隐藏" : "显示到主页", systemImage: workflow.isOpen ? "eye.slash" : "eye")
+        }
+        .disabled(!workflowManager.canCloseWorkflow(workflow.id))
+
+        Button {
+            presentation = .iconPicker(workflow.id)
+        } label: {
+            Label("更换图标", systemImage: "square.grid.2x2")
+        }
+
+        if workflowManager.canDuplicateWorkflow(workflow.id) {
+            Button {
+                workflowManager.duplicateWorkflow(workflow.id)
+            } label: {
+                Label("创建副本", systemImage: "doc.on.doc")
+            }
+        }
+
+        if workflowManager.canDeleteWorkflow(workflow.id) {
+            Divider()
+            Button(role: .destructive) {
+                withAnimation {
+                    workflowManager.deleteWorkflow(workflow.id)
+                }
+            } label: {
+                Label("删除", systemImage: "trash")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func presentationView(for item: WorkflowConfigPresentation) -> some View {
+        switch item {
+        case .addNode:
+            AddNodeSheet()
+        case .editNode(let nodeID):
+            if let node = workflowManager.nodes.first(where: { $0.id == nodeID }) {
+                EditNodeSheet(node: node)
+            } else {
+                NavigationStack {
+                    ContentUnavailableView("节点已不存在", systemImage: "exclamationmark.triangle")
+                        .navigationTitle("编辑节点")
+                        .navigationBarTitleDisplayMode(.inline)
+                }
+                .presentationDetents([.medium])
+            }
+        case .iconPicker(let workflowID):
+            IconPickerView(selectedIcon: iconName(for: workflowID)) { newIcon in
+                updateWorkflow(workflowID) { workflow in
+                    workflow.icon = newIcon
+                }
+            }
         }
     }
 
@@ -240,240 +460,241 @@ struct WorkflowConfigView: View {
         return "\(visibility) · \(enabledCount)/\(totalCount) 节点启用"
     }
 
-    private func workflowRowIconColor(for workflow: Workflow, isSelected: Bool) -> Color {
-        if isSelected || (workflow.kind == .autoPasteSync && workflow.isActive) {
-            return Design.primaryColor
+    private func displayName(for workflow: Workflow) -> String {
+        let trimmed = workflow.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "未命名 Workflow" : trimmed
+    }
+
+    private func iconName(for workflowID: UUID) -> String {
+        workflowManager.workflows.first { $0.id == workflowID }?.icon ?? "arrow.triangle.branch"
+    }
+
+    private func workflowNameBinding(for workflowID: UUID) -> Binding<String> {
+        Binding {
+            workflowManager.workflows.first { $0.id == workflowID }?.name ?? ""
+        } set: { newValue in
+            updateWorkflow(workflowID) { workflow in
+                workflow.name = newValue
+            }
         }
-        return Color(.tertiaryLabel)
+    }
+
+    private func autoPasteActiveBinding(for workflowID: UUID) -> Binding<Bool> {
+        Binding {
+            workflowManager.workflows.first { $0.id == workflowID }?.isActive ?? false
+        } set: { newValue in
+            let workflow = workflowManager.workflows.first { $0.id == workflowID }
+            let isActive = workflow?.isActive ?? false
+            guard isActive != newValue else { return }
+
+            if newValue {
+                let host = workflow?.syncConfig.host.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                guard !host.isEmpty else {
+                    syncWarningWorkflowId = workflowID
+                    return
+                }
+            }
+
+            syncWarningWorkflowId = nil
+            workflowManager.toggleWorkflowActive(workflowID)
+        }
+    }
+
+    private func autoPasteHostBinding(for workflowID: UUID) -> Binding<String> {
+        Binding {
+            workflowManager.workflows.first { $0.id == workflowID }?.syncConfig.host ?? ""
+        } set: { newValue in
+            if !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                syncWarningWorkflowId = nil
+            }
+            workflowManager.updateAutoPasteSyncConfig(workflowID: workflowID, host: newValue)
+        }
+    }
+
+    private func autoPastePortBinding(for workflowID: UUID) -> Binding<Int> {
+        Binding {
+            workflowManager.workflows.first { $0.id == workflowID }?.syncConfig.port ?? 7788
+        } set: { newValue in
+            workflowManager.updateAutoPasteSyncConfig(workflowID: workflowID, port: newValue)
+        }
+    }
+
+    private func addWorkflow() {
+        let count = workflowManager.workflows.count + 1
+        let workflow = Workflow(name: "Workflow \(count)", kind: .manual)
+        workflowManager.addWorkflow(workflow)
+        selectWorkflowForEditing(workflow.id)
+        if horizontalSizeClass == .compact {
+            compactPath = [workflow.id]
+        }
+    }
+
+    private func updateWorkflow(_ workflowID: UUID, mutate: (inout Workflow) -> Void) {
+        guard var workflow = workflowManager.workflows.first(where: { $0.id == workflowID }) else { return }
+        mutate(&workflow)
+        workflowManager.updateWorkflow(workflow)
+    }
+
+    private func ensureSelection() {
+        if let selectedWorkflowId = workflowManager.selectedWorkflowId,
+           workflowManager.workflows.contains(where: { $0.id == selectedWorkflowId }) {
+            return
+        }
+
+        if let firstWorkflowId = workflowManager.workflows.first?.id {
+            workflowManager.selectWorkflow(firstWorkflowId)
+        }
+    }
+
+    private func selectWorkflowForEditing(_ workflowID: UUID) {
+        activateWorkflowDetail(workflowID)
+        showWorkflowDetailInCompact()
+    }
+
+    private func activateWorkflowDetail(_ workflowID: UUID) {
+        detailWorkflowId = workflowID
+        workflowManager.selectWorkflow(workflowID)
+    }
+
+    private func resetNavigationForCurrentSizeClass() {
+        guard horizontalSizeClass == .compact else {
+            detailWorkflowId = workflowManager.selectedWorkflowId ?? workflowManager.workflows.first?.id
+            return
+        }
+
+        compactPath = []
+        detailWorkflowId = nil
+        preferredCompactColumn = .sidebar
+    }
+
+    private func showWorkflowDetailInCompact() {
+        guard horizontalSizeClass == .compact else { return }
+        preferredCompactColumn = .detail
+    }
+
+    private func normalizeWorkflowName(_ workflowID: UUID) {
+        updateWorkflow(workflowID) { workflow in
+            let trimmed = workflow.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            workflow.name = trimmed.isEmpty ? "未命名 Workflow" : trimmed
+        }
+    }
+
+    private func normalizeWorkflowNames() {
+        for workflow in workflowManager.workflows {
+            normalizeWorkflowName(workflow.id)
+        }
     }
 }
 
+private struct WorkflowSidebarRow: View {
+    let workflow: Workflow
+    let summary: String
 
-struct WorkflowListView: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var workflowManager = WorkflowManager.shared
-    @State private var showRenameAlert = false
-    @State private var renameText = ""
-    @State private var renamingWorkflowId: UUID? = nil
-    @State private var iconPickerWorkflowId: UUID? = nil
-    
     var body: some View {
-        NavigationStack {
-            List {
-                ForEach(workflowManager.openWorkflows) { workflow in
-                    let isSelected = workflow.id == workflowManager.selectedWorkflowId
-                    
-                    HStack(spacing: 12) {
-                        Image(systemName: workflow.icon)
-                            .foregroundStyle(workflowRowIconColor(for: workflow, isSelected: isSelected))
-                            .font(.system(size: 20))
-                            .frame(width: 28)
-                        
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(workflow.name)
-                                .font(isSelected ? .callout.bold() : .callout)
-                            
-                            Text(workflowSummary(for: workflow))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        
-                        Spacer()
-                    }
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        workflowManager.selectWorkflow(workflow.id)
-                        dismiss()
-                    }
-                    .accessibilityAddTraits(.isButton)
-                    .contextMenu {
-                        Button {
-                            workflowManager.toggleWorkflowOpen(workflow.id)
-                        } label: {
-                            Label(workflow.isOpen ? "从主页隐藏" : "显示到主页", systemImage: workflow.isOpen ? "eye.slash" : "eye")
-                        }
-                        Button {
-                            iconPickerWorkflowId = workflow.id
-                        } label: {
-                            Label("更换图标", systemImage: "square.grid.2x2")
-                        }
-                        
-                        Button {
-                            renamingWorkflowId = workflow.id
-                            renameText = workflow.name
-                            showRenameAlert = true
-                        } label: {
-                            Label("重命名", systemImage: "pencil")
-                        }
-                        
-                        if workflowManager.canDuplicateWorkflow(workflow.id) {
-                            Button {
-                                workflowManager.duplicateWorkflow(workflow.id)
-                            } label: {
-                                Label("创建副本", systemImage: "doc.on.doc")
-                            }
-                        }
-                        
-                        if workflowManager.canDeleteWorkflow(workflow.id) {
-                            Divider()
-                            Button(role: .destructive) {
-                                withAnimation { workflowManager.deleteWorkflow(workflow.id) }
-                            } label: {
-                                Label("删除", systemImage: "trash")
-                            }
-                        }
-                    }
-                }
-                
-                if !workflowManager.closedWorkflows.isEmpty {
-                    Section("已隐藏") {
-                        ForEach(workflowManager.closedWorkflows) { workflow in
-                            let isSelected = workflow.id == workflowManager.selectedWorkflowId
-                            
-                            HStack(spacing: 12) {
-                                Image(systemName: workflow.icon)
-                                    .foregroundStyle(workflowRowIconColor(for: workflow, isSelected: isSelected))
-                                    .font(.system(size: 20))
-                                    .frame(width: 28)
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(workflow.name)
-                                        .font(isSelected ? .callout.bold() : .callout)
-                                    
-                                    Text(workflowSummary(for: workflow))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                
-                                Spacer()
-                            }
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                workflowManager.selectWorkflow(workflow.id)
-                                dismiss()
-                            }
-                            .accessibilityAddTraits(.isButton)
-                            .contextMenu {
-                                Button {
-                                    workflowManager.toggleWorkflowOpen(workflow.id)
-                                } label: {
-                                    Label("显示到主页", systemImage: "eye")
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                Button {
-                    let count = workflowManager.workflows.count + 1
-                    let newWf = Workflow(name: "Workflow \(count)", kind: .manual)
-                    workflowManager.addWorkflow(newWf)
-                    workflowManager.selectWorkflow(newWf.id)
-                    dismiss()
-                } label: {
-                    Label("新建 Workflow", systemImage: "plus.circle")
-                        .foregroundStyle(.primary)
-                }
-            }
-            .navigationTitle("所有 Workflow")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") { dismiss() }
-                        .fontWeight(.semibold)
-                }
-            }
-            .alert("重命名", isPresented: $showRenameAlert) {
-                TextField("名称", text: $renameText)
-                Button("取消", role: .cancel) {}
-                Button("确定") {
-                    guard let id = renamingWorkflowId,
-                          var wf = workflowManager.workflows.first(where: { $0.id == id }) else { return }
-                    let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !trimmed.isEmpty else { return }
-                    wf.name = trimmed
-                    workflowManager.updateWorkflow(wf)
-                }
-            }
-            .sheet(item: $iconPickerWorkflowId) { workflowId in
-                IconPickerView(selectedIcon: currentIcon(for: workflowId)) { newIcon in
-                    guard var wf = workflowManager.workflows.first(where: { $0.id == workflowId }) else { return }
-                    wf.icon = newIcon
-                    workflowManager.updateWorkflow(wf)
-                }
+        HStack(spacing: 10) {
+            Image(systemName: workflow.icon)
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(iconColor)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(displayName)
+                    .font(.callout)
+                    .lineLimit(1)
+
+                Text(summary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
         }
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
-    }
-    
-    private func currentIcon(for id: UUID) -> String {
-        workflowManager.workflows.first(where: { $0.id == id })?.icon ?? "arrow.triangle.branch"
+        .padding(.vertical, 2)
     }
 
-    private func workflowSummary(for workflow: Workflow) -> String {
-        let visibility = workflow.isOpen ? "主页显示" : "未在主页显示"
-
-        if workflow.kind == .autoPasteSync {
-            let state = workflow.isActive ? "同步已开启" : "同步已关闭"
-            let host = workflow.syncConfig.host.trimmingCharacters(in: .whitespacesAndNewlines)
-            let target = host.isEmpty ? "未配置目标" : "\(host):\(workflow.syncConfig.port)"
-            return "\(visibility) · \(state) · \(target)"
-        }
-
-        let enabledCount = workflow.nodes.filter { $0.isEnabled }.count
-        let totalCount = workflow.nodes.count
-        return "\(visibility) · \(enabledCount)/\(totalCount) 节点启用"
+    private var displayName: String {
+        let trimmed = workflow.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "未命名 Workflow" : trimmed
     }
 
-    private func workflowRowIconColor(for workflow: Workflow, isSelected: Bool) -> Color {
-        if isSelected || (workflow.kind == .autoPasteSync && workflow.isActive) {
+    private var iconColor: Color {
+        if workflow.kind == .autoPasteSync && workflow.isActive {
             return Design.primaryColor
         }
-        return Color(.tertiaryLabel)
+        return .primary
     }
 }
 
-extension UUID: @retroactive Identifiable {
-    public var id: UUID { self }
+private struct EmptyWorkflowNodesView: View {
+    let onAdd: () -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "point.3.connected.trianglepath.dotted")
+                .font(.system(size: 30, weight: .medium))
+                .foregroundStyle(.secondary)
+
+            VStack(spacing: 4) {
+                Text("还没有节点")
+                    .font(.headline)
+                Text("添加节点后，这个 Workflow 会按顺序处理当前草稿。")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            Button {
+                onAdd()
+            } label: {
+                Label("添加节点", systemImage: "plus.circle.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Design.primaryColor)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+    }
 }
 
 
 struct NodeRowView: View {
     let node: WorkflowNode
+    let position: Int
     let onEdit: () -> Void
     @State private var workflowManager = WorkflowManager.shared
-    
+
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: node.type.icon)
-                .font(.system(size: 18))
-                .foregroundStyle(.primary)
-                .frame(width: 28)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(node.type.displayName)
-                    .font(.callout)
-                
-                if node.type == .aiProcess, let prompt = node.config.aiPrompt {
-                    Text(prompt)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+            Text("\(position)")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(node.isEnabled ? Design.primaryColor : .secondary)
+                .frame(width: 28, height: 28)
+                .background(
+                    Circle()
+                        .fill(node.isEnabled ? Design.primaryColor.opacity(0.14) : Color(.tertiarySystemFill))
+                )
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
+                    Image(systemName: node.type.icon)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(node.isEnabled ? .primary : .secondary)
+                        .frame(width: 18)
+
+                    Text(node.type.displayName)
+                        .font(.callout.weight(.medium))
+                        .foregroundStyle(node.isEnabled ? .primary : .secondary)
                 }
-                
-                if node.type == .httpPost {
-                    let host = node.config.httpHost ?? "localhost"
-                    let port = node.config.httpPort ?? 9999
-                    Text("\(host):\(port)")
+
+                if let detail = nodeDetail {
+                    Text(detail)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
             }
-            
+
             Spacer()
-            
+
             Toggle("", isOn: Binding(
                 get: { node.isEnabled },
                 set: { newValue in
@@ -488,6 +709,25 @@ struct NodeRowView: View {
         .contentShape(Rectangle())
         .onTapGesture { onEdit() }
         .accessibilityAddTraits(.isButton)
+        .accessibilityLabel("\(position). \(node.type.displayName)")
+    }
+
+    private var nodeDetail: String? {
+        if !node.isEnabled {
+            return "已停用"
+        }
+
+        if node.type == .aiProcess, let prompt = node.config.aiPrompt, !prompt.isEmpty {
+            return prompt
+        }
+
+        if node.type == .httpPost {
+            let host = node.config.httpHost ?? "localhost"
+            let port = node.config.httpPort ?? 9999
+            return "\(host):\(port)"
+        }
+
+        return nil
     }
 }
 
@@ -495,7 +735,7 @@ struct NodeRowView: View {
 struct AddNodeSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var workflowManager = WorkflowManager.shared
-    
+
     var body: some View {
         NavigationStack {
             List {
@@ -537,7 +777,7 @@ struct EditNodeSheet: View {
     @State private var aiPrompt: String = ""
     @State private var httpHost: String = ""
     @State private var httpPort: String = ""
-    
+
     var body: some View {
         NavigationStack {
             Form {
@@ -547,7 +787,7 @@ struct EditNodeSheet: View {
                             .lineLimit(5...)
                     }
                 }
-                
+
                 if node.type == .httpPost {
                     Section {
                         TextField("主机地址", text: $httpHost)
@@ -562,7 +802,7 @@ struct EditNodeSheet: View {
                         Text("内容将发送到以下地址")
                     }
                 }
-                
+
             }
             .navigationTitle("编辑节点")
             .navigationBarTitleDisplayMode(.inline)
@@ -583,7 +823,7 @@ struct EditNodeSheet: View {
         }
         .presentationDetents([.medium])
     }
-    
+
     private func saveChanges() {
         var updated = node
         updated.config.aiPrompt = aiPrompt.isEmpty ? nil : aiPrompt
@@ -598,10 +838,10 @@ struct EditNodeSheet: View {
 struct IconPickerView: View {
     let selectedIcon: String
     let onSelect: (String) -> Void
-    
+
     @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
-    
+
     private let icons: [(category: String, symbols: [String])] = [
         ("常用", [
             "arrow.triangle.branch", "bolt", "wand.and.stars",
@@ -683,7 +923,7 @@ struct IconPickerView: View {
             "pawprint", "gift", "party.popper"
         ])
     ]
-    
+
     private var filteredIcons: [(category: String, symbols: [String])] {
         let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !trimmed.isEmpty else { return icons }
@@ -692,9 +932,9 @@ struct IconPickerView: View {
             return filtered.isEmpty ? nil : (group.category, filtered)
         }
     }
-    
+
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 6)
-    
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -705,7 +945,7 @@ struct IconPickerView: View {
                                 .font(.footnote.bold())
                                 .foregroundStyle(.secondary)
                                 .padding(.horizontal, 4)
-                            
+
                             LazyVGrid(columns: columns, spacing: 12) {
                                 ForEach(group.symbols, id: \.self) { symbol in
                                     let isSelected = symbol == selectedIcon
