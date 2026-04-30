@@ -117,9 +117,7 @@ struct WorkflowConfigView: View {
                     }
                     .onMove { workflowManager.moveWorkflows(inOpenState: false, from: $0, to: $1) }
                 } header: {
-                    Text("已隐藏")
-                } footer: {
-                    Text("隐藏后不会出现在主页，但仍可在这里编辑。")
+                    Text("不显示")
                 }
             }
 
@@ -193,9 +191,7 @@ struct WorkflowConfigView: View {
                     }
                     .onMove { workflowManager.moveWorkflows(inOpenState: false, from: $0, to: $1) }
                 } header: {
-                    Text("已隐藏")
-                } footer: {
-                    Text("隐藏后不会出现在主页，但仍可在这里编辑。")
+                    Text("不显示")
                 }
             }
 
