@@ -188,13 +188,6 @@ class WorkflowManager {
         workflows.filter { $0.kind == .autoPasteSync }
     }
 
-    func areTerminalNodesAllDisabled(for workflow: Workflow) -> Bool {
-        guard workflow.kind == .manual else { return false }
-        let saveEnabled = workflow.nodes.contains { $0.type == .save && $0.isEnabled }
-        let copyEnabled = workflow.nodes.contains { $0.type == .copyToClipboard && $0.isEnabled }
-        return !saveEnabled && !copyEnabled
-    }
-    
     func selectWorkflow(_ id: UUID) {
         selectedWorkflowId = id
         UserDefaults.standard.set(id.uuidString, forKey: selectedWorkflowIdKey)

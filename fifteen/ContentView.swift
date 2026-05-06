@@ -396,7 +396,7 @@ struct ContentView: View {
             return workflow.isActive ? Design.primaryColor : .secondary
         }
 
-        return workflowManager.areTerminalNodesAllDisabled(for: workflow) ? Color.bule : .primary
+        return .primary
     }
 
     private func workflowAccessibilityLabel(for workflow: Workflow) -> String {
