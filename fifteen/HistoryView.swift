@@ -301,7 +301,7 @@ struct HistoryView: View {
         .navigationTitle("随心记")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItemGroup(placement: .topBarTrailing) {
+            ToolbarItem(id: AppToolbarIdentity.moreButton, placement: .topBarTrailing) {
                 if isEditMode && !listCache.savedItems.isEmpty {
                     Button(action: {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -340,14 +340,10 @@ struct HistoryView: View {
                             .disabled(isExporting)
                         }
                     } label: {
-                        if isExporting || isImporting {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "ellipsis")
-                                .font(.system(size: 17, weight: .regular))
-                        }
+                        AppToolbarMoreLabel(isLoading: isExporting || isImporting)
                     }
+                    .accessibilityLabel("更多")
+                    .id(AppToolbarIdentity.moreButton)
                 }
             }
             

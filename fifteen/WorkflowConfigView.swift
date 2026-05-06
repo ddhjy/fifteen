@@ -17,6 +17,10 @@ private enum WorkflowConfigPresentation: Identifiable {
     }
 }
 
+private enum WorkflowToolbarIdentity {
+    static let editButton = "workflow-edit-button"
+}
+
 private struct WorkflowEditButton: View {
     @Environment(\.editMode) private var editMode
 
@@ -31,6 +35,23 @@ private struct WorkflowEditButton: View {
             }
         }
         .tint(.primary)
+        .id(WorkflowToolbarIdentity.editButton)
+    }
+}
+
+private struct WorkflowEditToolbarItem: ToolbarContent {
+    let isVisible: Bool
+
+    init(isVisible: Bool = true) {
+        self.isVisible = isVisible
+    }
+
+    var body: some ToolbarContent {
+        ToolbarItem(id: WorkflowToolbarIdentity.editButton, placement: .topBarTrailing) {
+            if isVisible {
+                WorkflowEditButton()
+            }
+        }
     }
 }
 
@@ -146,9 +167,7 @@ struct WorkflowConfigView: View {
         .navigationTitle("Workflow")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                WorkflowEditButton()
-            }
+            WorkflowEditToolbarItem()
         }
     }
 
@@ -208,9 +227,7 @@ struct WorkflowConfigView: View {
         .navigationTitle("Workflow")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                WorkflowEditButton()
-            }
+            WorkflowEditToolbarItem()
         }
     }
 
@@ -230,11 +247,7 @@ struct WorkflowConfigView: View {
         .navigationTitle(displayName(for: workflow))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                if workflow.kind == .manual {
-                    WorkflowEditButton()
-                }
-            }
+            WorkflowEditToolbarItem(isVisible: workflow.kind == .manual)
         }
     }
 

@@ -56,9 +56,14 @@ struct ContentView: View {
                         .labelStyle(.iconOnly)
                 }
                 
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("设置", systemImage: "ellipsis") { showSettings = true }
-                        .labelStyle(.iconOnly)
+                ToolbarItem(id: AppToolbarIdentity.moreButton, placement: .topBarTrailing) {
+                    Button {
+                        showSettings = true
+                    } label: {
+                        AppToolbarMoreLabel()
+                    }
+                    .accessibilityLabel("设置")
+                    .id(AppToolbarIdentity.moreButton)
                 }
             }
 
