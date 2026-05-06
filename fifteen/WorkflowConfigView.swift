@@ -18,7 +18,6 @@ private enum WorkflowConfigPresentation: Identifiable {
 }
 
 struct WorkflowConfigView: View {
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var workflowManager = WorkflowManager.shared
     @State private var preferredCompactColumn = NavigationSplitViewColumn.sidebar
@@ -35,7 +34,6 @@ struct WorkflowConfigView: View {
                 regularWorkflowSplitView
             }
         }
-        .tint(Design.primaryColor)
         .sheet(item: $presentation) { item in
             presentationView(for: item)
         }
@@ -135,10 +133,7 @@ struct WorkflowConfigView: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 EditButton()
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("完成") { dismiss() }
-                    .fontWeight(.semibold)
+                    .tint(.primary)
             }
         }
     }
@@ -209,12 +204,7 @@ struct WorkflowConfigView: View {
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 EditButton()
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                if horizontalSizeClass == .compact {
-                    Button("完成") { dismiss() }
-                        .fontWeight(.semibold)
-                }
+                    .tint(.primary)
             }
         }
     }
@@ -238,11 +228,8 @@ struct WorkflowConfigView: View {
             ToolbarItem(placement: .topBarLeading) {
                 if workflow.kind == .manual {
                     EditButton()
+                        .tint(.primary)
                 }
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("完成") { dismiss() }
-                    .fontWeight(.semibold)
             }
         }
     }
@@ -758,6 +745,7 @@ struct AddNodeSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("取消") { dismiss() }
+                        .tint(.primary)
                 }
             }
         }
@@ -805,10 +793,12 @@ struct EditNodeSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("取消") { dismiss() }
+                        .tint(.primary)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("保存") { saveChanges() }
                         .fontWeight(.semibold)
+                        .tint(.primary)
                 }
             }
             .onAppear {
@@ -973,6 +963,7 @@ struct IconPickerView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("完成") { dismiss() }
                         .fontWeight(.semibold)
+                        .tint(.primary)
                 }
             }
         }
