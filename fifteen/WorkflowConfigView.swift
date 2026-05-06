@@ -319,7 +319,14 @@ struct WorkflowConfigView: View {
             Button {
                 presentation = .addNode
             } label: {
-                Label("添加节点", systemImage: "plus.circle.fill")
+                Label {
+                    Text("添加节点")
+                        .foregroundStyle(.primary)
+                } icon: {
+                    Image(systemName: "plus.circle.fill")
+                        .symbolRenderingMode(.monochrome)
+                        .foregroundStyle(WorkflowConfigStyle.controlTint)
+                }
             }
             .tint(WorkflowConfigStyle.controlTint)
         }
