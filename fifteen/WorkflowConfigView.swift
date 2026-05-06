@@ -34,6 +34,12 @@ private struct WorkflowEditButton: View {
     }
 }
 
+private enum WorkflowConfigStyle {
+    static let controlTint = Color(.label)
+    static let selectedForeground = Color(.systemBackground)
+    static let nodeBadgeFill = Color(.label).opacity(0.10)
+}
+
 struct WorkflowConfigView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var workflowManager = WorkflowManager.shared
@@ -241,7 +247,7 @@ struct WorkflowConfigView: View {
                 } label: {
                     Image(systemName: workflow.icon)
                         .font(.system(size: 28, weight: .medium))
-                        .foregroundStyle(Design.primaryColor)
+                        .foregroundStyle(WorkflowConfigStyle.controlTint)
                         .frame(width: 58, height: 58)
                         .background(Circle().fill(Color(.tertiarySystemFill)))
                 }
@@ -269,6 +275,7 @@ struct WorkflowConfigView: View {
                     Label(workflow.isOpen ? "从主页隐藏" : "显示到主页", systemImage: workflow.isOpen ? "eye.slash" : "eye")
                 }
                 .buttonStyle(.bordered)
+                .tint(WorkflowConfigStyle.controlTint)
                 .disabled(!workflowManager.canCloseWorkflow(workflow.id))
 
                 Menu {
@@ -277,6 +284,7 @@ struct WorkflowConfigView: View {
                     Label("更多", systemImage: "ellipsis.circle")
                 }
                 .buttonStyle(.bordered)
+                .tint(WorkflowConfigStyle.controlTint)
             }
             .labelStyle(.titleAndIcon)
         }
@@ -313,6 +321,7 @@ struct WorkflowConfigView: View {
             } label: {
                 Label("添加节点", systemImage: "plus.circle.fill")
             }
+            .tint(WorkflowConfigStyle.controlTint)
         }
     }
 
@@ -323,7 +332,7 @@ struct WorkflowConfigView: View {
 
         Section {
             Toggle("开启同步", isOn: autoPasteActiveBinding(for: workflow.id))
-                .tint(Design.primaryColor)
+                .tint(WorkflowConfigStyle.controlTint)
 
             TextField("AutoPaste 主机地址", text: autoPasteHostBinding(for: workflow.id))
                 .textInputAutocapitalization(.never)
@@ -341,7 +350,7 @@ struct WorkflowConfigView: View {
         Section {
             HStack(spacing: 10) {
                 Image(systemName: needsHost ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                    .foregroundStyle(needsHost ? .orange : Design.primaryColor)
+                    .foregroundStyle(needsHost ? .orange : WorkflowConfigStyle.controlTint)
                     .frame(width: 24)
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -591,7 +600,7 @@ private struct WorkflowSidebarRow: View {
 
     private var iconColor: Color {
         if workflow.kind == .autoPasteSync && workflow.isActive {
-            return Design.primaryColor
+            return WorkflowConfigStyle.controlTint
         }
         return .primary
     }
@@ -621,7 +630,7 @@ private struct EmptyWorkflowNodesView: View {
                 Label("添加节点", systemImage: "plus.circle.fill")
             }
             .buttonStyle(.borderedProminent)
-            .tint(Design.primaryColor)
+            .tint(WorkflowConfigStyle.controlTint)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
@@ -639,11 +648,11 @@ struct NodeRowView: View {
         HStack(spacing: 12) {
             Text("\(position)")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(node.isEnabled ? Design.primaryColor : .secondary)
+                .foregroundStyle(node.isEnabled ? WorkflowConfigStyle.controlTint : .secondary)
                 .frame(width: 28, height: 28)
                 .background(
                     Circle()
-                        .fill(node.isEnabled ? Design.primaryColor.opacity(0.14) : Color(.tertiarySystemFill))
+                        .fill(node.isEnabled ? WorkflowConfigStyle.nodeBadgeFill : Color(.tertiarySystemFill))
                 )
 
             VStack(alignment: .leading, spacing: 3) {
@@ -677,7 +686,7 @@ struct NodeRowView: View {
                 }
             ))
             .labelsHidden()
-            .tint(Design.primaryColor)
+            .tint(WorkflowConfigStyle.controlTint)
         }
         .contentShape(Rectangle())
         .onTapGesture { onEdit() }
@@ -729,7 +738,7 @@ struct AddNodeSheet: View {
                 }
             }
             .listStyle(.insetGrouped)
-            .tint(Design.primaryColor)
+            .tint(WorkflowConfigStyle.controlTint)
             .navigationTitle("添加节点")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -932,10 +941,10 @@ struct IconPickerView: View {
                                         Image(systemName: symbol)
                                             .font(.system(size: 22))
                                             .frame(width: 48, height: 48)
-                                            .foregroundStyle(isSelected ? .white : .primary)
+                                            .foregroundStyle(isSelected ? WorkflowConfigStyle.selectedForeground : .primary)
                                             .background(
                                                 RoundedRectangle(cornerRadius: 10)
-                                                    .fill(isSelected ? Design.primaryColor : Color(.tertiarySystemFill))
+                                                    .fill(isSelected ? WorkflowConfigStyle.controlTint : Color(.tertiarySystemFill))
                                             )
                                     }
                                     .buttonStyle(.plain)
