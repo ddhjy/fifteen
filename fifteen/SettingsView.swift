@@ -27,7 +27,6 @@ class SettingsManager {
 }
 
 struct SettingsView: View {
-    @Environment(\.dismiss) private var dismiss
     @State private var settingsManager = SettingsManager.shared
     
     
@@ -47,14 +46,6 @@ struct SettingsView: View {
             }
             .navigationTitle("设置")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") {
-                        dismiss()
-                    }
-                    .fontWeight(.semibold)
-                }
-            }
         }
     }
 }
