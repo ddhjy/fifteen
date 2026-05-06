@@ -131,7 +131,7 @@ struct WorkflowConfigView: View {
         .navigationTitle("Workflow")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
+            ToolbarItem(placement: .topBarTrailing) {
                 EditButton()
                     .tint(.primary)
             }
@@ -202,7 +202,7 @@ struct WorkflowConfigView: View {
         .navigationTitle("Workflow")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
+            ToolbarItem(placement: .topBarTrailing) {
                 EditButton()
                     .tint(.primary)
             }
@@ -225,7 +225,7 @@ struct WorkflowConfigView: View {
         .navigationTitle(displayName(for: workflow))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
+            ToolbarItem(placement: .topBarTrailing) {
                 if workflow.kind == .manual {
                     EditButton()
                         .tint(.primary)
