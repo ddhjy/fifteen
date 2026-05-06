@@ -88,28 +88,20 @@ struct WorkflowConfigView: View {
             Section {
                 ForEach(workflowManager.openWorkflows) { workflow in
                     NavigationLink(value: workflow.id) {
-                        WorkflowSidebarRow(
-                            workflow: workflow,
-                            summary: workflowSummary(for: workflow)
-                        )
+                        WorkflowSidebarRow(workflow: workflow)
                     }
                     .contextMenu { workflowContextMenu(for: workflow) }
                 }
                 .onMove { workflowManager.moveWorkflows(inOpenState: true, from: $0, to: $1) }
             } header: {
                 Text("主页显示")
-            } footer: {
-                Text("这些 Workflow 会出现在主页底部工具栏。")
             }
 
             if !workflowManager.closedWorkflows.isEmpty {
                 Section {
                     ForEach(workflowManager.closedWorkflows) { workflow in
                         NavigationLink(value: workflow.id) {
-                            WorkflowSidebarRow(
-                                workflow: workflow,
-                                summary: workflowSummary(for: workflow)
-                            )
+                            WorkflowSidebarRow(workflow: workflow)
                         }
                         .contextMenu { workflowContextMenu(for: workflow) }
                     }
@@ -157,10 +149,7 @@ struct WorkflowConfigView: View {
             Section {
                 ForEach(workflowManager.openWorkflows) { workflow in
                     NavigationLink(value: workflow.id) {
-                        WorkflowSidebarRow(
-                            workflow: workflow,
-                            summary: workflowSummary(for: workflow)
-                        )
+                        WorkflowSidebarRow(workflow: workflow)
                     }
                     .tag(workflow.id)
                     .contextMenu { workflowContextMenu(for: workflow) }
@@ -168,18 +157,13 @@ struct WorkflowConfigView: View {
                 .onMove { workflowManager.moveWorkflows(inOpenState: true, from: $0, to: $1) }
             } header: {
                 Text("主页显示")
-            } footer: {
-                Text("这些 Workflow 会出现在主页底部工具栏。")
             }
 
             if !workflowManager.closedWorkflows.isEmpty {
                 Section {
                     ForEach(workflowManager.closedWorkflows) { workflow in
                         NavigationLink(value: workflow.id) {
-                            WorkflowSidebarRow(
-                                workflow: workflow,
-                                summary: workflowSummary(for: workflow)
-                            )
+                            WorkflowSidebarRow(workflow: workflow)
                         }
                         .tag(workflow.id)
                         .contextMenu { workflowContextMenu(for: workflow) }
@@ -571,7 +555,6 @@ struct WorkflowConfigView: View {
 
 private struct WorkflowSidebarRow: View {
     let workflow: Workflow
-    let summary: String
 
     var body: some View {
         HStack(spacing: 10) {
@@ -580,16 +563,9 @@ private struct WorkflowSidebarRow: View {
                 .foregroundStyle(iconColor)
                 .frame(width: 24)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(displayName)
-                    .font(.callout)
-                    .lineLimit(1)
-
-                Text(summary)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
+            Text(displayName)
+                .font(.callout)
+                .lineLimit(1)
         }
         .padding(.vertical, 2)
     }
