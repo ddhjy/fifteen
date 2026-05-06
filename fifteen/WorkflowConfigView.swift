@@ -17,6 +17,23 @@ private enum WorkflowConfigPresentation: Identifiable {
     }
 }
 
+private struct WorkflowEditButton: View {
+    @Environment(\.editMode) private var editMode
+
+    private var isEditing: Bool {
+        editMode?.wrappedValue.isEditing == true
+    }
+
+    var body: some View {
+        Button(isEditing ? "完成" : "编辑") {
+            withAnimation {
+                editMode?.wrappedValue = isEditing ? .inactive : .active
+            }
+        }
+        .tint(.primary)
+    }
+}
+
 struct WorkflowConfigView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var workflowManager = WorkflowManager.shared
@@ -124,8 +141,7 @@ struct WorkflowConfigView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                EditButton()
-                    .tint(.primary)
+                WorkflowEditButton()
             }
         }
     }
@@ -187,8 +203,7 @@ struct WorkflowConfigView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                EditButton()
-                    .tint(.primary)
+                WorkflowEditButton()
             }
         }
     }
@@ -211,8 +226,7 @@ struct WorkflowConfigView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if workflow.kind == .manual {
-                    EditButton()
-                        .tint(.primary)
+                    WorkflowEditButton()
                 }
             }
         }
