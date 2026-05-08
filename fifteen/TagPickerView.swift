@@ -361,51 +361,48 @@ struct TagRowView: View {
                 Circle()
                     .stroke(circleColor, lineWidth: 2)
                     .frame(width: 24, height: 24)
-                
+
                 if isSelected || isPreviousSelected {
                     Circle()
                         .fill(circleColor)
                         .frame(width: 24, height: 24)
-                    
+
                     Image(systemName: "checkmark")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(.white)
                 }
             }
-            
-            VStack(alignment: .leading, spacing: 0) {
-                Text(tagName)
-                    .font(.callout)
-                    .foregroundStyle(Color(.label))
+            .frame(width: 24, height: 24)
 
-                if !markers.isEmpty {
-                    HStack(spacing: 6) {
-                        ForEach(markers) { marker in
-                            TagRowMarkerBadge(marker: marker)
-                        }
+            Text(tagName)
+                .font(.callout)
+                .foregroundStyle(Color(.label))
+                .lineLimit(1)
+                .truncationMode(.tail)
+
+            Spacer(minLength: 8)
+
+            if !markers.isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(markers) { marker in
+                        TagRowMarkerBadge(marker: marker)
                     }
-                    .padding(.top, 6)
                 }
-            }
-            
-            Spacer()
-            
-            if let onEdit = onEdit {
-                Button(action: onEdit) {
-                    Image(systemName: "pencil")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Color(.secondaryLabel))
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+                .fixedSize(horizontal: true, vertical: false)
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.vertical, 10)
         .contentShape(Rectangle())
         .onTapGesture {
             onToggle()
+        }
+        .contextMenu {
+            if let onEdit = onEdit {
+                Button(action: onEdit) {
+                    Label("编辑", systemImage: "pencil")
+                }
+            }
         }
         .accessibilityAddTraits(.isButton)
     }
