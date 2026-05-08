@@ -344,6 +344,8 @@ struct TagRowView: View {
     var markers: [TagRowMarker] = []
     let onToggle: () -> Void
     var onEdit: (() -> Void)? = nil
+    private let selectionCircleSize: CGFloat = 20
+    private let selectionIconSlotSize: CGFloat = 24
     
     private var circleColor: Color {
         if isSelected {
@@ -359,20 +361,20 @@ struct TagRowView: View {
         HStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .stroke(circleColor, lineWidth: 2)
-                    .frame(width: 24, height: 24)
+                    .stroke(circleColor, lineWidth: 1.8)
+                    .frame(width: selectionCircleSize, height: selectionCircleSize)
 
                 if isSelected || isPreviousSelected {
                     Circle()
                         .fill(circleColor)
-                        .frame(width: 24, height: 24)
+                        .frame(width: selectionCircleSize, height: selectionCircleSize)
 
                     Image(systemName: "checkmark")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(.white)
                 }
             }
-            .frame(width: 24, height: 24)
+            .frame(width: selectionIconSlotSize, height: selectionIconSlotSize)
 
             Text(tagName)
                 .font(.callout)
