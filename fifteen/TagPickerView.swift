@@ -113,8 +113,13 @@ struct TagPickerView: View {
         }
 
         let availableTags = tagManager.tags
+        let historyExamples = historyManager.tagRecommendationExamples(excluding: itemId)
         recommendationTask = Task {
-            let recommended = (try? await AIService.shared.recommendTags(for: text, from: availableTags)) ?? []
+            let recommended = (try? await AIService.shared.recommendTags(
+                for: text,
+                from: availableTags,
+                historyExamples: historyExamples
+            )) ?? []
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 self.recommendedTags = recommended

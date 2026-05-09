@@ -322,6 +322,27 @@ class HistoryManager {
             tags.allSatisfy { item.tags.contains($0) }
         }
     }
+
+    func tagRecommendationExamples(excluding itemId: UUID, limit: Int = 200) -> [TagRecommendationExample] {
+        let boundedLimit = max(0, limit)
+        guard boundedLimit > 0 else { return [] }
+
+        return savedItems
+            .filter { item in
+                item.id != itemId
+                    && !item.tags.isEmpty
+                    && !item.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
+            .sorted { $0.createdAt > $1.createdAt }
+            .prefix(boundedLimit)
+            .map { item in
+                TagRecommendationExample(
+                    text: item.text,
+                    tags: item.tags,
+                    createdAt: item.createdAt
+                )
+            }
+    }
     
     private func saveDraft() {
         guard let draft = items.first(where: { $0.isDraft }) else { return }

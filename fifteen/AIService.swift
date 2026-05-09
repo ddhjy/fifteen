@@ -1,5 +1,11 @@
 import Foundation
 
+nonisolated struct TagRecommendationExample: Sendable {
+    let text: String
+    let tags: [String]
+    let createdAt: Date
+}
+
 @MainActor
 @Observable
 class AIService {
@@ -70,7 +76,12 @@ class AIService {
         return content
     }
 
-    func recommendTags(for text: String, from availableTags: [String], maxCount: Int = 8) async throws -> [String] {
+    func recommendTags(
+        for text: String,
+        from availableTags: [String],
+        historyExamples: [TagRecommendationExample] = [],
+        maxCount: Int = 8
+    ) async throws -> [String] {
         let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty else { return [] }
 
@@ -82,6 +93,11 @@ class AIService {
 
         let uniqueTags = Array(Set(cleanedTags)).sorted()
         let limitedCount = max(1, min(maxCount, uniqueTags.count))
+        let historySection = buildHistoryExamplesSection(
+            for: trimmedText,
+            candidates: uniqueTags,
+            historyExamples: historyExamples
+        )
 
         let prompt = """
         你是标签推荐器。请根据正文内容，从候选标签中选出最相关的标签并按相关性从高到低排序。
@@ -89,7 +105,10 @@ class AIService {
         要求：
         1. 只能从候选标签中选择，不能新增、改写或合并标签。
         2. 最多返回 \(limitedCount) 个标签。
-        3. 只返回 JSON 数组，例如 ["标签A","标签B"]，不要输出其它文字。
+        3. 历史打标样例代表用户过往的个人标签语义，只能辅助判断；如果历史样例与当前正文冲突，以当前正文为准。
+        4. 只返回 JSON 数组，例如 ["标签A","标签B"]，不要输出其它文字。
+
+        \(historySection)
 
         候选标签：
         \(uniqueTags.joined(separator: " | "))
@@ -145,6 +164,182 @@ class AIService {
         }
 
         return results
+    }
+
+    private struct SelectedTagRecommendationExample {
+        let excerpt: String
+        let tags: [String]
+    }
+
+    private func buildHistoryExamplesSection(
+        for text: String,
+        candidates: [String],
+        historyExamples: [TagRecommendationExample]
+    ) -> String {
+        let selectedExamples = selectRelevantHistoryExamples(
+            for: text,
+            candidates: candidates,
+            historyExamples: historyExamples
+        )
+        guard !selectedExamples.isEmpty else { return "" }
+
+        let examplesText = selectedExamples.enumerated().map { index, example in
+            """
+            样例 \(index + 1)
+            标签：\(example.tags.joined(separator: "、"))
+            文本摘录：\(example.excerpt)
+            """
+        }.joined(separator: "\n\n")
+
+        return """
+        历史打标样例：
+        \(examplesText)
+        """
+    }
+
+    private func selectRelevantHistoryExamples(
+        for text: String,
+        candidates: [String],
+        historyExamples: [TagRecommendationExample],
+        maxExamples: Int = 12,
+        maxExamplesPerTag: Int = 2,
+        maxExcerptLength: Int = 160
+    ) -> [SelectedTagRecommendationExample] {
+        let candidateSet = Set(candidates)
+        let currentTokens = normalizedTokens(from: text)
+        guard !currentTokens.isEmpty else { return [] }
+
+        let now = Date()
+        let scoredExamples = historyExamples.compactMap { example -> (example: TagRecommendationExample, tags: [String], score: Double)? in
+            let tags = cleanedTags(from: example.tags, candidateSet: candidateSet)
+            guard !tags.isEmpty else { return nil }
+
+            let exampleTokens = normalizedTokens(from: example.text)
+            guard !exampleTokens.isEmpty else { return nil }
+
+            let overlapCount = currentTokens.intersection(exampleTokens).count
+            guard overlapCount > 0 else { return nil }
+
+            let unionCount = currentTokens.union(exampleTokens).count
+            let similarity = Double(overlapCount) / Double(max(unionCount, 1))
+            let ageInDays = max(0, now.timeIntervalSince(example.createdAt)) / 86_400
+            let recencyScore = 1 / (1 + ageInDays / 30)
+            let score = similarity * 0.8 + recencyScore * 0.2
+
+            return (example, tags, score)
+        }
+        .sorted {
+            if $0.score != $1.score {
+                return $0.score > $1.score
+            }
+            return $0.example.createdAt > $1.example.createdAt
+        }
+
+        var selectedExamples: [SelectedTagRecommendationExample] = []
+        var exampleCountByTag: [String: Int] = [:]
+
+        for scoredExample in scoredExamples {
+            let availableTags = scoredExample.tags.filter {
+                exampleCountByTag[$0, default: 0] < maxExamplesPerTag
+            }
+            guard !availableTags.isEmpty else { continue }
+
+            selectedExamples.append(
+                SelectedTagRecommendationExample(
+                    excerpt: excerpt(from: scoredExample.example.text, maxLength: maxExcerptLength),
+                    tags: availableTags
+                )
+            )
+
+            for tag in availableTags {
+                exampleCountByTag[tag, default: 0] += 1
+            }
+
+            if selectedExamples.count >= maxExamples {
+                break
+            }
+        }
+
+        return selectedExamples
+    }
+
+    private func cleanedTags(from tags: [String], candidateSet: Set<String>) -> [String] {
+        var seen = Set<String>()
+        return tags.compactMap { tag in
+            let trimmedTag = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard candidateSet.contains(trimmedTag), !seen.contains(trimmedTag) else { return nil }
+            seen.insert(trimmedTag)
+            return trimmedTag
+        }
+    }
+
+    private func normalizedTokens(from text: String) -> Set<String> {
+        var tokens = Set<String>()
+        var wordRun = ""
+        var cjkRun: [String] = []
+
+        func flushWordRun() {
+            let token = wordRun.trimmingCharacters(in: .whitespacesAndNewlines)
+            if token.count >= 2 {
+                tokens.insert(token)
+            }
+            wordRun = ""
+        }
+
+        func flushCJKRun() {
+            if cjkRun.count == 1 {
+                tokens.insert(cjkRun[0])
+            } else if cjkRun.count > 1 {
+                for index in 0..<(cjkRun.count - 1) {
+                    tokens.insert(cjkRun[index] + cjkRun[index + 1])
+                }
+            }
+            cjkRun = []
+        }
+
+        for scalar in text.lowercased().unicodeScalars {
+            if isCJK(scalar) {
+                flushWordRun()
+                cjkRun.append(String(scalar))
+            } else if CharacterSet.alphanumerics.contains(scalar) {
+                flushCJKRun()
+                wordRun.unicodeScalars.append(scalar)
+            } else {
+                flushWordRun()
+                flushCJKRun()
+            }
+        }
+
+        flushWordRun()
+        flushCJKRun()
+
+        return tokens
+    }
+
+    private func isCJK(_ scalar: UnicodeScalar) -> Bool {
+        switch scalar.value {
+        case 0x3400...0x4DBF,
+             0x4E00...0x9FFF,
+             0xF900...0xFAFF,
+             0x20000...0x2A6DF,
+             0x2A700...0x2B73F,
+             0x2B740...0x2B81F,
+             0x2B820...0x2CEAF:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func excerpt(from text: String, maxLength: Int) -> String {
+        let condensedText = text
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard condensedText.count > maxLength else { return condensedText }
+        return String(condensedText.prefix(maxLength)) + "..."
     }
 
     private func endpointURL(path: String) throws -> URL {
